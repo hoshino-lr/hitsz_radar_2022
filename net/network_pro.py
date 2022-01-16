@@ -10,7 +10,7 @@ import cv2
 import os
 from multiprocessing import Process
 from resources.config import net1_onnx,net2_onnx,net1_engine,\
-        net2_engine,net1_cls,net2_cls_names,net2_col_names,absolute_path,\
+        net2_engine,net1_cls,net2_cls_names,net2_col_names,\
             enemy_color
 from net.tensorrtx import YoLov5TRT
 
@@ -30,8 +30,8 @@ class Predictor(object):
     net1_nmsThreshold = 0.4
     net1_inpHeight = 640
     net1_inpWidth = 640
-    net1_onnx_file = os.path.join(absolute_path,net1_onnx)
-    net1_trt_file = os.path.join(absolute_path,net1_engine)
+    net1_onnx_file = net1_onnx
+    net1_trt_file = net1_engine
     # 不检测base
 
 
@@ -46,8 +46,8 @@ class Predictor(object):
     net2_inpHeight = 640
     net2_inpWidth = 640
     net2_box_num = 25200
-    net2_onnx_file = os.path.join(absolute_path,net2_onnx)
-    net2_trt_file = os.path.join(absolute_path,net2_engine)
+    net2_onnx_file = net2_onnx
+    net2_trt_file = net2_engine
 
     net2_grid = []
     net2_num_anchors = [3, 3, 3]

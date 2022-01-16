@@ -1,7 +1,7 @@
 """
 预警类
-created by 黄继凡 2020/1
-最新修改 by 黄继凡 2021/1/14
+created by 黄继凡 2021/1
+最新修改 by 黄继凡 2022/1/14
 """
 import cv2
 import numpy as np

@@ -14,20 +14,21 @@ from PyQt5 import QtWidgets
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import QTimer
 
-from resources.config import INIT_FRAME_PATH,\
-    MAP_PATH,enemy_color,map_size,absolute_path
+from resources.config import INIT_FRAME_PATH, \
+    MAP_PATH, enemy_color, map_size
 
 from mapping.ui import Ui_MainWindow
+
 
 class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui_MainWindow
     def __init__(self):
         super(Mywindow, self).__init__()
+        self.start = time.time()
+        self.end =  time.time()
         self.setupUi(self)
         self.view_change = 0  # 视角切换控制符
-        INIT_FRAME_PATH1 = os.path.join(absolute_path, INIT_FRAME_PATH)
-        MAP_PATH1 = os.path.join(absolute_path, MAP_PATH)
-        frame = cv2.imread(INIT_FRAME_PATH1)
-        frame_m = cv2.imread(MAP_PATH1)
+        frame = cv2.imread(INIT_FRAME_PATH)
+        frame_m = cv2.imread(MAP_PATH)
         self.close = False
         # 小地图翻转
 
@@ -54,7 +55,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.ChangeView.setText("视角")
         # self.btn3.setText("位姿估计")
         self.btn4.setText("终止程序")
-
 
     def btn1_on_clicked(self):
         '''
@@ -91,8 +91,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if not position in ["main_demo", "map", "textBrowser"]:
             print("[ERROR] The position isn't a member of this UIwindow")
             return False
-
-        # get the size of the corresponding window
         if position == "main_demo":
             width = self.main_demo.width()
             height = self.main_demo.height()
@@ -100,8 +98,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             width = self.map.width()
             height = self.map.height()
         elif position == "textBrowser":
-            width = self.textBrowser.width()
-            height = self.textBrowser.height()
+            width = self.message_box.width()
+            height = self.message_box.height()
 
         if frame.shape[2] == 3:
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -127,52 +125,51 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.textBrowser.setScaledContents(True)
         return True
 
-    def set_text(self, position: str, message=""):
+    def set_text(self, _type: str, message):
         """
         to set text in the QtLabel
 
-        :param position: must be one of the followings: "feedback", "textBrowser", "state"
-        :param message: For feedback, a string you want to show in the next line;
+        :param message: must be one of the followings: "feedback", "textBrowser", "state"
+        :param _type: For feedback, a string you want to show in the next line;
         For the others, a string to show on that position , which will replace the origin one.
         :return:
         a flag to indicate whether the showing process have succeeded or not
         """
-        if position not in ["feedback", "textBrowser", "state"]:
-            print("[ERROR] The position isn't a member of this UIwindow")
-            return False
-        if position == "feedback":
-            if len(self.feedback_textBrowser) >= 12:  # the feedback could contain at most 12 messages lines.
-                self.feedback_textBrowser.pop(0)
+        title = ["[ERROR] ","[INFO] ","[WARNING] "]
+        if len(self.feedback_textBrowser) >= 12:  # the feedback could contain at most 12 messages lines.
+            self.feedback_textBrowser.pop(0)
+        self.end = time.time()
+        if len(self.feedback_textBrowser) > 0 and (self.end - self.start) > 2:
+            self.feedback_textBrowser.pop(0)
+            self.start = time.time()
+        # Using "<br \>" to combine the contents of the message list to a single string message
+        if _type == "ERROR":
+            message = title[0] + message
+        if _type == "INFO":
+            message = title[1] + message
+        if message not in self.feedback_textBrowser and message not in title:
             self.feedback_textBrowser.append(message)
-            # Using "<br \>" to combine the contents of the message list to a single string message
-            message = "<br \>".join(self.feedback_textBrowser)  # css format to replace \n
-            self.feedback.setText(message)
-            return True
-        if position == "state":
-            self.state.setText(message)
-            return True
-        if position == "textBrowser":
-            self.textBrowser.setText(message)
-            return True
-    
+        message = "<br \>".join(self.feedback_textBrowser)  # css format to replace \n
+        self.textBrowser.setText(message)
+        return True
+
 
 if __name__ == "__main__":
     # demo of the window class
     from resources.config import config_init
+
     config_init()
     app = QtWidgets.QApplication(sys.argv)
     myshow = Mywindow()
     timer = QTimer()
     myshow.set_text("textBrowser", '<br \>'.join(['', "<font color='#FF0000'><b>base detect enermy</b></font>",
-                                               "<font color='#FF0000'><b>base detect enermy</b></font>",
-                                               f"哨兵:<font color='#FF0000'><b>{99:d}</b></font>"]))
+                                                  "<font color='#FF0000'><b>base detect enermy</b></font>",
+                                                  f"哨兵:<font color='#FF0000'><b>{99:d}</b></font>"]))
 
     myshow.show()  # 显示
     MAP_PATH1 = os.path.join(absolute_path, MAP_PATH)
     frame_m = cv2.imread(MAP_PATH1)
-    
+
     timer.timeout.connect(show_picture)
     timer.start(0)
     sys.exit(app.exec_())
-
-

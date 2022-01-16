@@ -19,7 +19,7 @@ class Reproject(object):
     '''
     _iou_threshold = 0.8
 
-    def __init__(self, frame, name):
+    def __init__(self, name):
         self._tvec = cam_config[name]['tvec']
         self._rvec = cam_config[name]['rvec']
         self.name = name
@@ -112,7 +112,7 @@ class Reproject(object):
         for i in self._scene_region.keys():
             recor = self._scene_region[i]
             type, shape_type, team, location, height_type = i.split('_')
-            if color2enemy[team] == enemy_color:
+            if color2enemy[team] != enemy_color:
                 continue
             else:
                 for p in recor:
@@ -122,7 +122,7 @@ class Reproject(object):
             for i in result.keys():
                 recor = self._scene_region[i]
                 type, shape_type, team, location, height_type = i.split('_')
-                if color2enemy[team] == enemy_color:
+                if color2enemy[team] != enemy_color:
                     continue
                 else:
                     cv2.polylines(frame, [recor], 1, (0, 255, 0))

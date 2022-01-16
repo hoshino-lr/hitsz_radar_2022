@@ -8,7 +8,7 @@ import numpy as np
 from numpy.lib.arraysetops import isin
 
 import mapping.draw_map as draw_map #引入draw_map模块，使用其中的CompeteMap类
-from resources.config import armor_list, color2enemy, enemy_case,cam_config
+from resources.config import armor_list, color2enemy, enemy_case,cam_config,real_size
 
 # 此函数来自上交源码的common.py文件，可考虑删除，通过模块引入使用该函数
 def is_inside(box: np.ndarray, point: np.ndarray):
@@ -55,12 +55,12 @@ class Alarm(draw_map.CompeteMap):
     _ground_thre = 100  # 地面阈值，我们最后调到了100就是没用这个阈值，看情况调
     _using_l1 = True  # 不用均值，若两个都有预测只用右相机预测值
 
-    def __init__(self, region: dict, api, touch_api, enemy, real_size, two_Camera=True, debug=False):
+    def __init__(self, region: dict, api, touch_api, enemy, two_Camera=False, debug=False):
         '''
 
         :param region:预警区域
         :param api:主程序显示api，传入画图程序进行调用（不跨线程使用,特别是Qt）
-        :param touch_api:车间通信api
+        :param touch_api:log api
         :param enemy:敌方编号
         :param real_size:场地实际大小
         :param two_camera:是否使用两个相机
@@ -232,7 +232,7 @@ class Alarm(draw_map.CompeteMap):
             # 被预测id,debug输出
             for i in range(10):
                 if do_prediction[i]:
-                    print("{0} lp yes".format(armor_list[i]))
+                    self._touch_api.api_info("{0} lp yes".format(armor_list[i]))
 
         now[do_prediction] = v[do_prediction] + pre[1][do_prediction]
 
@@ -363,19 +363,19 @@ class Alarm(draw_map.CompeteMap):
             if self._debug:
                 # 位置debug输出
                 for armor, loc in judge_loc.items():
-                    print("{0} in ({1:.3f},{2:.3f},{3:.3f})".format(armor_list[int(armor) - 1], *loc))
+                    self._touch_api.api_info("{0} in ({1:.3f},{2:.3f},{3:.3f})".format(armor_list[int(armor) - 1], *loc))
             for i in range(1, 11):
                 location[str(i)] = self._location[str(i)].copy()
             
             # 执行裁判系统发送
             # judge_loc为未预测的位置，作为logging保存，location为预测过的位置，作为小地图发送
-            self._touch_api({'task':1, 'data':[judge_loc, location]})
+            self._touch_api.api_info({'task':1, 'data':[judge_loc, location]})
 
             # 返回车辆位置字典
             return self._location
             
         else:
-            print('[ERROR] This update function only supports two_camera case, using update instead.')
+            self._touch_api.api_error('[ERROR] This update function only supports two_camera case, using update instead.')
 
     def update(self, t_location):
         '''
@@ -439,12 +439,12 @@ class Alarm(draw_map.CompeteMap):
                 pass
             for i in range(1, 11):
                 location[str(i)] = self._location[str(i)].copy()
-            # self._touch_api({'task': 1, 'data': [judge_loc, location]})
+            print(str({'task': 1, 'data': [judge_loc, location]}))
             # 返回车辆位置字典
             return self._location
 
         else:
-            print(
+            self._touch_api.error(
                 '[ERROR] This update function only supports single_camera case, using two_camera_merge_update instead.')
 
 

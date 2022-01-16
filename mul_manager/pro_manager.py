@@ -2,8 +2,8 @@
 多线程管理类
 mul_manager.py
 用于多进程间的信息发布与接收
-created by 李龙 in 2021/1
-最终修改 by 李龙 in 2021/1/15
+created by 李龙 in 2022/1
+最终修改 by 李龙 in 2022/1/15
 """
 from os import wait
 from multiprocessing import Queue, Process,Event

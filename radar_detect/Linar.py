@@ -20,7 +20,7 @@ from datetime import datetime
 import pickle as pkl
 from sensor_msgs import point_cloud2
 from sensor_msgs.msg import PointCloud2
-from resources.config import PC_STORE_DIR, LIDAR_TOPIC_NAME
+from resources.config import PC_STORE_DIR, LIDAR_TOPIC_NAME,BAG_FIRE
 
 
 class DepthQueue(object):
@@ -129,7 +129,6 @@ class Radar(object):
     __init_flag = False  # 雷达启动标志
     __working_flag = False  # 雷达接收线程启动标志
     __threading = None  # 雷达接收子线程
-
     __lock = threading.Lock()  # 线程锁
     __queue = []  # 一个列表，存放雷达类各个对象的Depth Queue
 
@@ -139,26 +138,26 @@ class Radar(object):
 
     __record_max_times = 100  # 最大存点云数量
 
-    def __init__(self, K_0, C_0, E_0, queue_size=200, imgsz=(3088, 2064)):
+    def __init__(self, name,text_api, queue_size=200, imgsz=(1024, 1024)):
         '''
         雷达处理类，对每个相机都要创建一个对象
 
-        :param K_0:相机内参
-        :param C_0:畸变系数
-        :param E_0:雷达到相机外参
+        :param name:相机名字
         :param queue_size:队列最大长度
         :param imgsz:相机图像大小
         '''
+        from resources.config import cam_config
         if not Radar.__init_flag:
             # 当雷达还未有一个对象时，初始化接收节点
             Radar.__laser_listener_begin(LIDAR_TOPIC_NAME)
             Radar.__init_flag = True
             Radar.__threading = threading.Thread(target=Radar.__main_loop, daemon=True)
         self._no = len(Radar.__queue)  # 该对象对应于整个雷达对象列表的序号
-        self._K_0 = K_0
-        self._C_0 = C_0
-        self._E_0 = E_0
-        Radar.__queue.append(DepthQueue(queue_size, imgsz, K_0, C_0, E_0))
+        self._K_0 = cam_config[name]['K_0']
+        self._C_0 = cam_config[name]['C_0']
+        self._E_0 = cam_config[name]['E_0']
+        self.api = text_api
+        Radar.__queue.append(DepthQueue(queue_size, imgsz, self._K_0, self._C_0, self._E_0))
 
     @staticmethod
     def start():
@@ -268,6 +267,17 @@ class Radar(object):
             return True
         else:
             return False
+
+    def preload(self):
+        lidar_bag = rosbag.Bag(BAG_FIRE, "r")
+        topic = '/livox/lidar'
+        bag_data = lidar_bag.read_messages(topic)
+        for topic, msg, t in bag_data:
+            pc = np.float32(point_cloud2.read_points_list(msg, field_names=("x", "y", "z"), skip_nans=True)).reshape(
+                -1, 3)
+            dist = np.linalg.norm(pc, axis=1)
+            pc = pc[dist > 0.4]  # 雷达近距离滤除
+            self.__queue[self._no].push_back(pc)
 
     def __del__(self):
         Radar.stop()

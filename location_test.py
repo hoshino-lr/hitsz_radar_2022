@@ -4,7 +4,7 @@
 
 from camera.cam import Camera
 from net.network_pro import Predictor
-from resources.config import DEBUG, config_init, logger, USEABLE
+from resources.config import DEBUG, USEABLE
 from mapping.mainEntry import Mywindow
 from radar_detect.location_alarm import Alarm
 
@@ -62,16 +62,12 @@ if __name__=="__main__":
     from sensor_msgs.msg import PointCloud2
     import rosbag
     import cv2
-    logger.setLevel(logging.DEBUG)
     # ui
     app = QtWidgets.QApplication(sys.argv)
     myshow = Mywindow()
     timer_main = QTimer()
     timer_serial = QTimer()
     myshow.show()
-    logger.info("初始化程序开始运行")
-    config_init()
-
 
     alarm = Alarm(test_region,lambda x: myshow.set_image(x, "map"),[],enemy_color,real_size,False,True)
     bag_file = '/home/hoshino/CLionProjects/camera_lidar_calibration/data/game/beijing.bag'
