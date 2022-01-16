@@ -1,100 +1,37 @@
+''' 
+网络类（适合多进程） 使用tensorrtx 接口
+created by 李龙 in 2020/11
+最终修改版本 李龙 2021/1/16
 '''
-network class
-适合多线程调用，使用pytrt 接口
-'''
-
-import pytrt
+import multiprocessing
 import numpy as np
 import time
-from pathlib import Path
 import cv2
-import sys
-import random
-from threading import Thread
-from resources.config import net1_onnx,net2_onnx,net1_engine,net2_engine  \
-    ,net1_cls,net2_cls_names,net2_col_names
-
-
-def scale_coords(img1_shape, coords, img0_shape):
-    # Rescale coords (xyxy) from img1_shape to img0_shape
-    gain1 = img1_shape[0] / img0_shape[0]  # gain  = old / new
-    gain2 = img1_shape[1] / img0_shape[1]
-    coords[:, [0, 2]] /= gain2
-    coords[:, [1, 3]] /= gain1
-    coords[:, 0] = np.clip(coords[:, 0], 0, img0_shape[1])  # x1
-    coords[:, 1] = np.clip(coords[:, 1], 0, img0_shape[0])  # y1
-    coords[:, 2] = np.clip(coords[:, 2], 0, img0_shape[1])  # x2
-    coords[:, 3] = np.clip(coords[:, 3], 0, img0_shape[0])  # y2
-    return coords
-
-
-def jigsaw(det_points, img_src):
-    # 拼图 用于第二层检测的前处理
-    step = 213
-    jig_picture = np.zeros((640, 640, 3), dtype=np.uint8)
-    count = 0
-    for i in det_points:
-        try:
-            cut_img = img_src[int(i[1]):int(i[3]), int(i[0]):int(i[2])]
-            cut_img = cv2.resize(cut_img, (213, 213))
-            u = count % 3 * 213
-            v = count // 3 * 213
-            jig_picture[v:v + 213, u:u + 213] = cut_img.copy()
-            count += 1
-            if count == 9:
-                break
-        except:
-            print("error!")
-    return jig_picture
-
-
-def net2_output_process(net2_input, det_points, shape):
-    #  对第二层网络输出的处理
-    net2_boxes = [[], [], [], [], [], [], [], [], []]
-    net2_output = np.full((det_points.shape[0], 7), np.nan)
-    if net2_input is None:
-        pass
-    else:
-        for i in net2_input:
-            count = i[0] // 213 + i[1] // 213 * 3
-            i[0] %= 213
-            i[1] %= 213
-            i[2] = i[0] + i[2]
-            i[3] = i[1] + i[3]
-            net2_boxes[count].append(i)
-        for count, i in enumerate(net2_boxes):
-            if not len(i):
-                continue
-            else:
-                i = np.array(i)
-                confidences = i[:, 4]
-                index = np.where(confidences == np.max(confidences))[0][0]
-                scale = (
-                    int(det_points[count, 3] - det_points[count, 1]), int(det_points[count, 2] - det_points[count, 0]))
-                i[:, :4] = scale_coords((213, 213), i[:, :4], scale).round()
-                i = i[index, :]
-                i[0] += det_points[count, 0]
-                i[1] += det_points[count, 1]
-                i[2] += det_points[count, 0]
-                i[3] += det_points[count, 1]
-                net2_output[count, :] = i[:]
-
-    return net2_output
+import os
+from multiprocessing import Process
+from resources.config import net1_onnx,net2_onnx,net1_engine,\
+        net2_engine,net1_cls,net2_cls_names,net2_col_names,absolute_path,\
+            enemy_color
+from net.tensorrtx import YoLov5TRT
 
 
 class Predictor(object):
+    """
+    格式定义： [N,bbox(xyxy),conf,cls,bbox(xyxy),conf,cls,col,N]
+    """
     # 输入图片与输出结果
     img_src = []
     output = []
     name = ""
     img_show = True
+
     # net1参数
     net1_confThreshold = 0.2
     net1_nmsThreshold = 0.4
     net1_inpHeight = 640
     net1_inpWidth = 640
-    net1_onnx_file = net1_onnx
-    net1_trt_file = net1_engine
+    net1_onnx_file = os.path.join(absolute_path,net1_onnx)
+    net1_trt_file = os.path.join(absolute_path,net1_engine)
     # 不检测base
 
 
@@ -105,12 +42,12 @@ class Predictor(object):
 
     # net2参数
     net2_confThreshold = 0.25
-    net2_nmsThreshold = 0.45
+    net2_nmsThreshold = 0.2
     net2_inpHeight = 640
     net2_inpWidth = 640
     net2_box_num = 25200
-    net2_onnx_file = net2_onnx
-    net2_trt_file = net2_engine
+    net2_onnx_file = os.path.join(absolute_path,net2_onnx)
+    net2_trt_file = os.path.join(absolute_path,net2_engine)
 
     net2_grid = []
     net2_num_anchors = [3, 3, 3]
@@ -118,22 +55,19 @@ class Predictor(object):
     net2_strides = [8, 16, 32]
 
 
-
     def __init__(self, _name):
-        # 初始化函数
-
-        # 线程初始化 可不用
-        self.__thread = Thread(target=self.thread_detect)
-        self.name = _name
+        """
+        初始化函数
+        :param _name 
+        """
         # net1初始化
-        self._net1 = pytrt.Trt()
-        self._net1.CreateEngine(self.net1_onnx_file, self.net1_trt_file, 1, 1)
-        self._net1.SetDevice(0)
+        self._net1 = YoLov5TRT(self.net1_trt_file)
         # net2初始化
-        self._net2 = pytrt.Trt()
-        self._net2.CreateEngine(self.net2_onnx_file, self.net2_trt_file, 1, 1)
-        self._net2.SetDevice(0)
+        self._net2 = YoLov5TRT(self.net2_trt_file)
 
+        self.name = _name # 选择的相机是左还是右
+        self.choose_type = 0 #只选择检测cars类，不检测哨兵和基地
+        self.enemy_color = not enemy_color
         for i in self.net1_strides:
             self.net1_grid.append([self.net1_num_anchors[0], int(self.net1_inpHeight / i), int(self.net1_inpWidth / i)])
 
@@ -142,15 +76,18 @@ class Predictor(object):
 
     def pub_sub_init(self, pub, cam):
         # 管道初始化
-        self.__pub = pub
-        self.__sub = cam
-
-    def thread_start(self):
-        # 开启多线程
-        self.__thread.setDaemon(True)
-        self.__thread.start()
+        """
+        :param pub
+        :param cammera
+        """
+        self.pub = pub
+        self.sub = cam
 
     def detect_cars(self, src):
+        """
+        :param src 640x640
+        :param 
+        """
         # 检测函数
         self.img_src = src.copy()
         # 图像预处理
@@ -159,50 +96,51 @@ class Predictor(object):
         img = np.ascontiguousarray(img)
         img = img.astype(np.float32)
         img /= 255.0
-        img = img.flatten()
-        self._net1.CopyFromHostToDevice(img, 0)
-        self._net1.Forward()
-        net1_output = self._net1.CopyFromDeviceToHost(1)
+        net1_output = self._net1.infer(img,1)[0]
         res = self.net1_process(net1_output)
         if res.shape[0] != 0:
             # get Jigsaw
-            res[:, :4] = scale_coords((640, 640), res[:, :4], self.img_src.shape).round()
-            net2_img = jigsaw(res[:, :4], self.img_src.copy())
+            res[:, :4] = self.scale_coords((640, 640), res[:, :4], self.img_src.shape).round()
+            net2_img = self.jigsaw(res[:, :4], self.img_src.copy())
             # Rescale boxes from img_size to im0 size
             net2_output = self.detect_armor(net2_img)
-            net2_output = net2_output_process(net2_output, det_points=res[:, :4], shape=self.img_src.shape)
+            net2_output = self.net2_output_process(net2_output, det_points=res[:, :4], shape=self.img_src.shape)
             res = np.concatenate([res, net2_output], axis=1)
+        else:
+            res =  None
 
-        if self.img_show:  # 画图
+        if self.img_show and res is not None:  # 画图
             self.net_show(res)
 
         return res, self.img_src.copy()
 
+
     def detect_armor(self, src):
+        """
+        :param src 输入一张640x640的图片
+        :param res 输出一个(N,7)的array 或是None
+        """
         img = cv2.resize(src, (self.net2_inpHeight, self.net2_inpWidth), interpolation=cv2.INTER_LINEAR)
         # Convert
         img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x640x640
         img = np.ascontiguousarray(img)
         img = img.astype(np.float32)
         img /= 255.0
-        img = img.flatten()
-        self._net2.CopyFromHostToDevice(img, 0)
-        self._net2.Forward()
-        net_output1 = self._net2.CopyFromDeviceToHost(1)
-        net_output2 = self._net2.CopyFromDeviceToHost(2)
-        net_output3 = self._net2.CopyFromDeviceToHost(3)
-        res = self.net2_process(net_output1, net_output2, net_output3)
+        net_output = self._net2.infer(img,3)
+        res = self.net2_process(net_output[0], net_output[1], net_output[2])
         return res
 
     def net1_process(self, output):
         # 第一个网络的处理
+        """
+        :param res 输出为一个(N,6)的array 或为一个空array
+        """
         classIds = []
         confidences = []
         bboxes = []
-        output = output[0]  # 拉平
+        output = output.reshape(-1,26)
         choose = output[:, 4] > self.net1_confThreshold
         output = output[choose]
-
         choose = np.where(choose == True)[0]
         for i in range(0, len(choose)):
             if choose[i] < 19200:
@@ -225,6 +163,8 @@ class Predictor(object):
             anchor = self.net1_anchors[n * self.net1_grid[n][0] + c]
             xc = output[i, :]
             max_id = np.argmax(xc[5:])  # 选择置信度最高的 class
+            if max_id != self.choose_type:  #只选择最高的
+                continue
             obj_conf = float(xc[4] * xc[5 + max_id])  # 置信度
             centerX = int(
                 (xc[0] * 2 - 0.5 + w) / self.net1_grid[n][2] * self.net2_inpWidth)
@@ -261,15 +201,20 @@ class Predictor(object):
         return 1 / (1 + np.exp(-x))
 
     def net2_process(self, output1, output2, output3):
+        """
+        :param 第一层 19200 输入
+        :param 第二层 4800 输入
+        :param 第三层 1200 输入
+        """
         # 第二个网络的处理
         classIds = []
         colorIds = []
         confidences = []
         bboxes = []
-        output1 = output1.reshape(1, -1, 28)  # 1x19200x28
-        output2 = output2.reshape(1, -1, 28)  # 1x4800x28
-        output3 = output3.reshape(1, -1, 28)  # 1x1600x28
-        net_output = np.concatenate([np.concatenate([output1, output2], axis=1), output3], axis=1)[0]
+        output1 = output1.reshape(-1, 28)  # 1x19200x28
+        output2 = output2.reshape(-1, 28)  # 1x4800x28
+        output3 = output3.reshape(-1, 28)  # 1x1600x28
+        net_output = np.concatenate([np.concatenate([output1, output2], axis=0), output3], axis=0)
         choose = self.sigmoid(net_output[:, 4]) > self.net1_confThreshold
         output = net_output[choose]
         output = self.sigmoid(output)
@@ -296,6 +241,8 @@ class Predictor(object):
             xc = output[i, :]
             cls_id = np.argmax(xc[15:15 + 9])  # 选择置信度最高的 class
             col_id = np.argmax(xc[24:])  # 选择置信度最高的 color
+            if col_id != self.enemy_color and cls_id in range(1,6):
+                continue
             obj_conf = float(xc[4])  # 置信度
             centerX = int(
                 (xc[0] * 2 - 0.5 + w) / self.net1_grid[n][2] * self.net2_inpWidth)
@@ -309,6 +256,7 @@ class Predictor(object):
             classIds.append(cls_id)
             colorIds.append(col_id)
             confidences.append(obj_conf)
+            
         # NMS筛选
         indices = cv2.dnn.NMSBoxes(bboxes, confidences,
                                    self.net2_confThreshold, self.net2_nmsThreshold)
@@ -316,26 +264,101 @@ class Predictor(object):
         if len(indices):
             res = []
             for i in indices:
-                if bboxes[i[0]][0] < 0:
-                    bboxes[i[0]][0] = 0
-                if bboxes[i[0]][1] < 0:
-                    bboxes[i[0]][1] = 0
-                res.append([bboxes[i[0]][0], bboxes[i[0]][1], bboxes[i[0]][2] + bboxes[i[0]][0],
-                            bboxes[i[0]][3] + bboxes[i[0]][1], confidences[i[0]],
+                res.append([bboxes[i[0]][0], bboxes[i[0]][1], bboxes[i[0]][2],
+                            bboxes[i[0]][3], confidences[i[0]],
                             classIds[i[0]], colorIds[i[0]]])
         else:
             res = None
         return res
 
+    @staticmethod
+    def scale_coords(img1_shape, coords, img0_shape):
+        # Rescale coords (xyxy) from img1_shape to img0_shape
+        gain1 = img1_shape[0] / img0_shape[0]  # gain  = old / new
+        gain2 = img1_shape[1] / img0_shape[1]
+        coords[:, [0, 2]] /= gain2
+        coords[:, [1, 3]] /= gain1
+        coords[:, 0] = np.clip(coords[:, 0], 0, img0_shape[1])  # x1
+        coords[:, 1] = np.clip(coords[:, 1], 0, img0_shape[0])  # y1
+        coords[:, 2] = np.clip(coords[:, 2], 0, img0_shape[1])  # x2
+        coords[:, 3] = np.clip(coords[:, 3], 0, img0_shape[0])  # y2
+        return coords
+
+    @staticmethod
+    def jigsaw(det_points, img_src):
+        # 拼图 用于第二层检测的前处理
+        # 将每一辆车的图片resize成213x213的图片，放进9x9的网格图片中
+        # 输出为一张640x640的图片
+        step = 213
+        jig_picture = np.zeros((640, 640, 3), dtype=np.uint8)
+        count = 0
+        for i in det_points:
+            try:
+                cut_img = img_src[int(i[1]):int(i[3]), int(i[0]):int(i[2])]
+                cut_img = cv2.resize(cut_img, (213, 213))
+                u = count % 3 * 213
+                v = count // 3 * 213
+                jig_picture[v:v + 213, u:u + 213] = cut_img.copy()
+                count += 1
+                if count == 9:
+                    break
+            except:
+                print("error!")
+        return jig_picture
+
+
+    def net2_output_process(self,net2_input, det_points, shape):
+        #  对第二层网络输出的处理
+        net2_boxes = [[], [], [], [], [], [], [], [], []]
+        net2_output = np.full((det_points.shape[0], 8), np.nan)
+        for i in range(det_points.shape[0]): # 满足reporject类的需求，对装甲板进行编号
+            net2_output[i, 7] = i
+        if net2_input is None:
+            pass
+        else:
+            for i in net2_input:
+                count = i[0] // 213 + i[1] // 213 * 3
+                i[0] %= 213
+                i[1] %= 213
+                i[2] = i[0] + i[2]
+                i[3] = i[1] + i[3]
+                net2_boxes[count].append(i)
+            for count, i in enumerate(net2_boxes):
+                if not len(i) or count >= det_points.shape[0]:
+                    continue
+                else:
+                    i = np.array(i)
+                    confidences = i[:, 4]
+                    index = np.where(confidences == np.max(confidences))[0][0]
+                    scale = (
+                        int(det_points[count, 3] - det_points[count, 1]),
+                        int(det_points[count, 2] - det_points[count, 0]))
+                    i[:, :4] = self.scale_coords((213, 213), i[:, :4], scale).round()
+                    i = i[index, :]
+                    i[0] += det_points[count, 0]
+                    i[1] += det_points[count, 1]
+                    i[2] += det_points[count, 0]
+                    i[3] += det_points[count, 1]
+                    net2_output[count, 0:7] = i[:]
+        return net2_output
+
+    def stop(self):
+        """
+        停止ternsorrt线程，在关闭之前必须做这个操作，不然tensorrt的stramer可能无法释放
+        """
+        self._net1.destroy()
+        self._net2.destroy()
+
     def net_show(self, res):
+        #绘制函数
         color = (255,0,255)
         line_thickness = 3
         tl = line_thickness  # line/font thickness
         for i in res:
             if not np.isnan(i[11]):
-                label = f'{self.net1_cls[int(i[5])]} {i[4]:.2f}  {self.net2_cls_names[int(i[11])]}'
+                label = f'{net1_cls[int(i[5])]} {i[4]:.2f}  {net2_cls_names[int(i[11])]}'
             else:
-                label = f'{self.net1_cls[int(i[5])]} {i[4]:.2f} None'
+                label = f'{net1_cls[int(i[5])]} {i[4]:.2f} None'
             # Plots one bounding box on image img
             if not np.isnan(i[11]):
                 c1, c2 = (int(i[6]), int(i[7])), (int(i[8]), int(i[9]))
@@ -351,23 +374,27 @@ class Predictor(object):
                 cv2.putText(self.img_src, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf,
                             lineType=cv2.LINE_AA)
 
-        # self.img_src = cv2.resize(self.img_src, (640, 640))
-        # cv2.imshow("img_src", self.img_src)
-
-    def thread_detect(self):
-        # 多线程接收写法
-        count = 0
-        while True:
-            picture = self.__sub.sub()
-            if picture is not None:
-                self.detect_cars(picture)
-                count += 1
 
 
 if __name__ == '__main__':
-    sys.path.append("..")
-    # 偷懒，直接用了yolov5中的不少函数来检测网络
-    from mul_manager.mul_manager import MulManager
+    import sys
+    sys.path.append("..")  #单独跑int的时候需要
+    from mul_manager.pro_manager import thread_detect,pub
+    multiprocessing.set_start_method("forkserver",force=True)
+    cap = cv2.VideoCapture("/home/hoshino/CLionProjects/hitsz_radar/resources/two_cam/1.mp4")
+    count = 0
+    t1 = time.time()
+    pre1 = Predictor('cam_left')
+    while cap.isOpened():
+        res, frame = cap.read()
+        if res:
+            pre1.detect_cars(frame)
+        else:
+            break
+    pre1.stop()
+    print("主线程结束")
+
+
 
 
 

@@ -1,12 +1,13 @@
 """
 相机类
-__init.py__
-用于打开相机并且管理相机进程
+用于打开相机并且输出图像
+created by 李龙 2021/11
+最终修改 by 李龙 2021/1
 """
 import cv2 as cv
-import cam_drive
+from camera import cam_drive
 import numpy as np
-
+from resources.config import cam_config
 Camera_Messages = {
     0: "Camera_OK",
     1: "unable to enum camera devices!",
@@ -19,7 +20,6 @@ Camera_Messages = {
     8: "failed to stop grabbing image!",
     9: "failed to get img"
 }
-
 
 class CameraConfig(object):
     def __init__(self, fx, fy, cx, cy, k1, k2, p1, p2, k3):
@@ -42,33 +42,36 @@ class CameraConfig(object):
         # cv.initUndistortRectifyMap(self.mtx,self.dist,)
         self.FOCUS_PIXEL = (fx + fy) / 2
 
-
 class Camera(object):
     """
     相机类
     """
     img = np.ndarray((1024, 1024, 3), dtype="uint8")
-    camera_ids = "00F78889001"
+    camera_ids = None
     __init_ok = False
     __set = False
     __ROI = [0, 0, 1024, 1024]
     __gain = 15
     __exprosure = 5000.0
 
-    def __init__(self, camera_ids, run_mode, debug=False):
+    def __init__(self, type_, debug=False):
         """
         @param debug:暂时没用
-        @param run_mode:暂时没用
+        @param type:相机左右类型
         @param camera_ids:
         """
         self.debug = debug
-        self.camera_ids = camera_ids
-        self.run_mode = run_mode
-        result = self.cam = cam_drive.HKCamera("00F78889001")
-        if not result:
-            self.error_handler(result)
+        self.type = type_
+        self.camera_config = cam_config[self.type]
+        if not self.debug:
+            result = self.cam = cam_drive.HKCamera(self.camera_config["id"])
+            if not result:
+                self.error_handler(result)
+            else:
+                print(Camera_Messages[0])
+                self.__init_ok = True
         else:
-            print(Camera_Messages[0])
+            self.cap = cv.VideoCapture(self.camera_config["video_path"])
             self.__init_ok = True
 
     def cam_init(self, ROI, exprosure, gain):
@@ -110,12 +113,16 @@ class Camera(object):
         if not self.__init_ok:
             print("init failed can't get img")
             return None
-        result = cam.read(self.img)
+        if not self.debug:
+            result = cam.read(self.img)
+        else:
+            _,frame = self.cap.read()
+            return frame
         if not result:
             print("failed to get img")
-            return None
+            return self.img
         return self.img
-
+        
     def cam_start(self):
         if not self.__init_ok:
             print("init failed can't get img")
@@ -125,7 +132,6 @@ class Camera(object):
             self.error_handler(result)
             return False
         return True
-
 
 if __name__ == '__main__':
     cam = cam_drive.HKCamera("00F78889001")

@@ -2,15 +2,21 @@
 多线程管理类
 mul_manager.py
 用于多线程间的信息发布与接收
+created by 李龙 
 """
-
+import time
 from queue import Queue
+from threading import Event
 
 pub_list = []
 sub_list = []
 
 
 class MulManager(object):
+    """
+    多线程管理类
+    负责多线程之间的通讯和链接
+    """
     global pub_list
     global sub_list
 
@@ -24,7 +30,7 @@ class MulManager(object):
 
     def create_sub(self, name, num):
         sub = MulSubsriber()
-        if sub.create(name, num, pub_list,sub_list):
+        if sub.create(name, num, pub_list, sub_list):
             sub_list.append(sub)
             return sub
         else:
@@ -34,17 +40,25 @@ class MulManager(object):
 class MulPublisher(object):
     """
     publisher类
+    :param init_ok
+    :param
     """
     init_ok = False
     name = ""
-    que = Queue(1)
 
     def __init__(self):
+        """
+        :param none
+        """
+        self.que = Queue()
+        self.event = Event()
         pass
 
     def create(self, name, pub_lists, sub_lists):
         """
-        name : string
+        :param name : string
+        :param publists
+        :param sublists
         """
         if not self.check(name):
             print("名称应为string类型")
@@ -57,6 +71,7 @@ class MulPublisher(object):
             if i.name == name:
                 print("已有队列，正在匹配")
                 self.que = i.que
+                self.event = i.event
         print("初始化成功")
         self.name = name
         self.init_ok = True
@@ -73,36 +88,19 @@ class MulPublisher(object):
         else:
             return True
 
-    # 已被抛弃的写法，queue自己有锁
-    # def pub(self, data):
-    #     if not self.init_ok:
-    #         print("未初始化成功,不能使用")
-    #         return False
-    #     if self.lock.acquire(timeout=0.1):
-    #         if self.que.full():
-    #             # print("队列满")
-    #             try:
-    #                 self.que.get_nowait()
-    #             except:
-    #                 pass
-    #         self.que.put(data)
-    #         self.lock.release()
-    #         return True
-    #     else:
-    #         print("获取锁失败")
-    #         return False
-
     def pub(self, data):
         if not self.init_ok:
             print("未初始化成功,不能使用")
-            return False
+            return
+        if self.event.is_set():
+            return
         if self.que.full():
             try:
                 self.que.get_nowait()
             except:
                 pass
-        self.que.put(data)
-        return True
+        self.que.put_nowait(data)
+        self.event.set()
 
 
 class MulSubsriber(object):
@@ -112,6 +110,7 @@ class MulSubsriber(object):
     init_ok = False
     name = ""
     que = Queue(1)
+    event = Event()
 
     def __init__(self):
         pass
@@ -133,6 +132,7 @@ class MulSubsriber(object):
             if i.name == name:
                 print("已有发布器，正在匹配")
                 i.que = self.que
+                self.event = i.event
         print("初始化成功")
         self.name = name
         self.init_ok = True
@@ -149,27 +149,13 @@ class MulSubsriber(object):
         else:
             return True
 
-    # 已被抛弃的写法，queue自己有锁
-    # def sub(self):
-    #     if not self.init_ok:
-    #         print("未初始化成功,不能使用")
-    #         return None
-    #     if self.lock.acquire(timeout=0.1):
-    #         if self.que.empty():
-    #             re_data = None
-    #         else:
-    #             re_data = self.que.get()
-    #         self.lock.release()
-    #     else:
-    #         re_data = None
-    #     return re_data
-
     def sub(self):
         if not self.init_ok:
             print("未初始化成功,不能使用")
-            return None
+        self.event.wait()
         try:
             re_data = self.que.get_nowait()
         except:
             re_data = None
+        self.event.clear()
         return re_data

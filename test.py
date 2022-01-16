@@ -1,58 +1,79 @@
 """
-测试程序
+雷达主程序
 """
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str,
-                        default='/home/hoshino/CLionProjects/copy_sjtu_radar/resources/best.pt',
-                        help='model.pt path(s)')
-    parser.add_argument('--source', type=str,
-                        default='/home/hoshino/CLionProjects/copy_sjtu_radar/resources/demo_pic.jpg',
-                        help='source')  # file/folder, 0 for webcam
-    parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
-    parser.add_argument('--conf-thres', type=float, default=0.45, help='object confidence threshold')
-    parser.add_argument('--iou-thres', type=float, default=0.3, help='IOU threshold for NMS')
-    parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--view-img', action='store_true', help='display results')
-    parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')
-    parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
-    parser.add_argument('--classes', nargs='+', type=int, default=[0, 1, 2],
-                        help='filter by class: --class 0, or --class 0 2 3')
-    parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
-    parser.add_argument('--augment', action='store_true', help='augmented inference')
-    parser.add_argument('--project', default='runs/detect', help='save results to project/name')
-    parser.add_argument('--name', default='exp', help='save results to project/name')
-    parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
-    opt = parser.parse_args()
-    save_img = True
-    save_txt = False
-    vid_path, vid_writer = None, None
-    save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
-    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
-    dataset = LoadImages('/home/hoshino/CLionProjects/copy_sjtu_radar/resources/two_cam/1.mp4', img_size=640)
-    predictor = Predictor()
-    for path, img, im0s, vid_cap in dataset:
-        p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 0)
-        p = Path(p)
-        save_path = str(save_dir / p.name)
-        t1 = time_synchronized()
-        output = predictor.detect_cars(im0s)
-        t2 = time_synchronized()
-        print(f'{s}Done. ({t2 - t1:.3f}s)')
-        if save_img:
-            if dataset.mode == 'image':
-                cv2.imwrite(save_path, output)
-            else:  # 'video'
-                if vid_path != save_path:  # new video
-                    vid_path = save_path
-                    if isinstance(vid_writer, cv2.VideoWriter):
-                        vid_writer.release()  # release previous video writer
+from camera.cam import Camera
+from net.network_pro import Predictor
+from resources.config import DEBUG, config_init, logger, USEABLE
+from mapping.mainEntry import Mywindow
+from radar_detect.reproject import Reproject
 
-                    fourcc = 'mp4v'  # output video codec
-                    fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                    w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                    h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                    vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*fourcc), fps, (w, h))
-                vid_writer.write(output)
+from PyQt5.QtCore import QTimer
+from PyQt5 import QtWidgets
+import logging
+import cv2 as cv
+import numpy as np
+import sys
 
+
+def spin_once():
+    pic_left = None
+    pic_right = None
+    res_left, res_right = None,None
+    if USEABLE['cam_left']:
+        frame = cam.get_img()
+        if frame is not None:
+            im1 = frame.copy()
+            res_left,frame = Predictor1.detect_cars(frame)
+    if USEABLE['cam_right']:
+        frame = cam.get_img()
+        if frame is not None:
+            im1 = frame.copy()
+            res_right,frame = Predictor1.detect_cars(frame)
+    result = [None, None]
+    if res_left is None:
+        pass
+    else:
+        armors = res_left[:, [11, 13, 6, 7, 8, 9]]
+        cars = res_left[:,[11, 0, 1, 2, 3]]
+        result = repo_left.check(armors, cars)
+        print(result)
+    if not myshow.view_change:
+        pic_info = frame
+    else:
+        pic_info = frame
+    if pic_info is not None:
+        repo_left.update(result[0],pic_info)
+        myshow.set_image(pic_info, "main_demo")
+    if myshow.close:
+        if USEABLE['cam_left']:
+            Predictor1.stop()
+        if USEABLE['cam_right']:
+            Predictor1.stop()
+        sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    logger.setLevel(logging.DEBUG)
+    # ui
+    app = QtWidgets.QApplication(sys.argv)
+    myshow = Mywindow()
+    repo_left = Reproject(DEBUG,"cam_left")
+    timer_main = QTimer()
+    timer_serial = QTimer()
+    myshow.show()
+    logger.info("初始化程序开始运行")
+    config_init()
+    if USEABLE['cam_left']:
+        Predictor1 = Predictor('cam_left')
+        cam = Camera('cam_left', True)
+    if USEABLE['cam_right']:
+        Predictor1 = Predictor('cam_right')
+        cam = Camera('cam_right', True)
+    if USEABLE['Lidar']:
+        pass
+    if USEABLE['serial']:
+        pass
+    timer_main.timeout.connect(spin_once)
+    timer_main.start(0)
+    sys.exit(app.exec_())

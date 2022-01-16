@@ -2,13 +2,12 @@
 雷达监测类
 Linar.py
 用于生成激光雷达云图
+根据上交代码做出了一些简单的修改
+最终修改 by 李龙 2021/1/15
 '''
-try:
-    import rospy
-    from sensor_msgs.msg import PointCloud2
-    from sensor_msgs import point_cloud2
-except:
-    print("[ERROR] ROS environment hasn't been successfully loaded.You can only use DepthQueue with saved PointCloud")
+import numpy
+import rospy
+import rosbag
 import cv2
 import os
 import numpy as np
@@ -19,63 +18,57 @@ import inspect
 import time
 from datetime import datetime
 import pickle as pkl
-
-os.path.join("/home/hoshino/CLionProjects/hitsz_radar/resources")
+from sensor_msgs import point_cloud2
+from sensor_msgs.msg import PointCloud2
 from resources.config import PC_STORE_DIR, LIDAR_TOPIC_NAME
 
 
 class DepthQueue(object):
-    def __init__(self, capacity, size, K_0, C_0, E_0):
+    def __init__(self, capacity, size, K_0,C_0, E_0):
         '''
         用队列关系储存点云
         :param capacity: the maximum length of depth queue
         :param size: image size [W,H]
         :param K_0: 相机内参
-        :param C_0: 畸变系数
         :param E_0: 雷达到相机外参
         '''
         self.size = size
         self.depth = np.ones((size[1], size[0]), np.float64) * np.nan
         self.queue = Queue(capacity)
+        self.rvec = cv2.Rodrigues(E_0[:3,:3])[0]
+        self.tvec = E_0[:3,3]
         self.K_0 = K_0
         self.C_0 = C_0
-        self.rvec = cv2.Rodrigues(E_0[:3, :3])[0]
-        self.tvec = E_0[:3, 3]
         self.E_0 = E_0
         self.init_flag = False
 
-    def push_back(self, pc: np.array):
+    def push_back(self, entry):
 
         # 当队列为空时，说明该类正在被初始化，置位初始化置位符
         if self.queue.empty():
             self.init_flag = True
 
-        # pc (N,3) 原始点云
-
         # 坐标转换 由雷达坐标转化相机坐标，得到点云各点在相机坐标系中的z坐标
-        dpt = (self.E_0 @ (np.concatenate([pc, np.ones((pc.shape[0], 1))], axis=1).transpose())).transpose()[:, 2]
+        dpt = (self.E_0@(np.concatenate([entry,np.ones((entry.shape[0],1))],axis = 1).transpose())).transpose()[:,2]
 
         # 得到雷达点云投影到像素平面的位置
-        ip = cv2.projectPoints(pc, self.rvec, self.tvec, self.K_0, self.C_0)[0].reshape(-1, 2).astype(np.int)
+        ip = cv2.projectPoints(entry,self.rvec,self.tvec,self.K_0,self.C_0)[0].reshape(-1,2).astype(np.int32)
 
         # 判断投影点是否在图像内部
         inside = np.logical_and(np.logical_and(ip[:, 0] >= 0, ip[:, 0] < self.size[0]),
                                 np.logical_and(ip[:, 1] >= 0, ip[:, 1] < self.size[1]))
         ip = ip[inside]
-        dpt = dpt[inside]
-
+        dpt = np.array(dpt[inside]).flatten()
         # 将各个点的位置[N,2]加入队列
         self.queue.put(ip)
         if self.queue.full():
             # 队满，执行出队操作，将出队的点云中所有点对应的投影位置的值置为nan
             ip_d = self.queue.get()
             self.depth[ip_d[:, 1], ip_d[:, 0]] = np.nan
-
-        # TODO: 如果点云有遮挡关系，则测距测到前或后不确定
-
-        # 更新策略，将进队点云投影点的z值与原来做比较，取较小的那个
+        # TODO: 如果点云有遮挡关系，则测距测到前或后不确定  其实我也遇到了这个问题
+        # 更新策略，将进队点云投影点的z值与原来做比较，取均值
         s = np.stack([self.depth[ip[:, 1], ip[:, 0]], dpt], axis=1)
-        s = np.nanmin(s, axis=1)
+        s = np.nanmean(s, axis=1)
         self.depth[ip[:, 1], ip[:, 0]] = s
 
     def depth_detect_refine(self, r):
@@ -84,14 +77,14 @@ class DepthQueue(object):
 
         :return: (x0,y0,z) x0,y0是中心点在归一化相机平面的坐标前两位，z为其对应在相机坐标系中的z坐标值
         '''
-        center = np.float32([r[0] + r[2] / 2, r[1] + r[3] / 2])
-        # 采用以中心点为基准点扩大一倍的装甲板框，并设置ROI上界和下界，防止其超出像素平面范围
-        area = self.depth[int(max(0, center[1] - r[3])):int(min(center[1] + r[3], self.size[1] - 1)),
-               int(max(center[0] - r[2], 0)):int(min(center[0] + r[2], self.size[0] - 1))]
-
+        # center = np.float32([r[0] + r[2] / 2, r[1] + r[3] / 2])
+        # # 采用以中心点为基准点扩大一倍的装甲板框，并设置ROI上界和下界，防止其超出像素平面范围
+        # area = self.depth[int(max(0, center[1] - r[3])):int(min(center[1] + r[3], self.size[1] - 1)),
+        #        int(max(center[0] - r[2], 0)):int(min(center[0] + r[2], self.size[0] - 1))]
+        area = self.depth[int(r[1]):int(r[1]+r[3]),int(r[0]):int(r[0] + r[2])]
         z = np.nanmean(area) if not np.isnan(area).all() else np.nan  # 当对应ROI全为nan，则直接返回为nan
 
-        return np.concatenate([cv2.undistortPoints(center, self.K_0, self.C_0).reshape(-1), np.array([z])], axis=0)
+        return z
 
     def detect_depth(self, rects):
         '''
@@ -101,7 +94,7 @@ class DepthQueue(object):
         x0,y0是中心点在归一化相机平面的坐标前两位，z为其对应在相机坐标系中的z坐标值
         '''
         if len(rects) == 0:
-            return []
+            return np.stack([], axis=0)*np.nan
 
         ops = []
 
@@ -164,6 +157,7 @@ class Radar(object):
         self._no = len(Radar.__queue)  # 该对象对应于整个雷达对象列表的序号
         self._K_0 = K_0
         self._C_0 = C_0
+        self._E_0 = E_0
         Radar.__queue.append(DepthQueue(queue_size, imgsz, K_0, C_0, E_0))
 
     @staticmethod
@@ -281,70 +275,38 @@ class Radar(object):
 
 if __name__ == '__main__':
     # 测试demo 同时也是非常好的测距测试脚本
-    from radar_class.camera import read_yaml, Camera_Thread
-    from radar_class import locate_pick
-    import traceback
-
-    _, K_0, C_0, E_0, imgsz = read_yaml(0)
-
-    ra = Radar(K_0, C_0, E_0, imgsz=imgsz)
-    Radar.start()
-
-    cv2.namedWindow("out", cv2.WINDOW_NORMAL)  # 显示雷达深度图
-    cv2.namedWindow("img", cv2.WINDOW_NORMAL)  # 显示实际图片
-    cap = Camera_Thread(0)
-    try:
-        flag, frame = cap.read()
-
-        # 选定一个ROI区域来测深度
-        cv2.imshow("img", frame)
-        rect = cv2.selectROI("img", frame, False)
-
-        _, rvec, tvec = locate_pick(cap, 0, 0)  # 用四点手动标定估计位姿
-
-        # 创建transform matrix
-        T = np.eye(4)
-        T[:3, :3] = cv2.Rodrigues(rvec)[0]
-        T[:3, 3] = tvec.reshape(-1)
-        T = np.linalg.inv(T)
-
+    # 还没改
+    from resources.config import cam_config
+    cv2.namedWindow("img",cv2.WINDOW_NORMAL) # 显示实际图片
+    bag_file = '/home/hoshino/CLionProjects/camera_lidar_calibration/data/game/beijing.bag'
+    bag = rosbag.Bag(bag_file, "r")
+    topic = '/livox/lidar'
+    bag_data = bag.read_messages(topic)
+    K_0 = cam_config['cam_left']['K_0']
+    C_0 = cam_config['cam_left']['C_0']
+    E_0 = cam_config['cam_right']['E_0']
+    depth = DepthQueue(100, size=[1024, 1024], K_0=K_0, C_0=C_0,E_0=E_0)
+    for topic, msg, t in bag_data:
+        pc = np.float32(point_cloud2.read_points_list(msg, field_names=("x", "y", "z"), skip_nans=True)).reshape(
+            -1, 3)
+        dist = np.linalg.norm(pc, axis=1)
+        pc = pc[dist > 0.4]  # 雷达近距离滤除
+        depth.push_back(pc)
+    ori = cv2.imread("/home/hoshino/CLionProjects/camera_lidar_calibration/data/photo/0.bmp")
+    frame = ori.copy()
+    rect = cv2.selectROI("img", frame, False)
+    key = cv2.waitKey(1)
+    while key != ord('q'):
         key = cv2.waitKey(1)
+        # 分别在实际相机图和深度图上画ROI框来对照
+        cv2.rectangle(frame, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 255, 0), 3)
+        cv2.imshow("img", frame)
+        if key == ord('r') & 0xFF:
+            # 重选区域
+            rect = cv2.selectROI("img", frame, False)
+            frame = ori.copy()
+        if key == ord('s') & 0xFF:
+            # 显示世界坐标系和相机坐标系坐标和深度，以对测距效果进行粗略测试
+            dee = depth.detect_depth([rect])
+            print(dee)
 
-        while (flag and key != ord('q') & 0xFF):
-
-            depth = ra.read()  # 获得深度图
-
-            # 分别在实际相机图和深度图上画ROI框来对照
-            cv2.rectangle(frame, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 255, 0), 3)
-
-            cv2.rectangle(depth, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), 255, 3)
-
-            cv2.imshow("out", depth)
-            cv2.imshow("img", frame)
-
-            key = cv2.waitKey(1)
-            if key == ord('r') & 0xFF:
-                # 重选区域
-                rect = cv2.selectROI("img", frame, False)
-
-            if key == ord('s') & 0xFF:
-                # 显示世界坐标系和相机坐标系坐标和深度，以对测距效果进行粗略测试
-                cp = ra.detect_depth([rect]).reshape(-1)
-
-                cp = (T @ np.concatenate(
-                    [np.concatenate([cp[:2], np.ones(1)], axis=0) * cp[2], np.ones(1)], axis=0))[:3]
-
-                cp_eye = (np.eye(4) @ np.concatenate(
-                    [np.concatenate([cp[:2], np.ones(1)], axis=0) * cp[2], np.ones(1)], axis=0))[:3]
-
-                print(
-                    f"target position is ({cp[0]:0.3f},{cp[1]:0.3f},{cp[2]:0.3f}) and distance is {np.linalg.norm(cp):0.3f}")
-
-                print(
-                    f"origin target position is ({cp_eye[0]:0.3f},{cp_eye[1]:0.3f},{cp_eye[2]:0.3f}) and distance is {np.linalg.norm(cp_eye):0.3f}")
-
-            flag, frame = cap.read()
-    except:
-        traceback.print_exc()
-    Radar.stop()
-    cap.release()
