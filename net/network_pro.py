@@ -85,7 +85,7 @@ class Predictor(object):
 
     def detect_cars(self, src):
         """
-        :param src 640x640
+        :param src 1024x1024
         :param 
         """
         # 检测函数

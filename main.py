@@ -15,8 +15,8 @@ from radar_detect.location_alarm import Alarm
 import time
 from PyQt5 import QtWidgets
 import cv2 as cv
-from camera.cam import Camera
-from resources.config import DEBUG, LOGGER, USEABLE,enemy_color,test_region,cam_config
+from unuse.cam import Camera
+from resources.config import DEBUG, LOGGER, USEABLE, enemy_color, test_region, cam_config
 from mul_manager.pro_manager import sub, pub
 from mapping.mainEntry import Mywindow
 from PyQt5.QtCore import QTimer
@@ -33,13 +33,14 @@ class Radar_main(object):
     event_close = multiprocessing.get_context('spawn').Event()
 
     def __init__(self):
-        self.text_api = LOGGER(lambda x,t: myshow.set_text(x,t))
-        self.show_api = lambda x:myshow.set_image(x,"main_demo")
+        self.logger = LOGGER(lambda x, t: myshow.set_text(x, t))
+        self.text_api = lambda x, y, z: self.logger.add_text(x, y, z)
+        self.show_api = lambda x: myshow.set_image(x, "main_demo")
         self.show_map = lambda x: myshow.set_image(x, "map")
         if USEABLE['cam_left']:
             self.PRE_left = multiprocessing.Process(target=process_detect, args=(
-                                                    self.event_left, self.que_left, self.event_close,
-                                                    'cam_left',))
+                self.event_left, self.que_left, self.event_close,
+                'cam_left',))
             self.PRE_left.daemon = True
             self.repo_left = Reproject('cam_left')
         if USEABLE['cam_right']:
@@ -56,8 +57,8 @@ class Radar_main(object):
             self.lidar.preload()
         if USEABLE['serial']:
             pass
-        self.loc_alarm = Alarm(enemy=enemy_color,api=self.show_map,touch_api=self.text_api,
-                          region=test_region, debug=False)
+        self.loc_alarm = Alarm(enemy=enemy_color, api=self.show_map, touch_api=self.text_api,
+                               region=test_region, debug=False)
         T = np.eye(4)
         rvec = cam_config['cam_left']['rvec']
         tvec = cam_config['cam_left']['tvec']
@@ -109,7 +110,7 @@ class Radar_main(object):
                     location[int(i[0]), :] = i
                 points = self.loc_alarm.update(location)
                 self.loc_alarm.show()
-        self.text_api.api_info("")
+        self.text_api.add_text()
         if myshow.close:
             self.event_close.set()
             if USEABLE['cam_left']:

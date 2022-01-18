@@ -2,16 +2,14 @@
 雷达主程序
 """
 
-from camera.cam import Camera
+from unuse.cam import Camera
 from net.network_pro import Predictor
-from resources.config import DEBUG, USEABLE
+from resources.config import USEABLE
 from mapping.mainEntry import Mywindow
 from radar_detect.location_alarm import Alarm
 
 from PyQt5.QtCore import QTimer
 from PyQt5 import QtWidgets
-import logging
-import cv2 as cv
 import numpy as np
 import sys
 
@@ -59,7 +57,6 @@ if __name__=="__main__":
     from resources.config import cam_config,test_region,enemy_color,\
         real_size
     from sensor_msgs import point_cloud2
-    from sensor_msgs.msg import PointCloud2
     import rosbag
     import cv2
     # ui

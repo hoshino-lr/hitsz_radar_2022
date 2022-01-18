@@ -2,7 +2,7 @@
 雷达主程序
 """
 
-from camera.cam import Camera
+from unuse.cam import Camera
 from net.network_pro import Predictor
 from resources.config import DEBUG, config_init, logger, USEABLE
 from mapping.mainEntry import Mywindow
@@ -11,8 +11,6 @@ from radar_detect.reproject import Reproject
 from PyQt5.QtCore import QTimer
 from PyQt5 import QtWidgets
 import logging
-import cv2 as cv
-import numpy as np
 import sys
 
 

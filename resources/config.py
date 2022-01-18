@@ -9,7 +9,6 @@ import os
 import numpy as np
 import logging
 
-
 enemy_color = 0
 USEABLE = {
     "cam_left": True,
@@ -29,6 +28,8 @@ cam_config = {
                        [0.0, 0.0, 1.0]]),
         "C_0": np.mat([-0.2275028300247, 0.20188387553073965, -0.00032941427232237167, -0.0007610612612672920245,
                        0.09717811036906197]),
+        "exposure": 5000,
+        "gain": 15,
         "rvec": np.mat([[1.59668528], [0.58626031], [-0.53932911]]),
         "tvec": np.mat([[-8625.00028137], [771.3457855], [6926.60950051]]),
         "E_0": np.mat([
@@ -47,6 +48,8 @@ cam_config = {
                        [0.0, 0.0, 1.0]]),
         "C_0": np.mat([[-0.22753846151806761], [0.2209031621277345], [-0.0006069352871209068], [-0.0006361387371312384],
                        [0.02412961227405689]]),
+        "exporsure": 5000,
+        "gain": 15,
         "rvec": np.mat([[1.59668528], [0.58626031], [-0.53932911]]),
         "tvec": np.mat([[-8625.00028137], [771.3457855], [6926.60950051]]),
         "E_0": np.mat([
@@ -57,11 +60,11 @@ cam_config = {
         ])}
 }
 
-net1_onnx = os.path.dirname(os.path.abspath(__file__))+"/net_onnx/net1_sim.onnx"
-net1_engine = os.path.dirname(os.path.abspath(__file__))+"/net_onnx/net1.engine"
+net1_onnx = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net1_sim.onnx"
+net1_engine = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net1.engine"
 
-net2_onnx = os.path.dirname(os.path.abspath(__file__))+"/net_onnx/net2.onnx"
-net2_engine = os.path.dirname(os.path.abspath(__file__))+"/net_onnx/net2.engine"
+net2_onnx = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net2.onnx"
+net2_engine = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net2.engine"
 net1_cls = ['car', 'watcher', 'base']
 
 net2_cls_names = ["0", "1", "2", "3", "4",
@@ -83,7 +86,7 @@ unit_list = ['R1', 'R2', 'R3', 'R4', 'R5', 'RG', 'RO', 'RB', 'B1', 'B2', 'B3', '
              'BB']  # 赛场上各个目标，主要用于HP显示
 
 # 小地图图片路径
-MAP_PATH = os.path.dirname(os.path.abspath(__file__))+"/map.jpg"
+MAP_PATH = os.path.dirname(os.path.abspath(__file__)) + "/map.jpg"
 BAG_FIRE = "/home/hoshino/CLionProjects/camera_lidar_calibration/data/game/beijing.bag"
 
 # 小地图设定大小
@@ -91,7 +94,7 @@ map_size = (716, 384)
 real_size = (28., 15.)
 # UI中主视频源初始图像路径
 
-INIT_FRAME_PATH = os.path.dirname(os.path.abspath(__file__))+"/beijing.png"
+INIT_FRAME_PATH = os.path.dirname(os.path.abspath(__file__)) + "/beijing.png"
 
 region = \
     {}
@@ -112,7 +115,8 @@ class LOGGER():
     """
     logger 类
     """
-    def __init__(self,text_api):
+
+    def __init__(self, text_api):
         # 创建一个logger
         import time
         logger_name = time.strftime('%Y-%m-%d %H-%M-%S')
@@ -140,19 +144,17 @@ class LOGGER():
         self.logger.addHandler(fh)
         self.logger.addHandler(ch)
 
-    def info(self,text):
-        self.logger.info(text)
-
-
-    def api_info(self,text):
-        self.logger.info(text)
-        self.api("INFO",text)
-
-    def error(self,text):
-        self.logger.error(text)
-
-
-    def api_error(self,text):
-        self.logger.error(text)
-        self.api("ERROR",text)
-
+    def add_text(self, handle, text, show_api=True):
+        """
+        :param handle 警告类型 有 WARNING ERROR INFO 三种
+        :param text 输入的文字
+        :param show_api 是否显示在 ui 上
+        """
+        if handle == "WARNING":
+            self.logger.warning(text)
+        if handle == "ERROR":
+            self.logger.error(text)
+        if handle == "INFO":
+            self.logger.info(text)
+        if show_api:
+            self.api(handle, text)
