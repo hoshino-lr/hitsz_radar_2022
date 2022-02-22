@@ -1,9 +1,10 @@
 '''
 位置预警类，还需要修改和完善
 created by 黄继凡 2021/12
-最新修改 by 黄继凡 2021/1/15 
+最新修改 by 黄继凡 2021/2/22 
 '''
 import cv2
+from matplotlib.pyplot import axis
 import numpy as np
 from numpy.lib.arraysetops import isin
 
@@ -258,18 +259,19 @@ class Alarm(draw_map.CompeteMap):
 
         return alarming, base_alarming
 
-    def two_camera_merge_update(self, locations):
+    def two_camera_merge_update(self, locations, extra_locations):
         """
         两个相机合并更新，顾名思义，two_camera为True才能用的专属api
 
         :param locations: the list of the predicted locations [N,cls+x+y+z] of the both two cameras
-        :param radar:  the list of the radar class corresponding to the two camera
+        :param extra_locations: the list of iou prediction [:,cls+x0+y0+z] of the both two cameras
         """
         if self._two_camera:
             # init location
             for i in range(1, 11):
                 self._location[str(i)] = [0, 0]
             rls = []
+            ex_rls = []
             for location in locations:# 车辆预测框列表，列表元素格式为[N,cls+x+y+z]
                 #对左右两相机获取结果进行处理
                 if isinstance(location, np.ndarray):
@@ -280,7 +282,14 @@ class Alarm(draw_map.CompeteMap):
                 else:
                     rls.append(None)
 
-            
+            for e_location in extra_locations:#对iou预测装甲板进行解析
+                if isinstance(e_location, np.ndarray):
+                    # 滤除nan
+                    mask = np.logical_not(np.any(np.isnan(e_location), axis=1))
+                    ex_rls.append(e_location[mask])
+                else:
+                    ex_rls.append(None)
+
             pred_loc = [] # 存储预测的位置 cls+x+y+z
             if self._z_a:
                 pred_1 = []
@@ -290,13 +299,16 @@ class Alarm(draw_map.CompeteMap):
             for armor in range(1,11):
                 l1 = None  # 对于特定id，第一个相机基于直接神经网络预测装甲板计算出的位置
                 l2 = None  # 对于特定id，第二个相机基于直接神经网络预测装甲板计算出的位置
+                el1 = None  # 对于特定id，第一个相机基于IoU预测装甲板计算出的位置
+                el2 = None  # 对于特定id，第二个相机基于IoU预测装甲板计算出的位置
                 al1 = None  # 对于特定id，第一个相机预测出的位置
                 al2 = None  # 对于特定id，第二个相机预测出的位置
 
+                # 若有直接神经网络预测的装甲板则直接使用，否则使用IoU预测出的装甲板
                 # 第一个相机数据处理
                 if isinstance(rls[0], np.ndarray):
                     mask = rls[0][:, 0] == armor
-                    if mask.any(): # 预测装甲板编号有对应
+                    if mask.any(): # 神经网络预测装甲板编号有对应
                         l1 = rls[0][mask].reshape(-1)
                         # 坐标换算为世界坐标
                         l1[1:] = (self._T[0] @ np.concatenate([np.concatenate([l1[1:3], np.ones(1)], axis=0) * 
@@ -305,6 +317,17 @@ class Alarm(draw_map.CompeteMap):
                         if self._z_a:
                             self._adjust_z_one_armor(l1, 0)
                         al1 = l1
+                    else:
+                        if isinstance(ex_rls[0], np.ndarray):
+                            mask = ex_rls[0][:, 0] == armor
+                            if mask.any():
+                                el1 = ex_rls[0][mask].reshape(-1)
+                                el1[1:] = (self._T[0] @ np.concatenate(
+                                [np.concatenate([el1[1:3], np.ones(1)], axis=0) * el1[3], np.ones(1)], axis=0))[:3]
+                                if self._z_a:
+                                    self._adjust_z_one_armor(el1, 1)
+                                al1 = el1
+
                 # 第二个相机处理
                 if isinstance(rls[1], np.ndarray):
                     mask = rls[1][:, 0] == armor
@@ -315,6 +338,16 @@ class Alarm(draw_map.CompeteMap):
                         if self._z_a:
                             self._adjust_z_one_armor(l2, 1)
                             al2 = l2
+                    else:
+                        if isinstance(ex_rls[1], np.ndarray):
+                            mask = ex_rls[1][:, 0] == armor
+                            if mask.any():
+                                el2 = ex_rls[1][mask].reshape(-1)
+                                el2[1:] = (self._T[1] @ np.concatenate(
+                                [np.concatenate([el2[1:3], np.ones(1)], axis=0) * el2[3], np.ones(1)], axis=0))[:3]
+                                if self._z_a:
+                                    self._adjust_z_one_armor(el2, 1)
+                                al2 = el2
 
                 if self._z_a:
                     if isinstance(al1, np.ndarray):
@@ -377,12 +410,12 @@ class Alarm(draw_map.CompeteMap):
         else:
             self._touch_api.api_error('[ERROR] This update function only supports two_camera case, using update instead.')
 
-    def update(self, t_location):
+    def update(self, t_location, e_location):
         '''
         
         #单相机使用
         :param t_location: the predicted locations [N,cls+x+y+z]
-        :param radar:the radar class
+        :param e_location: iou prediction [:,cls+x0+y0+z]
 
         '''
 
@@ -396,6 +429,15 @@ class Alarm(draw_map.CompeteMap):
             if isinstance(t_location, np.ndarray):
                 mask = np.logical_not(np.any(np.isnan(t_location), axis = 1)) #  当t_location中有一数组对应z值为nan，对应false
                 locations = t_location[mask]
+
+            if isinstance(e_location, np.ndarray):
+                # nan滤除
+                mask = np.logical_not(np.any(np.isnan(e_location), axis=1))
+                ex_rls = e_location[mask]
+                if isinstance(locations, np.ndarray):
+                    locations = np.concatenate([location, ex_rls], axis=0)
+                else:
+                    locations = ex_rls
 
             judge_loc = {}
             if isinstance(locations, np.ndarray):
