@@ -9,7 +9,6 @@ from os import wait
 from multiprocessing import Queue, Process,Event
 
 
-
 def thread_detect(event, que, name):
     """
     debug 使用

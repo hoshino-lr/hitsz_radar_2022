@@ -12,17 +12,17 @@ import logging
 enemy_color = 0
 USEABLE = {
     "cam_left": True,
-    "cam_right": False,
+    "cam_right": True,
     "serial": False,
     "Lidar": False,
 }
 DEBUG = True
-
+BO = 0
 cam_config = {
     "cam_right": {
         "id": "00F78889001",
         "size": (1024, 1024),
-        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/two_cam/mangdao.avi",
+        "video_path": "/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/1.mp4",
         "K_0": np.mat([[1273.6729986357857, 0.0, 598.3779780737999],
                        [0.0, 1274.0066230685838, 531.2012102435624],
                        [0.0, 0.0, 1.0]]),
@@ -40,15 +40,15 @@ cam_config = {
         ])},
 
     "cam_left": {
-        "id": "J37877236",
-        "size": (3072, 2048),
-        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/two_cam/mangdao.avi",
+        "id": "00F78889001",
+        "size": (1024, 1024),
+        "video_path": "/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/2.mp4",
         "K_0": np.mat([[1273.6729986357857, 0.0, 598.3779780737999],
                        [0.0, 1274.0066230685838, 531.2012102435624],
                        [0.0, 0.0, 1.0]]),
         "C_0": np.mat([[-0.22753846151806761], [0.2209031621277345], [-0.0006069352871209068], [-0.0006361387371312384],
                        [0.02412961227405689]]),
-        "exposure": 4000,
+        "exposure": 5000,
         "gain": 15,
         "rvec": np.mat([[1.59668528], [0.58626031], [-0.53932911]]),
         "tvec": np.mat([[-8625.00028137], [771.3457855], [6926.60950051]]),
@@ -109,6 +109,15 @@ test_region = \
 
 PC_STORE_DIR = ""
 LIDAR_TOPIC_NAME = "/livox/lidar"
+
+test_objNames = ['R4下来的角', '坡除角', '坡上角', '烧饼轨道 u远',
+                 '烧饼轨道 近', '坡，另一边角']
+test_objPoints = np.array([[4021, 3994, 0],  # R4下来的角
+                           [7820, 4550, 0],  # 坡除角
+                           [6756, 6300, 600],  # 坡上角
+                           [2250, 8311, 1376],  # 烧饼轨道 u远
+                           [2250, 4825, 1376],  # 烧饼轨道 近
+                           [6970, 8311, 600]], dtype=np.float32)  # 坡，另一边角
 
 
 class LOGGER():

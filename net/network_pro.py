@@ -9,9 +9,9 @@ import time
 import cv2
 import os
 from multiprocessing import Process
-from resources.config import net1_onnx,net2_onnx,net1_engine,\
-        net2_engine,net1_cls,net2_cls_names,net2_col_names,\
-            enemy_color
+from resources.config import net1_onnx, net2_onnx, net1_engine, \
+    net2_engine, net1_cls, net2_cls_names, net2_col_names, \
+    enemy_color
 from net.tensorrtx import YoLov5TRT
 
 
@@ -26,14 +26,13 @@ class Predictor(object):
     img_show = True
 
     # net1参数
-    net1_confThreshold = 0.2
+    net1_confThreshold = 0.3
     net1_nmsThreshold = 0.4
     net1_inpHeight = 640
     net1_inpWidth = 640
     net1_onnx_file = net1_onnx
     net1_trt_file = net1_engine
     # 不检测base
-
 
     net1_grid = []
     net1_num_anchors = [3, 3, 3]
@@ -54,6 +53,9 @@ class Predictor(object):
     net2_anchors = [[4, 5], [8, 10], [13, 16], [23, 29], [43, 55], [73, 105], [146, 217], [231, 300], [335, 433]]
     net2_strides = [8, 16, 32]
 
+    net1_time = 0
+    net2_time = 0
+    jaw_time = 0
 
     def __init__(self, _name):
         """
@@ -65,8 +67,8 @@ class Predictor(object):
         # net2初始化
         self._net2 = YoLov5TRT(self.net2_trt_file)
 
-        self.name = _name # 选择的相机是左还是右
-        self.choose_type = 0 #只选择检测cars类，不检测哨兵和基地
+        self.name = _name  # 选择的相机是左还是右
+        self.choose_type = 0  # 只选择检测cars类，不检测哨兵和基地
         self.enemy_color = not enemy_color
         for i in self.net1_strides:
             self.net1_grid.append([self.net1_num_anchors[0], int(self.net1_inpHeight / i), int(self.net1_inpWidth / i)])
@@ -89,31 +91,37 @@ class Predictor(object):
         :param 
         """
         # 检测函数
+
         self.img_src = src.copy()
         # 图像预处理
-        img = cv2.resize(src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv2.INTER_LINEAR)
+        start = time.time()
+        img = cv2.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv2.INTER_LINEAR)
         img = img[:, :, ::-1].transpose(2, 0, 1)
         img = np.ascontiguousarray(img)
         img = img.astype(np.float32)
         img /= 255.0
-        net1_output = self._net1.infer(img,1)[0]
+
+        net1_output = self._net1.infer(img, 1)[0]
         res = self.net1_process(net1_output)
+        self.net1_time += time.time() - start
         if res.shape[0] != 0:
             # get Jigsaw
+            start = time.time()
             res[:, :4] = self.scale_coords((640, 640), res[:, :4], self.img_src.shape).round()
-            net2_img = self.jigsaw(res[:, :4], self.img_src.copy())
+            net2_img = self.jigsaw(res[:, :4], self.img_src)
+            self.jaw_time += time.time() - start
             # Rescale boxes from img_size to im0 size
+            start = time.time()
             net2_output = self.detect_armor(net2_img)
             net2_output = self.net2_output_process(net2_output, det_points=res[:, :4], shape=self.img_src.shape)
             res = np.concatenate([res, net2_output], axis=1)
         else:
-            res =  None
+            res = None
 
         if self.img_show and res is not None:  # 画图
             self.net_show(res)
-
-        return res, self.img_src.copy()
-
+        self.net2_time += time.time() - start
+        return res, self.img_src #cv2.resize(self.img_src, (1024, 1024), interpolation=cv2.INTER_LINEAR)
 
     def detect_armor(self, src):
         """
@@ -126,7 +134,7 @@ class Predictor(object):
         img = np.ascontiguousarray(img)
         img = img.astype(np.float32)
         img /= 255.0
-        net_output = self._net2.infer(img,3)
+        net_output = self._net2.infer(img, 3)
         res = self.net2_process(net_output[0], net_output[1], net_output[2])
         return res
 
@@ -138,7 +146,7 @@ class Predictor(object):
         classIds = []
         confidences = []
         bboxes = []
-        output = output.reshape(-1,26)
+        output = output.reshape(-1, 26)
         choose = output[:, 4] > self.net1_confThreshold
         output = output[choose]
         choose = np.where(choose == True)[0]
@@ -163,7 +171,7 @@ class Predictor(object):
             anchor = self.net1_anchors[n * self.net1_grid[n][0] + c]
             xc = output[i, :]
             max_id = np.argmax(xc[5:])  # 选择置信度最高的 class
-            if max_id != self.choose_type:  #只选择最高的
+            if max_id != self.choose_type:  # 只选择最高的
                 continue
             obj_conf = float(xc[4] * xc[5 + max_id])  # 置信度
             centerX = int(
@@ -195,6 +203,76 @@ class Predictor(object):
             res[:, 2] = res[:, 0] + res[:, 2]
             res[:, 3] = res[:, 1] + res[:, 3]
         return res
+
+    """
+
+    def net1_process(self, output):
+        # 第一个网络的处理
+        
+        # :param res 输出为一个(N,6)的array 或为一个空array
+        
+        classIds = []
+        confidences = []
+        bboxes = []
+        output = output.reshape(-1, 8)
+        choose = self.sigmoid(output[:, 4]) > self.net1_confThreshold
+        output = output[choose]
+        output = self.sigmoid(output)
+        choose = np.where(choose == True)[0]
+        for i in range(0, len(choose)):
+            if choose[i] < 19200:
+                n = 0
+                c = choose[i] // 6400
+                h = (choose[i] % 6400) // self.net1_grid[n][1]
+                w = (choose[i] % 6400) % self.net1_grid[n][2]
+            elif choose[i] > 24000:
+                choose[i] = choose[i] - 24000
+                n = 2
+                c = choose[i] // 400
+                h = (choose[i] % 400) // self.net1_grid[n][1]
+                w = (choose[i] % 400) % self.net1_grid[n][2]
+            else:
+                choose[i] = choose[i] - 19200
+                n = 1
+                c = choose[i] // 1600
+                h = (choose[i] % 1600) // self.net1_grid[n][1]
+                w = (choose[i] % 1600) % self.net1_grid[n][2]
+            anchor = self.net1_anchors[n * self.net1_grid[n][0] + c]
+            xc = output[i, :]
+            max_id = np.argmax(xc[5:])  # 选择置信度最高的 class
+            if max_id != self.choose_type:  # 只选择最高的
+                continue
+            obj_conf = float(xc[4] * xc[5 + max_id])  # 置信度
+            centerX = int(
+                (xc[0] * 2 - 0.5 + w) / self.net1_grid[n][2] * self.net2_inpWidth)
+            centerY = int(
+                (xc[1] * 2 - 0.5 + h) / self.net1_grid[n][1] * self.net2_inpHeight)
+            width = int(pow(xc[2] * 2, 2) * anchor[0])
+            height = int(pow(xc[3] * 2, 2) * anchor[1])
+            left = int(centerX - width / 2)
+            top = int(centerY - height / 2)
+            bboxes.append([left, top, width, height])
+            classIds.append(max_id)
+            confidences.append(obj_conf)
+
+        # NMS筛选
+        indices = cv2.dnn.NMSBoxes(bboxes, confidences, self.net1_confThreshold, self.net1_nmsThreshold)
+        res = []
+
+        if len(indices):
+            for i in indices:
+                # 暂时为完成 boxes 转 numpy
+                bbox = [float(x) for x in bboxes[i[0]]]
+                bbox.append(confidences[i[0]])
+                bbox.append(float(classIds[i[0]]))
+                res.append(bbox)
+
+        res = np.array(res)
+        if res.shape[0] != 0:
+            res[:, 2] = res[:, 0] + res[:, 2]
+            res[:, 3] = res[:, 1] + res[:, 3]
+        return res
+    """
 
     @staticmethod
     def sigmoid(x):
@@ -241,7 +319,7 @@ class Predictor(object):
             xc = output[i, :]
             cls_id = np.argmax(xc[15:15 + 9])  # 选择置信度最高的 class
             col_id = np.argmax(xc[24:])  # 选择置信度最高的 color
-            if col_id != self.enemy_color and cls_id in range(1,6):
+            if col_id != self.enemy_color and cls_id in range(1, 6):
                 continue
             obj_conf = float(xc[4])  # 置信度
             centerX = int(
@@ -256,7 +334,7 @@ class Predictor(object):
             classIds.append(cls_id)
             colorIds.append(col_id)
             confidences.append(obj_conf)
-            
+
         # NMS筛选
         indices = cv2.dnn.NMSBoxes(bboxes, confidences,
                                    self.net2_confThreshold, self.net2_nmsThreshold)
@@ -306,12 +384,11 @@ class Predictor(object):
                 print("error!")
         return jig_picture
 
-
-    def net2_output_process(self,net2_input, det_points, shape):
+    def net2_output_process(self, net2_input, det_points, shape):
         #  对第二层网络输出的处理
         net2_boxes = [[], [], [], [], [], [], [], [], []]
         net2_output = np.full((det_points.shape[0], 8), np.nan)
-        for i in range(det_points.shape[0]): # 满足reporject类的需求，对装甲板进行编号
+        for i in range(det_points.shape[0]):  # 满足reporject类的需求，对装甲板进行编号
             net2_output[i, 7] = i
         if net2_input is None:
             pass
@@ -350,8 +427,8 @@ class Predictor(object):
         self._net2.destroy()
 
     def net_show(self, res):
-        #绘制函数
-        color = (255,0,255)
+        # 绘制函数
+        color = (255, 0, 255)
         line_thickness = 3
         tl = line_thickness  # line/font thickness
         for i in res:
@@ -375,26 +452,38 @@ class Predictor(object):
                             lineType=cv2.LINE_AA)
 
 
-
 if __name__ == '__main__':
     import sys
-    sys.path.append("..")  #单独跑int的时候需要
-    from mul_manager.pro_manager import thread_detect,pub
-    multiprocessing.set_start_method("forkserver",force=True)
-    cap = cv2.VideoCapture("/home/hoshino/CLionProjects/hitsz_radar/resources/two_cam/1.mp4")
-    count = 0
-    t1 = time.time()
-    pre1 = Predictor('cam_left')
+
+    sys.path.append("..")  # 单独跑int的时候需要
+
+    multiprocessing.set_start_method("forkserver", force=True)
+    cap = cv2.VideoCapture("/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/1.mp4")
+    PICS = []
     while cap.isOpened():
         res, frame = cap.read()
         if res:
-            pre1.detect_cars(frame)
+            PICS.append(frame)
         else:
             break
+
+    count = 0
+    t2 = time.time()
+    t1 = time.time()
+    pre1 = Predictor('cam_left')
+
+    for frame in PICS:
+        _, pic = pre1.detect_cars(frame)
+        count += 1
+        cv2.imshow("asd", pic)
+        cv2.waitKey(1)
+        if time.time() - t1 > 1:
+            print(f"fps:{count / (time.time() - t1)}")
+            count = 0
+            t1 = time.time()
     pre1.stop()
+    print(time.time() - t2)
+    print(pre1.net1_time)
+    print(pre1.jaw_time)
+    print(pre1.net2_time)
     print("主线程结束")
-
-
-
-
-

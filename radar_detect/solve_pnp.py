@@ -1,59 +1,73 @@
 """
 预警类
 created by 黄继凡 2021/1
-最新修改 by 黄继凡 2022/1/14
+最新修改 by  lilong 2022/3/20
 """
 import cv2
 import numpy as np
-
-objPoints = np.array([[4021, 3994, 0],# R4下来的角
-                      [7820, 4550, 0], #坡除角
-                      [6756, 6300, 600], #坡上角
-                      [2250, 8311, 1376], #烧饼轨道 u远
-                      [2250,4825,1376], #烧饼轨道 近
-                      [6970, 8311,600]], dtype=np.float32) #坡，另一边角
-# 对象坐标点，此处依次使用定位点坐标1:(7740,4515,0)、
-# 2:(8880,5260,0)、6:(7710,9120,600)、7:(2720,9450,1376)
-objPoints = np.array([[4021, 3994, 0],# R4下来的角
-                      [7820, 4550, 0], #坡除角
-                      [6756, 6300, 600], #坡上角
-                      [2250, 8311, 1376], #烧饼轨道 u远
-                      [2250,4825,1376], #烧饼轨道 近
-                      [6970, 8311,600]], dtype=np.float32) #坡，另一边角
-
-imgPoints = np.zeros((6, 2), dtype=np.float32)
-rvec = np.zeros((3, 1), dtype=np.float64)
-tvec = np.zeros((3, 1), dtype=np.float64)
-# 鼠标回调事件
-count = 0  # 计数，依次确定个点图像坐标
+from location import CameraLocation
+from resources.config import test_objPoints, test_objNames, DEBUG, cam_config
 
 
-def select_callback(event, x, y, flags, param):
-    global count
-    global imgPoints
-    if event == cv2.EVENT_LBUTTONDOWN:  # 鼠标左键开始输入imgPoints
-        imgPoints[count, :] = [float(x), float(y)]
-        if count != 5:
-            count += 1
+class SolvePnp(CameraLocation):
+    imgPoints = np.zeros((6, 2), dtype=np.float32)
+    rvec = np.zeros((3, 1), dtype=np.float64)
+    tvec = np.zeros((3, 1), dtype=np.float64)
+    # 鼠标回调事件
+    count = 0  # 计数，依次确定个点图像坐标
+
+    def __init__(self):
+        super(SolvePnp, self).__init__(self.rvec, self.tvec)
+        self.debug = DEBUG
+        if self.debug:
+            self.count_max = test_objNames.count()
+            self.names = test_objNames
+            self.objPoints = test_objPoints
+        else:
+            self.count_max = test_objNames.count()
+            self.names = test_objNames
+            self.objPoints = test_objPoints
+        self.size = cam_config['cam_left']['size']
+        self.distCoeffs = cam_config['cam_left']['C_0']
+        self.cameraMatrix = cam_config['cam_left']['K_0']
+
+    def add_point(self, x, y) -> bool:
+        self.imgPoints[self.count, :] = [float(x), float(y)]
+        if self.count != self.count_max:
+            self.count += 1
+        else:
+            return False
         print("the coordinate (x,y) is", x, y)
-    if event == cv2.EVENT_MBUTTONDOWN:  # 鼠标中键按下重置imgPoints
-        imgPoints = np.zeros((6, 2))
-        count = 0
 
+    def del_point(self) -> None:
+        if self.count > 0:
+            self.count -= 1
 
-# 四点标定函数
-def locate_pick():
-    cv2.setMouseCallback("PNP", select_callback)
-    while (True):
-        key = cv2.waitKey(0)
-        if key == 13:  # 按下回车键输出rvec、tvec
-            u,rvec,tvec,inliers =cv2.solvePnPRansac(objectPoints=objPoints,
-                                                    distCoeffs=distCoeffs,
-                                                    cameraMatrix=cameraMatrix,
-                                                    imagePoints=imgPoints)
-            break
-    print(rvec,tvec)
-    return rvec, tvec
+    def sel_cam(self, side) -> None:
+        if side == 0:
+            self.size = cam_config['cam_left']['size']
+            self.distCoeffs = cam_config['cam_left']['C_0']
+            self.cameraMatrix = cam_config['cam_left']['K_0']
+        else:
+            self.size = cam_config['cam_right']['size']
+            self.distCoeffs = cam_config['cam_right']['C_0']
+            self.cameraMatrix = cam_config['cam_right']['K_0']
+
+    def save(self) -> None:
+        pass
+
+    def clc(self) -> None:
+        self.imgPoints = np.zeros((6, 2))
+        self.count = 0
+
+    # 四点标定函数
+    def locate_pick(self):
+        _, rvec, tvec, _ = cv2.solvePnPRansac(objectPoints=self.objPoints,
+                                              distCoeffs=self.distCoeffs,
+                                              cameraMatrix=self.cameraMatrix,
+                                              imagePoints=self.imgPoints)
+        self.rvec = rvec
+        self.tvec = tvec
 
 
 if __name__ == "__main__":

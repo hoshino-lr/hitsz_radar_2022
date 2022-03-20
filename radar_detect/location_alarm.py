@@ -95,13 +95,13 @@ class Alarm(draw_map.CompeteMap):
         self._location_cache = [self._location.copy(), self._location.copy()]
 
     def push_T(self, T, camera_position, camera_type):
-        '''
+        """
         位姿信息
 
         :param T:相机到世界转移矩阵
         :param camera_position:相机在世界坐标系坐标
         :param camera_type:相机编号，若为单相机填0
-        '''
+        """
         if camera_type > 0 and not self._two_camera:
             return
 
@@ -109,12 +109,12 @@ class Alarm(draw_map.CompeteMap):
         self._T[camera_type] = T.copy()
 
     def _check_alarm(self):
-        '''
+        """
         预警检测
 
         alarming:各区域是否有预警;
         base_alarming:基地是否有预警
-        '''
+        """
         alarming = False 
         base_alarming = False
         for loc in self._region.keys():
@@ -168,12 +168,12 @@ class Alarm(draw_map.CompeteMap):
         return alarming, base_alarming
 
     def _adjust_z_one_armor(self, l, camera_type):
-        '''
+        """
         z轴突变调整，仅针对一个装甲板
 
         :param l:(cls+x+y+z) 一个id的位置
         :param camera_type:相机编号
-        '''
+        """
         if isinstance(self._z_cache[camera_type], np.ndarray):
             mask = np.array(self._z_cache[camera_type][:, 0] == l[0])  # 检查上一帧缓存z坐标中有没有对应id
             if mask.any():
@@ -194,17 +194,17 @@ class Alarm(draw_map.CompeteMap):
 
 
     def show(self):
-        '''
+        """
         执行预警闪烁并画点显示地图
-        '''
+        """
         super(Alarm, self)._twinkle(self._region)
         super(Alarm, self)._update(self._location)
         super(Alarm, self)._show()
 
     def _location_prediction(self):
-        '''
+        """
         位置预测
-        '''
+        """
         
         # 次数统计
         # 若次数为1则不能预测，此时time_equal_one对应元素为1 time_equal_zero对应元素为0
@@ -251,9 +251,9 @@ class Alarm(draw_map.CompeteMap):
         self._location_cache[1] = self._location.copy()
 
     def check(self):
-        '''
+        """
         预警检测
-        '''
+        """
         alarming, base_alarming = self._check_alarm()
 
         return alarming, base_alarming
@@ -378,13 +378,13 @@ class Alarm(draw_map.CompeteMap):
             self._touch_api.api_error('[ERROR] This update function only supports two_camera case, using update instead.')
 
     def update(self, t_location):
-        '''
-        
+        """
+
         #单相机使用
         :param t_location: the predicted locations [N,cls+x+y+z]
         :param radar:the radar class
 
-        '''
+        """
 
         if not self._two_camera:
 

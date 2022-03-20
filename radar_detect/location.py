@@ -10,7 +10,6 @@ import re
 from pathlib import Path
 
 import numpy as np
-import cv2
 
 
 class CameraLocation(object):
@@ -90,3 +89,4 @@ class CameraLocation(object):
         # file_name = f"{datetime.datetime.now()}" if file_name is None else file_name
         rotation_file_path, translation_file_path = cls.__get_file_path(file_name)
         return CameraLocation(np.fromfile(rotation_file_path), np.fromfile(translation_file_path))
+

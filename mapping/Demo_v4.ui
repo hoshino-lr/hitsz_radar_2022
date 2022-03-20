@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1351</width>
-    <height>978</height>
+    <width>1700</width>
+    <height>982</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,7 +16,58 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout_2">
     <item>
-     <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0">
+     <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0">
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <property name="spacing">
+         <number>5</number>
+        </property>
+        <property name="leftMargin">
+         <number>5</number>
+        </property>
+        <property name="topMargin">
+         <number>5</number>
+        </property>
+        <property name="rightMargin">
+         <number>5</number>
+        </property>
+        <property name="bottomMargin">
+         <number>5</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="side_demo">
+          <property name="minimumSize">
+           <size>
+            <width>320</width>
+            <height>540</height>
+           </size>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::Box</enum>
+          </property>
+          <property name="text">
+           <string>side_demo</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="blood">
+          <property name="minimumSize">
+           <size>
+            <width>320</width>
+            <height>350</height>
+           </size>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::Box</enum>
+          </property>
+          <property name="text">
+           <string>blood</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
       <item>
        <layout class="QGridLayout" name="left" rowstretch="7,0">
         <property name="leftMargin">
@@ -35,22 +86,31 @@
          <number>10</number>
         </property>
         <item row="1" column="0" colspan="6">
-         <widget class="QLabel" name="messagebox">
+         <widget class="QLabel" name="far_demo">
           <property name="minimumSize">
            <size>
             <width>320</width>
-            <height>280</height>
+            <height>320</height>
            </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>320</width>
+            <height>320</height>
+           </size>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::Box</enum>
           </property>
           <property name="midLineWidth">
            <number>3</number>
           </property>
           <property name="text">
-           <string>message_box</string>
+           <string>far_demo</string>
           </property>
          </widget>
         </item>
-        <item row="0" column="0" colspan="7">
+        <item row="0" column="0" colspan="8">
          <widget class="QLabel" name="main_demo">
           <property name="minimumSize">
            <size>
@@ -60,9 +120,12 @@
           </property>
           <property name="maximumSize">
            <size>
-            <width>16777215</width>
-            <height>16777215</height>
+            <width>960</width>
+            <height>540</height>
            </size>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::Box</enum>
           </property>
           <property name="text">
            <string>main_demo</string>
@@ -77,14 +140,69 @@
             <height>280</height>
            </size>
           </property>
+          <property name="maximumSize">
+           <size>
+            <width>360</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="mouseTracking">
+           <bool>false</bool>
+          </property>
           <property name="focusPolicy">
            <enum>Qt::NoFocus</enum>
           </property>
           <property name="autoFillBackground">
            <bool>false</bool>
           </property>
+          <property name="styleSheet">
+           <string notr="true">background-color:rgb(240, 240, 240);</string>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::Box</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Sunken</enum>
+          </property>
+          <property name="tabChangesFocus">
+           <bool>false</bool>
+          </property>
+          <property name="undoRedoEnabled">
+           <bool>false</bool>
+          </property>
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="markdown">
+           <string>信息显示栏
+
+</string>
+          </property>
+          <property name="html">
+           <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Microsoft YaHei UI'; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:6px; margin-bottom:6px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;信息显示栏&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
           <property name="openExternalLinks">
            <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="7">
+         <widget class="QLabel" name="condition">
+          <property name="minimumSize">
+           <size>
+            <width>300</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::Box</enum>
+          </property>
+          <property name="text">
+           <string>condition</string>
           </property>
          </widget>
         </item>
@@ -122,7 +240,7 @@
            </size>
           </property>
           <property name="frameShape">
-           <enum>QFrame::NoFrame</enum>
+           <enum>QFrame::Box</enum>
           </property>
           <property name="text">
            <string>map</string>
@@ -144,12 +262,12 @@
            </size>
           </property>
           <property name="text">
-           <string>btn1</string>
+           <string>Change  View</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="choose4points">
+         <widget class="QPushButton" name="epnp">
           <property name="minimumSize">
            <size>
             <width>115</width>
@@ -163,12 +281,12 @@
            </size>
           </property>
           <property name="text">
-           <string>btn2</string>
+           <string>epnp</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="StartRecord">
+         <widget class="QPushButton" name="record">
           <property name="minimumSize">
            <size>
             <width>115</width>
@@ -182,12 +300,12 @@
            </size>
           </property>
           <property name="text">
-           <string>btn3</string>
+           <string>record</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="btn4">
+         <widget class="QPushButton" name="close">
           <property name="minimumSize">
            <size>
             <width>115</width>
@@ -201,7 +319,7 @@
            </size>
           </property>
           <property name="text">
-           <string>btn4</string>
+           <string>close</string>
           </property>
          </widget>
         </item>
@@ -216,8 +334,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1351</width>
-     <height>28</height>
+     <width>1700</width>
+     <height>26</height>
     </rect>
    </property>
   </widget>
@@ -242,7 +360,7 @@
    </hints>
   </connection>
   <connection>
-   <sender>choose4points</sender>
+   <sender>epnp</sender>
    <signal>clicked()</signal>
    <receiver>MainWindow</receiver>
    <slot>btn2_on_clicked()</slot>
@@ -258,7 +376,7 @@
    </hints>
   </connection>
   <connection>
-   <sender>StartRecord</sender>
+   <sender>record</sender>
    <signal>clicked()</signal>
    <receiver>MainWindow</receiver>
    <slot>btn3_on_clicked()</slot>
@@ -274,7 +392,7 @@
    </hints>
   </connection>
   <connection>
-   <sender>btn4</sender>
+   <sender>close</sender>
    <signal>clicked()</signal>
    <receiver>MainWindow</receiver>
    <slot>btn4_on_clicked()</slot>

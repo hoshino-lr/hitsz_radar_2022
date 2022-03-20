@@ -8,9 +8,8 @@ import numpy as np
 import sys
 from resources.config import cam_config  # 相机参数
 from radar_detect.common import is_inside
-from resources.config import color2enemy, enemy_case,real_size,enemy_color,cam_config,\
-    DEBUG,test_region,region
-
+from resources.config import color2enemy, enemy_case, real_size, enemy_color, cam_config, \
+    DEBUG, test_region, region
 
 
 class Reproject(object):
@@ -37,7 +36,7 @@ class Reproject(object):
         self._cache = None
         self._debug = DEBUG
         self._scene_init = False
-        self.push_T(self._tvec,self._rvec)
+        self.push_T(self._tvec, self._rvec)
 
     def _plot_regin(self):
         '''
@@ -106,9 +105,9 @@ class Reproject(object):
         return T, (T @ (np.array([0, 0, 0, 1])))[:3]
 
     def update(self, result, frame):
-        '''
+        """
         更新一帧
-        '''
+        """
         for i in self._scene_region.keys():
             recor = self._scene_region[i]
             type, shape_type, team, location, height_type = i.split('_')
@@ -117,7 +116,7 @@ class Reproject(object):
             else:
                 for p in recor:
                     cv2.circle(frame, tuple(p), 10, (0, 255, 0), -1)
-                cv2.polylines(frame, [recor], 1,(0, 0, 255))
+                cv2.polylines(frame, [recor], 1, (0, 0, 255))
         if result is not None:
             for i in result.keys():
                 recor = self._scene_region[i]
@@ -126,8 +125,6 @@ class Reproject(object):
                     continue
                 else:
                     cv2.polylines(frame, [recor], 1, (0, 255, 0))
-        return frame
-
 
     def check(self, armors, cars):
         '''
@@ -176,14 +173,15 @@ class Reproject(object):
                             now_bbox[2] += now_bbox[4] * 3
                             now_bbox[1] += now_bbox[3]
                             # TODO：Debug绘制装甲板
-                            now_bbox = now_bbox.reshape(-1,5)
+                            now_bbox = now_bbox.reshape(-1, 5)
                             pred_cls.append(np.array([i]))  # 预测出的装甲板类型
                             p_bbox.append(now_bbox[:, 1:].reshape(-1, 4))  # 预测出的bbox
 
             if len(pred_cls):
                 # 将cls和四点合并
-                pred_bbox = np.concatenate([np.stack(pred_cls, axis=0).reshape(-1, 1),np.stack(p_bbox, axis=0).reshape(-1,4)],
-                                           axis=1)
+                pred_bbox = np.concatenate(
+                    [np.stack(pred_cls, axis=0).reshape(-1, 1), np.stack(p_bbox, axis=0).reshape(-1, 4)],
+                    axis=1)
             # 默认使用bounding box为points四点
             x1 = armors[:, 2].reshape(-1, 1)
             y1 = armors[:, 3].reshape(-1, 1)
@@ -199,8 +197,8 @@ class Reproject(object):
             if isinstance(color_bbox, np.ndarray):
                 # 预估装甲板位置，见技术报告
                 color_cls = color_bbox[:, 0].reshape(-1, 1)
-                color_bbox[:, 3] = (color_bbox[:, 3] - color_bbox[:,1]) // 3
-                color_bbox[:, 4] = (color_bbox[:, 4] - color_bbox[:,2]) // 5
+                color_bbox[:, 3] = (color_bbox[:, 3] - color_bbox[:, 1]) // 3
+                color_bbox[:, 4] = (color_bbox[:, 4] - color_bbox[:, 2]) // 5
                 color_bbox[:, 1] += color_bbox[:, 3]
                 color_bbox[:, 2] += color_bbox[:, 4] * 3
                 x1 = color_bbox[:, 1]
@@ -228,13 +226,15 @@ class Reproject(object):
             self._cache = None
         return rp_alarming, pred_bbox
 
+
 if __name__ == "__main__":
     ori = cv2.imread("/home/hoshino/CLionProjects/hitsz_radar/resources/beijing.png")
     frame = ori.copy()
     repo = Reproject(frame=frame, name='cam_left')
-    _,_,region11 = repo.push_T(cam_config['cam_left']['rvec'],cam_config['cam_left']['tvec'])
+    _, _, region11 = repo.push_T(cam_config['cam_left']['rvec'], cam_config['cam_left']['tvec'])
     from resources.config import cam_config, test_region, enemy_color, \
         real_size
+
     frame = ori.copy()
     rect_armor = cv2.selectROI("img", frame, False)
     rect_car = cv2.selectROI("img", frame, False)
@@ -250,9 +250,9 @@ if __name__ == "__main__":
         # 为了统一采用is_inside来判断是否在图像内
         # 分别在实际相机图和深度图上画ROI框来对照
         cv2.rectangle(frame, (rect_car[0], rect_car[1]), (rect_car[0] + rect_car[2]
-        , rect_car[1] + rect_car[3]), (0, 255, 0), 3)
+                                                          , rect_car[1] + rect_car[3]), (0, 255, 0), 3)
         cv2.rectangle(frame, (rect_armor[0], rect_armor[1]), (rect_armor[0] + rect_armor[2]
-        , rect_armor[1] + rect_armor[3]), (0, 255, 0), 3)
+                                                              , rect_armor[1] + rect_armor[3]), (0, 255, 0), 3)
         cv2.imshow("img", frame)
         if key == ord('r') & 0xFF:
             # 重选区域
@@ -265,16 +265,7 @@ if __name__ == "__main__":
             frame = ori.copy()
         if key == ord('s') & 0xFF:
             # 显示世界坐标系和相机坐标系坐标和深度，以对测距效果进行粗略测试
-            armor = np.array([1,0,rect_armor[0],rect_armor[1],rect_armor[2],rect_armor[3]]).reshape((-1,6))
-            car = np.array([1,rect_car[0],rect_car[1],rect_car[2],rect_car[3]]).reshape((-1, 5))
-            result = repo.check(armors=armor,cars=car)
+            armor = np.array([1, 0, rect_armor[0], rect_armor[1], rect_armor[2], rect_armor[3]]).reshape((-1, 6))
+            car = np.array([1, rect_car[0], rect_car[1], rect_car[2], rect_car[3]]).reshape((-1, 5))
+            result = repo.check(armors=armor, cars=car)
             print(result)
-
-
-
-
-
-
-
-
-
