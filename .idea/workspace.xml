@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="66fee784-bd18-4e69-8add-6ded8f98fd3e" name="Changes" comment="">
+    <list default="true" id="66fee784-bd18-4e69-8add-6ded8f98fd3e" name="Changes" comment="add location_alarm.py">
       <change beforePath="$PROJECT_DIR$/radar_detect/location_alarm.py" beforeDir="false" afterPath="$PROJECT_DIR$/radar_detect/location_alarm.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -11,7 +10,20 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="3d5c776b2ce1a1c808adc977ee7654c08343d9c4" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GithubPullRequestsUISettings">
+    <option name="selectedUrlAndAccountId">
+      <UrlAndAccount>
+        <option name="accountId" value="c1c369cf-a691-4768-a906-c00b0bfb94d7" />
+        <option name="url" value="https://github.com/hoshino-lr/hitsz_radar_2022.git" />
+      </UrlAndAccount>
+    </option>
   </component>
   <component name="ProjectId" id="26gULXvXFwRrmbKaypY41Jnuaiy" />
   <component name="ProjectViewState">
@@ -33,6 +45,21 @@
       <option name="presentableId" value="Default" />
       <updated>1647844668117</updated>
     </task>
+    <task id="LOCAL-00001" summary="add location_alarm.py">
+      <created>1647846196514</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1647846196514</updated>
+    </task>
+    <task id="LOCAL-00002" summary="add location_alarm.py">
+      <created>1647846256596</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1647846256596</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -45,5 +72,10 @@
         </entry>
       </map>
     </option>
+    <option name="oldMeFiltersMigrated" value="true" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="add location_alarm.py" />
+    <option name="LAST_COMMIT_MESSAGE" value="add location_alarm.py" />
   </component>
 </project>
