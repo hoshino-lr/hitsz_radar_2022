@@ -4,10 +4,10 @@
 import time
 
 import numpy as np
-from official import official_Judge_Handler, Game_data_define
-from port_operation import Port_operate
+from .official import official_Judge_Handler, Game_data_define
+from .port_operation import Port_operate
 from resources.config import enemy_color
-from HP_show import HP_scene
+from .HP_show import HP_scene
 
 buffer = [0]
 bufferbyte = 0

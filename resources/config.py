@@ -7,21 +7,20 @@ created by 李龙 2021/12
 """
 import os
 import numpy as np
-import logging
 
 enemy_color = 0
 USEABLE = {
     "cam_left": True,
-    "cam_right": True,
+    "cam_right": False,
     "serial": False,
     "Lidar": False,
 }
-DEBUG = True
+DEBUG = False
 BO = 0
 cam_config = {
     "cam_right": {
         "id": "00F78889001",
-        "size": (1024, 1024),
+        "size": (3072, 2048),
         "video_path": "/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/1.mp4",
         "K_0": np.mat([[1273.6729986357857, 0.0, 598.3779780737999],
                        [0.0, 1274.0066230685838, 531.2012102435624],
@@ -40,6 +39,26 @@ cam_config = {
         ])},
 
     "cam_left": {
+        "id": "J37877236",
+        "size": (3072, 2048),
+        "video_path": "/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/2.mp4",
+        "K_0": np.mat([[1273.6729986357857, 0.0, 598.3779780737999],
+                       [0.0, 1274.0066230685838, 531.2012102435624],
+                       [0.0, 0.0, 1.0]]),
+        "C_0": np.mat([[-0.22753846151806761], [0.2209031621277345], [-0.0006069352871209068], [-0.0006361387371312384],
+                       [0.02412961227405689]]),
+        "exposure": 5000,
+        "gain": 15,
+        "rvec": np.mat([[1.59668528], [0.58626031], [-0.53932911]]),
+        "tvec": np.mat([[-8625.00028137], [771.3457855], [6926.60950051]]),
+        "E_0": np.mat([
+            [0.0474247, -0.998873, -0.0019402, -0.00701503],
+            [0.12093, 0.00766964, -0.992631, -0.0844397],
+            [0.991528, 0.0468406, 0.121157, 0.0749353],
+            [0, 0, 0, 1]
+        ])},
+
+    "cam_far": {
         "id": "00F78889001",
         "size": (1024, 1024),
         "video_path": "/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/2.mp4",
@@ -58,6 +77,7 @@ cam_config = {
             [0.991528, 0.0468406, 0.121157, 0.0749353],
             [0, 0, 0, 1]
         ])}
+
 }
 
 net1_onnx = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net1_sim.onnx"
@@ -119,51 +139,3 @@ test_objPoints = np.array([[4021, 3994, 0],  # R4下来的角
                            [2250, 4825, 1376],  # 烧饼轨道 近
                            [6970, 8311, 600]], dtype=np.float32)  # 坡，另一边角
 
-
-class LOGGER():
-    """
-    logger 类
-    """
-
-    def __init__(self, text_api):
-        # 创建一个logger
-        import time
-        logger_name = time.strftime('%Y-%m-%d %H-%M-%S')
-        self.logger = logging.getLogger(logger_name)
-        self.logger.setLevel(logging.DEBUG)
-        self.api = text_api
-        # 创建一个handler，用于写入日志文件
-        log_path = os.path.abspath(os.getcwd()) + "/logs/"  # 指定文件输出路径
-        if not os.path.exists(log_path):
-            os.makedirs(log_path)
-        logname = log_path + logger_name + '.log'  # 指定输出的日志文件名
-        fh = logging.FileHandler(logname, encoding='utf-8')  # 指定utf-8格式编码，避免输出的日志文本乱码
-        fh.setLevel(logging.DEBUG)
-
-        # 创建一个handler，用于将日志输出到控制台
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-
-        # 定义handler的输出格式
-        formatter = logging.Formatter('%(asctime)s-%(levelname)s-%(message)s')
-        fh.setFormatter(formatter)
-        ch.setFormatter(formatter)
-
-        # 给logger添加handler
-        self.logger.addHandler(fh)
-        self.logger.addHandler(ch)
-
-    def add_text(self, handle, text, show_api=True):
-        """
-        :param handle 警告类型 有 WARNING ERROR INFO 三种
-        :param text 输入的文字
-        :param show_api 是否显示在 ui 上
-        """
-        if handle == "WARNING":
-            self.logger.warning(text)
-        if handle == "ERROR":
-            self.logger.error(text)
-        if handle == "INFO":
-            self.logger.info(text)
-        if show_api:
-            self.api(handle, text)

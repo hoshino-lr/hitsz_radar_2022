@@ -11,17 +11,63 @@ import numpy as np
 import multiprocessing
 import threading
 import serial
+import logging
+import os
 
 from camera.cam_new import Camera
 from net.network_pro import Predictor
 from radar_detect.Linar import Radar
 from radar_detect.reproject import Reproject
 from radar_detect.location_alarm import Alarm
-from resources.config import DEBUG, LOGGER, USEABLE, enemy_color, test_region, cam_config
+from resources.config import DEBUG, USEABLE, enemy_color, test_region, cam_config
 from mul_manager.pro_manager import sub, pub
 from mapping.mainEntry import Mywindow
 from Serial.UART import read, write
 from Serial.HP_show import HP_scene
+from Serial.port_operation import Port_operate
+
+
+class LOGGER(object):
+    """
+    logger 类
+    """
+
+    def __init__(self):
+        # 创建一个logger
+        import time
+        logger_name = time.strftime('%Y-%m-%d %H-%M-%S')
+        self.terminal = sys.stdout
+        self.logger = logging.getLogger(logger_name)
+        self.logger.setLevel(logging.DEBUG)
+        # 创建一个handler，用于写入日志文件
+        log_path = os.path.abspath(os.getcwd()) + "/logs/"  # 指定文件输出路径
+        if not os.path.exists(log_path):
+            os.makedirs(log_path)
+        logname = log_path + logger_name + '.log'  # 指定输出的日志文件名
+        fh = logging.FileHandler(logname, encoding='utf-8')  # 指定utf-8格式编码，避免输出的日志文本乱码
+        fh.setLevel(logging.DEBUG)
+
+        # 定义handler的输出格式
+        formatter = logging.Formatter('%(asctime)s-%(levelname)s-%(message)s')
+        fh.setFormatter(formatter)
+
+        # 给logger添加handler
+        self.logger.addHandler(fh)
+
+    def write(self, message):
+        self.terminal.write(message)
+        if "[ERROR]" in message:
+            self.logger.error(message)
+        elif "[WARNING]" in message:
+            self.logger.warning(message)
+        else:
+            self.logger.info(message)
+
+    def flush(self):
+        pass
+
+    def __del__(self):
+        pass
 
 
 class Radar_main(object):
@@ -47,8 +93,8 @@ class Radar_main(object):
     __save_title = ''  # 当场次录制文件夹名
 
     def __init__(self):
-        self.logger = LOGGER(lambda tp, pos, mes: myshow.set_text(tp, pos, mes))
-        self.text_api = lambda x, y, z: self.logger.add_text(x, y, z)
+        self.hp_sence = HP_scene(enemy_color, lambda x: myshow.set_image(x, "blood"))
+        self.text_api = lambda x, y, z: myshow.set_text(x, y, z)
         self.show_api = lambda x: myshow.set_image(x, "main_demo")
         self.show_map = lambda x: myshow.set_image(x, "map")
         self.__cam_left = USEABLE['cam_left']
@@ -68,6 +114,7 @@ class Radar_main(object):
             self.PRE_right.daemon = True
             self.repo_right = Reproject('cam_right')
         self.lidar = Radar('cam_right', text_api=self.text_api)
+        self.e_location = {}
         # self.__cam_far = Camera("cam_far", DEBUG)
         if self.__Lidar:
             self.lidar.start()
@@ -140,9 +187,9 @@ class Radar_main(object):
         else:
             armors = res_temp[:, [11, 13, 6, 7, 8, 9]]
             cars = res_temp[:, [11, 0, 1, 2, 3]]
-            # result = self.repo_left.check(armors, cars)
-            # if result[0] is not None:
-            #     self.text_api("INFO", "Repro left", str(result[0].keys()))
+            result = self.repo_left.check(armors, cars)
+            if result[0] is not None:
+                self.text_api("INFO", "Repro left", str(result[0].keys()))
             self.repo_left.update(None, self.__res_left[1])
         res_temp = self.__res_right[0]
         if res_temp is None:
@@ -150,9 +197,10 @@ class Radar_main(object):
         else:
             armors = res_temp[:, [11, 13, 6, 7, 8, 9]]
             cars = res_temp[:, [11, 0, 1, 2, 3]]
-            # result = self.repo_left.check(armors, cars)
-            # if result[0] is not None:
-            #     self.text_api("INFO", "Repro right", str(result[0].keys()))
+            result = self.repo_left.check(armors, cars)
+            self.e_location = result[1]
+            if result[0] is not None:
+                self.text_api("INFO", "Repro right", str(result[0].keys()))
             self.repo_right.update(None, self.__res_right[1])
 
     def update_location_alarm(self):
@@ -171,7 +219,7 @@ class Radar_main(object):
                 location = np.zeros((10, 4)) * np.nan
                 for i in xyz:
                     location[int(i[0]), :] = i
-                self.loc_alarm.update(location)
+                self.loc_alarm.update(location, self.e_location)
                 self.loc_alarm.show()
 
     def spin_once(self):
@@ -190,6 +238,9 @@ class Radar_main(object):
             self.update_reproject()
             self.update_image()
             self.update_location_alarm()
+        if self.__serial:
+            Port_operate.get_message(self.hp_sence)
+            self.hp_sence.show()
         if myshow.terminate:
             self._event_close.set()
             if self.__cam_left:
@@ -204,20 +255,21 @@ def process_detect(event, que, Event_Close, name):
     print(f"子线程开始:{name}")
     predictor = Predictor(name)
     cam = Camera(name, DEBUG)
-    # count = 0
-    # t1 = 0
+    count = 0
+    t1 = 0
     while not Event_Close.is_set():
         frame = cam.get_img()
         if frame is not None:
-            #       t3 = time.time()
+            t3 = time.time()
             res = predictor.detect_cars(frame)
-            pub(event, que, res)
-    #      t1 = t1 + time.time() - t3
-    #     count += 1
 
+            pub(event, que, res)
+            t1 = t1 + time.time() - t3
+            count += 1
+    cam.destroy()
     predictor.stop()
-    # fps = float(count) / t1
-    # print(f'{name} count:{count} fps: {int(fps)}')
+    fps = float(count) / t1
+    print(f'{name} count:{count} fps: {int(fps)}')
     print(f"相机网络子进程:{name} 退出")
     sys.exit()
 
@@ -226,6 +278,7 @@ if __name__ == "__main__":
     multiprocessing.set_start_method('spawn')
     # ui
     app = QtWidgets.QApplication(sys.argv)
+    sys.stdout = LOGGER()
     myshow = Mywindow()
     radar_main = Radar_main()
     radar_main.start()

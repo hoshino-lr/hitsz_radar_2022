@@ -5,7 +5,7 @@ created by 黄继凡 2021/1
 """
 import cv2
 import numpy as np
-from location import CameraLocation
+from .location import CameraLocation
 from resources.config import test_objPoints, test_objNames, DEBUG, cam_config
 
 
@@ -20,11 +20,11 @@ class SolvePnp(CameraLocation):
         super(SolvePnp, self).__init__(self.rvec, self.tvec)
         self.debug = DEBUG
         if self.debug:
-            self.count_max = test_objNames.count()
+            self.count_max = len(test_objNames)
             self.names = test_objNames
             self.objPoints = test_objPoints
         else:
-            self.count_max = test_objNames.count()
+            self.count_max = len(test_objNames)
             self.names = test_objNames
             self.objPoints = test_objPoints
         self.size = cam_config['cam_left']['size']
@@ -33,7 +33,7 @@ class SolvePnp(CameraLocation):
 
     def add_point(self, x, y) -> bool:
         self.imgPoints[self.count, :] = [float(x), float(y)]
-        if self.count != self.count_max:
+        if self.count < self.count_max:
             self.count += 1
         else:
             return False

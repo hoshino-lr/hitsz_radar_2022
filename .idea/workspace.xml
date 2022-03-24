@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="66fee784-bd18-4e69-8add-6ded8f98fd3e" name="Changes" comment="add location_alarm.py">
-      <change beforePath="$PROJECT_DIR$/radar_detect/location_alarm.py" beforeDir="false" afterPath="$PROJECT_DIR$/radar_detect/location_alarm.py" afterDir="false" />
-    </list>
+    <list default="true" id="66fee784-bd18-4e69-8add-6ded8f98fd3e" name="Changes" comment="add location_alarm.py" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -59,7 +57,21 @@
       <option name="project" value="LOCAL" />
       <updated>1647846256596</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="add location_alarm.py">
+      <created>1647846281476</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1647846281476</updated>
+    </task>
+    <task id="LOCAL-00004" summary="add location_alarm.py">
+      <created>1647846290858</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1647846290858</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

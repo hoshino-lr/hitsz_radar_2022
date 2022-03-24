@@ -7,33 +7,10 @@ import cv2
 from matplotlib.pyplot import axis
 import numpy as np
 from numpy.lib.arraysetops import isin
-
+from radar_detect.common import is_inside
 import mapping.draw_map as draw_map #引入draw_map模块，使用其中的CompeteMap类
 from resources.config import armor_list, color2enemy, enemy_case,cam_config,real_size
 
-# 此函数来自上交源码的common.py文件，可考虑删除，通过模块引入使用该函数
-def is_inside(box: np.ndarray, point: np.ndarray):
-    '''
-    判断点是否在凸四边形中
-    :param box:为凸四边形的四点 shape is (4,2)
-    :param point:为需判断的是否在内的点 shape is (2,)
-    '''
-    assert box.shape == (4, 2)
-    assert point.shape == (2,)
-    AM = point - box[0]
-    AB = box[1] - box[0]
-    BM = point - box[1]
-    BC = box[2] - box[1]
-    CM = point - box[2]
-    CD = box[3] - box[2]
-    DM = point - box[3]
-    DA = box[0] - box[3]
-    a = np.cross(AM, AB)
-    b = np.cross(BM, BC)
-    c = np.cross(CM, CD)
-    d = np.cross(DM, DA)
-    return a >= 0 and b >= 0 and c >= 0 and d >= 0 or \
-           a <= 0 and b <= 0 and c <= 0 and d <= 0
 
 class Alarm(draw_map.CompeteMap):
     '''

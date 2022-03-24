@@ -13,6 +13,7 @@ from resources.config import net1_onnx, net2_onnx, net1_engine, \
     net2_engine, net1_cls, net2_cls_names, net2_col_names, \
     enemy_color
 from net.tensorrtx import YoLov5TRT
+from radar_detect.common import armor_filter
 
 
 class Predictor(object):
@@ -80,14 +81,14 @@ class Predictor(object):
         # 管道初始化
         """
         :param pub
-        :param cammera
+        :param cam
         """
         self.pub = pub
         self.sub = cam
 
     def detect_cars(self, src):
         """
-        :param src 1024x1024
+        :param src 3072x2048
         :param 
         """
         # 检测函数
@@ -121,7 +122,8 @@ class Predictor(object):
         if self.img_show and res is not None:  # 画图
             self.net_show(res)
         self.net2_time += time.time() - start
-        return res, self.img_src #cv2.resize(self.img_src, (1024, 1024), interpolation=cv2.INTER_LINEAR)
+        armor_filter(res)
+        return res, self.img_src
 
     def detect_armor(self, src):
         """

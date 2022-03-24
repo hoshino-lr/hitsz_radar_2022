@@ -3,7 +3,7 @@
 '''
 import numpy as np
 
-from official import Game_data_define, official_Judge_Handler
+from .official import Game_data_define, official_Judge_Handler
 from resources.config import enemy_color, BO
 
 
