@@ -24,7 +24,7 @@ from resources.config import PC_STORE_DIR, LIDAR_TOPIC_NAME,BAG_FIRE
 
 
 class DepthQueue(object):
-    def __init__(self, capacity, size, K_0,C_0, E_0):
+    def __init__(self, capacity, size, K_0, C_0, E_0):
         '''
         用队列关系储存点云
         :param capacity: the maximum length of depth queue
@@ -269,6 +269,9 @@ class Radar(object):
             return False
 
     def preload(self):
+        '''
+        预加载雷达点云，debug用
+        '''
         lidar_bag = rosbag.Bag(BAG_FIRE, "r")
         topic = '/livox/lidar'
         bag_data = lidar_bag.read_messages(topic)

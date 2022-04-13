@@ -6,12 +6,12 @@ import ctypes
 import os
 
 from ctypes import *
-from CameraParams_const import *
-from CameraParams_header import *
-from MvCameraControl_header import *
-from MvErrorDefine_const import *
-from PixelType_const import *
-from PixelType_header import *
+from .CameraParams_const import *
+from .CameraParams_header import *
+from .MvCameraControl_header import *
+from .MvErrorDefine_const import *
+from .PixelType_const import *
+from .PixelType_header import *
 
 MvCamCtrldll = ctypes.cdll.LoadLibrary(os.getenv('MVCAM_COMMON_RUNENV') + "/64/libMvCameraControl.so")
 

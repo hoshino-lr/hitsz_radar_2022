@@ -1,6 +1,6 @@
-'''
+"""
 串口相关操作类
-'''
+"""
 import numpy as np
 
 from .official import Game_data_define, official_Judge_Handler
@@ -15,6 +15,9 @@ class Port_operate(object):
     _Game_Start_Flag = False
     _Game_End_Flag = False
     Remain_time = 0  # 剩余时间
+
+    change_view = False
+    missile_stage = False  # into stage 2
 
     _init_hp = np.ones(10, dtype=int) * 500  # 初始血量
     _HP = np.ones(16, dtype=int) * 500  # 血量
@@ -148,4 +151,6 @@ class Port_operate(object):
     def Receive_Robot_Data(buffer):
         # 车间通信
         if (0x0000 | buffer[7]) | (buffer[8] << 8) == 0x0200:
-            print("received")
+            Port_operate.change_view = True
+        if (0x0000 | buffer[7]) | (buffer[8] << 8) == 0x0201:
+            Port_operate.missile_stage = True

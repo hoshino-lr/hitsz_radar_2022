@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import traceback
 import time
-from common import is_inside
+from radar_detect.common import is_inside
 
 
 def missile_filter(frame_m, red=True):
@@ -42,15 +42,24 @@ class Missile(object):
     _region_thre = [100, 40000]  # 响应区域bounding box大小上下限
     _intensity_bound = 175  # 亮度
 
-    def __init__(self, enemy, debug=False):
+    def __init__(self, enemy: int, text_api=None, board_api=None, debug=False):
         """
         :param enemy: 敌方
+        :param api ui show
         :param debug: 调参
         """
+        self._stage = 1
+        self._pre_stage = False
+        self._launch = False
         self._init_flag = False
         self._debug = debug
         self._enemy = enemy
-        self._two_stage_time = 0  # 第二阶段开始的时间
+        self._text_api = text_api
+        self._board_api = board_api
+        self._pre_stage_time = time.time()
+        self._two_stage_time = time.time()  # 第二阶段开始的时间
+        self._launch_time = time.time()
+        self._launch_num = 0
         self._region = [None, None]
         self._roi = [None, None]
         self._previous_frame = [None, None]
@@ -68,7 +77,7 @@ class Missile(object):
             cv2.setTrackbarMin("s", "missile_debug", 0)
             cv2.setTrackbarPos("s", "missile_debug", 200)
 
-    def _push_init(self, init_frame, region):
+    def _push_init(self, init_frame: np.ndarray, region: dict) -> None:
         """
         进行初始化
 
@@ -96,11 +105,10 @@ class Missile(object):
             self._previous_frame[1] = init_frame[300:580, 1250:1800].copy()
             self._init_flag = True
 
-    def detect(self, img: np.ndarray, region: dict, stage):
+    def _detect(self, img: np.ndarray, region: dict, stage: int) -> bool:
         """
         :param img: 每一帧
         :param region: 检测区域
-        :param stage: 第几阶段
         """
         if self._debug:
             self._region_thre[0] = cv2.getTrackbarPos("lb", "missile_debug")
@@ -186,14 +194,15 @@ class Missile(object):
 
                 if self._debug:
                     cv2.imshow('missile_debug', current_frame)
-                cv2.imshow("c", current_frame)
-                cv2.imshow("p", self._previous_frame[stage])
+                    cv2.imshow("c", current_frame)
+                    cv2.imshow("p", self._previous_frame[stage])
                 for i in range(2):
                     # 储存为上一帧
                     self._previous_frame[i] = img[self._roi[i][0]:self._roi[i][1],
                                               self._roi[i][2]:self._roi[i][3]].copy()
                 return detect_flag
         except Exception:
+            self._init_flag = False
             traceback.print_exc()
             return False
 
@@ -202,23 +211,47 @@ class Missile(object):
         云台手按下按钮后，启动计时
         """
         self._two_stage_time = time.time()
+        if self._pre_stage:
+            self._stage = 1
 
-    def detect_stage2(self, img, region=None):
+    def _box_filter(self, detect_flag: bool):
+        if detect_flag:
+            self._pre_stage = True
+            self._pre_stage_time = time.time()
+        elif time.time() - self._pre_stage_time > 2.:
+            self._pre_stage = False
+
+    def detect_api(self, img: np.ndarray, region=None) -> None:
         """
         开启第二阶段检测
         :param img: 检测图片
         :param region: 检测区域
-        :return: 是否正在检测，是否检测到发射
+        :return: None
         """
-        launch = False
-        detect_flag = self.detect(img, region, 1)
-        if time.time() - self._two_stage_time > 20.:  # 若处于反导侦测阶段TWO_STAGE_TIME秒，则自动结束
-            print("missile end")
-            return False, False
-        if detect_flag:
-            self._touch_api({"task": 4})
-            launch = True
-        return True, launch
+        detect_flag = self._detect(img, region, self._stage)
+        if self._stage:  # 若处于反导侦测阶段TWO_STAGE_TIME秒，则自动结束
+            if time.time() - self._two_stage_time > 20.:
+                print("missile end")
+                self._text_api("INFO", "missile", "missile end")
+                self._stage = 0
+            elif detect_flag and not self._launch:
+                self._text_api("INFO", "missile", "missile detected!")
+                self._launch_time = time.time()
+                self._launch = True
+
+        else:
+            self._box_filter(detect_flag)
+            if self._pre_stage:
+                self._text_api("INFO", "missile", "missile door is opening please press the key!")
+            else:
+                self._text_api("INFO", "missile", "")
+
+        if self._launch and time.time() - self._launch_time > 2.:
+            self._launch = False
+
+    def reset(self):
+        self._launch = 0
+        self._text_api("INFO", "missile", "")
 
 
 if __name__ == '__main__':

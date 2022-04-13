@@ -35,7 +35,7 @@ def is_inside(box: np.ndarray, point: np.ndarray):
            a <= 0 and b <= 0 and c <= 0 and d <= 0
 
 
-def armor_filter(armors):
+def armor_filter(armors: np.ndarray):
     '''
     装甲板去重
 
@@ -45,7 +45,7 @@ def armor_filter(armors):
     '''
     # 直接取最高置信度
     ids = [1.0, 2.0, 3.0, 4.0, 5.0]
-    if isinstance(armors, np.ndarray):
+    if armors.shape[0] != 0:
         results = []
         for i in ids:
             mask = armors[:, 10] == i
@@ -99,3 +99,4 @@ def car_classify(frame_m, red=True):
         if cv2.contourArea(c) > 5:
             flag = True
     return flag
+

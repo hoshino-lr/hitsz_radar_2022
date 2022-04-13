@@ -1,16 +1,8 @@
-# pip install -r requirements.txt
-# If you only run the demo, you can just install the follow package
-numpy~=1.21.4
-pyyaml~=5.4.1
-
-matplotlib~=3.3.4
-pandas~=1.2.4
-seaborn~=0.11.1
-yaml~=0.2.5
-pillow~=8.2.0
-scipy~=1.6.2
-torchvision~=0.9.2
-tqdm~=4.59.0
-requests~=2.25.1
-pycuda~=2021.1
-tensorrt~=0.0.1
+numpy==1.17.4
+pycuda==2020.1
+PyQt5==5.14
+pyserial==3.5
+rosbag==1.15.14
+rospy==1.15.14
+sensor_msgs==1.13.1
+tensorrt==8.4.0.6

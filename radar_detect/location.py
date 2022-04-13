@@ -1,6 +1,7 @@
 """
 revc,tvec 储存读取类
 created by 秦泽钊 2021/1
+最新修改 by 李龙 2022/3/26
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ class CameraLocation(object):
     """
     将原本的 rvec 与 tvec 整合为一个对象
     """
-    checkpoint_dir = ""
+    checkpoint_dir = "../resources/cam_data/"
 
     @staticmethod
     def __last_checkpoint(cls) -> (int, str):
@@ -45,9 +46,9 @@ class CameraLocation(object):
         return
 
     @staticmethod
-    def __get_file_path(cls, file_name: str) -> (Path, Path):
-        return (Path(cls.checkpoint_dir, file_name + ".rvec"),
-                Path(cls.checkpoint_dir, file_name + ".tvec"))
+    def __get_file_path(file_name: str) -> (Path, Path):
+        return (Path(CameraLocation.checkpoint_dir, file_name + ".rvec"),
+                Path(CameraLocation.checkpoint_dir, file_name + ".tvec"))
 
     def save_to(self, file_name: str) -> None:
         """
@@ -63,7 +64,7 @@ class CameraLocation(object):
         """
         将两个变换向量用自增序列号命名保存到默认路径
         """
-        last_id, _ = self.__last_checkpoint()
+        last_id, _ = self.__last_checkpoint(self)
         return self.save_to(os.path.join(self.checkpoint_dir,
                                          f"{last_id + 1}_{datetime.datetime.now()}"))
 
@@ -80,13 +81,14 @@ class CameraLocation(object):
             return cls.from_checkpoint(path)
 
     @staticmethod
-    def from_checkpoint(cls, file_name: str) -> CameraLocation:
+    def from_checkpoint(file_name: str) -> CameraLocation:
         """
         从指定的路径读取两个变换向量
         :param file_name:str 文件名（不带后缀名）
         :return: 一个 PnpConverter 对象
         """
         # file_name = f"{datetime.datetime.now()}" if file_name is None else file_name
-        rotation_file_path, translation_file_path = cls.__get_file_path(file_name)
+        rotation_file_path, translation_file_path = CameraLocation.__get_file_path(file_name)
         return CameraLocation(np.fromfile(rotation_file_path), np.fromfile(translation_file_path))
+
 

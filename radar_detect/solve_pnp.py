@@ -1,12 +1,12 @@
 """
 预警类
 created by 黄继凡 2021/1
-最新修改 by  lilong 2022/3/20
+最新修改 by 李龙 2022/3/26
 """
 import cv2
 import numpy as np
-from .location import CameraLocation
-from resources.config import test_objPoints, test_objNames, DEBUG, cam_config
+from radar_detect.location import CameraLocation
+from resources.config import objPoints, objNames, DEBUG, cam_config
 
 
 class SolvePnp(CameraLocation):
@@ -19,65 +19,78 @@ class SolvePnp(CameraLocation):
     def __init__(self):
         super(SolvePnp, self).__init__(self.rvec, self.tvec)
         self.debug = DEBUG
-        if self.debug:
-            self.count_max = len(test_objNames)
-            self.names = test_objNames
-            self.objPoints = test_objPoints
-        else:
-            self.count_max = len(test_objNames)
-            self.names = test_objNames
-            self.objPoints = test_objPoints
-        self.size = cam_config['cam_left']['size']
-        self.distCoeffs = cam_config['cam_left']['C_0']
-        self.cameraMatrix = cam_config['cam_left']['K_0']
+        self.sel_cam(0)
 
-    def add_point(self, x, y) -> bool:
-        self.imgPoints[self.count, :] = [float(x), float(y)]
-        if self.count < self.count_max:
+    def add_point(self, x: int, y: int) -> str:
+        if self.count < self.count_max - 1:
+            self.imgPoints[self.count, :] = [float(x), float(y)]
             self.count += 1
+            text = f"现在需要输入第{self.count+1}个点：{self.names[self.count]}"
+        elif self.count == self.count_max - 1:
+            self.imgPoints[self.count, :] = [float(x), float(y)]
+            self.count += 1
+            text = f"please press enter!"
         else:
-            return False
-        print("the coordinate (x,y) is", x, y)
+            self.imgPoints[self.count, :] = [float(x), float(y)]
+            text = f"please press enter"
+        return text
 
-    def del_point(self) -> None:
+    def del_point(self) -> str:
         if self.count > 0:
             self.count -= 1
-
-    def sel_cam(self, side) -> None:
-        if side == 0:
-            self.size = cam_config['cam_left']['size']
-            self.distCoeffs = cam_config['cam_left']['C_0']
-            self.cameraMatrix = cam_config['cam_left']['K_0']
+            text = f"now Point is {self.names[self.count]}"
         else:
-            self.size = cam_config['cam_right']['size']
-            self.distCoeffs = cam_config['cam_right']['C_0']
-            self.cameraMatrix = cam_config['cam_right']['K_0']
+            text = f"invalid !!! please press enter"
+        return text
 
-    def save(self) -> None:
-        pass
+    def sel_cam(self, side) -> str:
+        if side == 0:
+            side_text = 'cam_left'
+        else:
+            side_text = 'cam_right'
+        self.count_max = len(objNames[int(self.debug)][side_text])
+        self.names = objNames[int(self.debug)][side_text]
+        self.objPoints = objPoints[int(self.debug)][side_text]
+        self.size = cam_config[side_text]['size']
+        self.distCoeffs = cam_config[side_text]['C_0']
+        self.cameraMatrix = cam_config[side_text]['K_0']
+        self.count = 0
+        text = f"现在需要输入第{self.count+1}个点： {self.names[self.count]}"
+        return text
 
-    def clc(self) -> None:
+    def save(self) -> str:
+        if self.size:
+            self.save_to("left_cam")
+            text = f"data save to left_cam"
+        else:
+            self.save_to("right_cam")
+            text = f"data save to right_cam"
+        return text
+
+    def clc(self) -> str:
         self.imgPoints = np.zeros((6, 2))
         self.count = 0
+        text = f"现在需要输入第{self.count+1}个点： {self.names[self.count]}"
+        return text
+
+    def step(self, num) -> str:
+        if self.count + num >= self.count_max or self.count + num < 0:
+            pass
+        else:
+            self.count = self.count + num
+        text = f"现在需要输入第{self.count + 1}个点： {self.names[self.count]}"
+        return text
 
     # 四点标定函数
-    def locate_pick(self):
-        _, rvec, tvec, _ = cv2.solvePnPRansac(objectPoints=self.objPoints,
-                                              distCoeffs=self.distCoeffs,
-                                              cameraMatrix=self.cameraMatrix,
-                                              imagePoints=self.imgPoints)
-        self.rvec = rvec
-        self.tvec = tvec
+    def locate_pick(self) -> bool:
+        if self.count == self.count_max:
+            _, rvec, tvec, _ = cv2.solvePnPRansac(objectPoints=self.objPoints,
+                                                  distCoeffs=self.distCoeffs,
+                                                  cameraMatrix=self.cameraMatrix,
+                                                  imagePoints=self.imgPoints)
+            self.rotation = rvec
+            self.translation = tvec
+            return True
+        else:
+            return False
 
-
-if __name__ == "__main__":
-    PIC = cv2.imread("/home/hoshino/CLionProjects/hitsz_radar/resources/beijing.png")
-    cv2.namedWindow("PNP", cv2.WINDOW_NORMAL)
-    cv2.imshow("PNP", PIC)
-    rvec, tvec = locate_pick()
-    T = np.eye(4)
-    T[:3, :3] = cv2.Rodrigues(rvec)[0]  # 旋转向量转化为旋转矩阵
-    T[:3, 3] = tvec.reshape(-1)  # 加上平移向量
-    T = np.linalg.inv(T)  # 矩阵求逆
-    print(T, (T @ (np.array([0, 0, 0, 1])))[:3])
-    cv2.destroyAllWindows()

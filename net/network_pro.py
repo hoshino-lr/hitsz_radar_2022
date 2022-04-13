@@ -28,7 +28,7 @@ class Predictor(object):
 
     # net1参数
     net1_confThreshold = 0.3
-    net1_nmsThreshold = 0.4
+    net1_nmsThreshold = 0.45
     net1_inpHeight = 640
     net1_inpWidth = 640
     net1_onnx_file = net1_onnx
@@ -54,9 +54,9 @@ class Predictor(object):
     net2_anchors = [[4, 5], [8, 10], [13, 16], [23, 29], [43, 55], [73, 105], [146, 217], [231, 300], [335, 433]]
     net2_strides = [8, 16, 32]
 
-    net1_time = 0
-    net2_time = 0
-    jaw_time = 0
+    # net1_time = 0
+    # net2_time = 0
+    # jaw_time = 0
 
     def __init__(self, _name):
         """
@@ -95,7 +95,7 @@ class Predictor(object):
 
         self.img_src = src.copy()
         # 图像预处理
-        start = time.time()
+        # start = time.time()
         img = cv2.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv2.INTER_LINEAR)
         img = img[:, :, ::-1].transpose(2, 0, 1)
         img = np.ascontiguousarray(img)
@@ -104,24 +104,22 @@ class Predictor(object):
 
         net1_output = self._net1.infer(img, 1)[0]
         res = self.net1_process(net1_output)
-        self.net1_time += time.time() - start
+        # self.net1_time += time.time() - start
         if res.shape[0] != 0:
             # get Jigsaw
-            start = time.time()
+            # start = time.time()
             res[:, :4] = self.scale_coords((640, 640), res[:, :4], self.img_src.shape).round()
             net2_img = self.jigsaw(res[:, :4], self.img_src)
-            self.jaw_time += time.time() - start
+            # self.jaw_time += time.time() - start
             # Rescale boxes from img_size to im0 size
-            start = time.time()
+            # start = time.time()
             net2_output = self.detect_armor(net2_img)
             net2_output = self.net2_output_process(net2_output, det_points=res[:, :4], shape=self.img_src.shape)
             res = np.concatenate([res, net2_output], axis=1)
-        else:
-            res = None
 
-        if self.img_show and res is not None:  # 画图
+        if self.img_show and res.shape != 0:  # 画图
             self.net_show(res)
-        self.net2_time += time.time() - start
+        # self.net2_time += time.time() - start
         armor_filter(res)
         return res, self.img_src
 
@@ -140,11 +138,12 @@ class Predictor(object):
         res = self.net2_process(net_output[0], net_output[1], net_output[2])
         return res
 
+    """
     def net1_process(self, output):
         # 第一个网络的处理
-        """
+        
         :param res 输出为一个(N,6)的array 或为一个空array
-        """
+        
         classIds = []
         confidences = []
         bboxes = []
@@ -242,8 +241,8 @@ class Predictor(object):
             anchor = self.net1_anchors[n * self.net1_grid[n][0] + c]
             xc = output[i, :]
             max_id = np.argmax(xc[5:])  # 选择置信度最高的 class
-            if max_id != self.choose_type:  # 只选择最高的
-                continue
+            # if max_id != self.choose_type:  # 只选择最高的
+            #     continue
             obj_conf = float(xc[4] * xc[5 + max_id])  # 置信度
             centerX = int(
                 (xc[0] * 2 - 0.5 + w) / self.net1_grid[n][2] * self.net2_inpWidth)
@@ -274,7 +273,7 @@ class Predictor(object):
             res[:, 2] = res[:, 0] + res[:, 2]
             res[:, 3] = res[:, 1] + res[:, 3]
         return res
-    """
+
 
     @staticmethod
     def sigmoid(x):
@@ -477,6 +476,7 @@ if __name__ == '__main__':
     for frame in PICS:
         _, pic = pre1.detect_cars(frame)
         count += 1
+        pic = cv2.resize(pic, (1280, 720))
         cv2.imshow("asd", pic)
         cv2.waitKey(1)
         if time.time() - t1 > 1:
@@ -485,7 +485,4 @@ if __name__ == '__main__':
             t1 = time.time()
     pre1.stop()
     print(time.time() - t2)
-    print(pre1.net1_time)
-    print(pre1.jaw_time)
-    print(pre1.net2_time)
     print("主线程结束")
