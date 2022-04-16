@@ -54,10 +54,6 @@ class Predictor(object):
     net2_anchors = [[4, 5], [8, 10], [13, 16], [23, 29], [43, 55], [73, 105], [146, 217], [231, 300], [335, 433]]
     net2_strides = [8, 16, 32]
 
-    # net1_time = 0
-    # net2_time = 0
-    # jaw_time = 0
-
     def __init__(self, _name):
         """
         初始化函数
@@ -138,12 +134,11 @@ class Predictor(object):
         res = self.net2_process(net_output[0], net_output[1], net_output[2])
         return res
 
-    """
-    def net1_process(self, output):
+    def net1_process_sjtu(self, output):
         # 第一个网络的处理
-        
-        :param res 输出为一个(N,6)的array 或为一个空array
-        
+        """
+        :return res 输出为一个(N,6)的array 或为一个空array
+        """
         classIds = []
         confidences = []
         bboxes = []
@@ -205,13 +200,12 @@ class Predictor(object):
             res[:, 3] = res[:, 1] + res[:, 3]
         return res
 
-    """
-
     def net1_process(self, output):
+        """
         # 第一个网络的处理
-        
-        # :param res 输出为一个(N,6)的array 或为一个空array
-        
+        :param output
+        :return res 输出为一个(N,6)的array 或为一个空array
+        """
         classIds = []
         confidences = []
         bboxes = []
@@ -273,7 +267,6 @@ class Predictor(object):
             res[:, 2] = res[:, 0] + res[:, 2]
             res[:, 3] = res[:, 1] + res[:, 3]
         return res
-
 
     @staticmethod
     def sigmoid(x):

@@ -95,7 +95,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.__cam_far = USEABLE['cam_far']
         self.__Lidar = USEABLE['Lidar']
         self.__serial = USEABLE['serial']
-
+        self.__using_d = USEABLE['using_d']
         if self.__cam_left:
             self.PRE_left = multiprocessing.Process(target=process_detect, args=(
                 self._event_left, self._que_left, self._event_close,
@@ -466,8 +466,10 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if side:
             T, T_ = self.repo_left.push_T(rvec, tvec)
             self.loc_alarm.push_T(T, T_, 0)
+            self.loc_alarm.push_RT(rvec, tvec, 0)
         else:
             self.repo_right.push_T(rvec, tvec)
+            self.loc_alarm.push_RT(rvec, tvec, 1)
 
     def update_reproject(self) -> None:
         res_temp = self.__res_left[0]
@@ -502,23 +504,39 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
 
     def update_location_alarm(self) -> None:
         if isinstance(self.__res_left[0], np.ndarray):
+            t_loc = None
+            e_loc = None
             if self.__res_left[0].shape[0] == 0:
                 self.text_api("INFO", "location", "")
-                location = np.zeros((10, 4)) * np.nan
             else:
-                location = np.zeros((10, 4)) * np.nan
-                armors = self.__res_left[0][:, [11, 6, 7, 8, 9]]
-                armors[:, 3] = armors[:, 3] - armors[:, 1]
-                armors[:, 4] = armors[:, 4] - armors[:, 2]
-                armors = armors[np.logical_not(np.isnan(armors[:, 0]))]
-                if armors.shape[0] != 0:
-                    dph = self.lidar.detect_depth(rects=armors[:, 1:].tolist()).reshape(-1, 1)
-                    x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
-                    y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
-                    xyz = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, dph], axis=1)
-                    for i in xyz:
-                        location[int(i[0]), :] = i
-            self.loc_alarm.update(location, self.e_location)
+                if not self.using_d:
+                    armors = self.__res_left[0][:, [11, 6, 7, 8, 9]]
+                    armors[:, 3] = armors[:, 3] - armors[:, 1]
+                    armors[:, 4] = armors[:, 4] - armors[:, 2]
+                    armors = armors[np.logical_not(np.isnan(armors[:, 0]))]
+                    if armors.shape[0] != 0:
+                        dph = self.lidar.detect_depth(rects=armors[:, 1:].tolist()).reshape(-1, 1)
+                        x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
+                        y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
+                        t_loc = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, dph], axis=1)
+                    armors = self.e_location[np.logical_not(np.isnan(self.e_location[:, 0]))]
+                    if armors.shape[0] != 0:
+                        dph = self.lidar.detect_depth(rects=armors[:, 1:].tolist()).reshape(-1, 1)
+                        x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
+                        y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
+                        e_loc = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, dph], axis=1)
+                else:
+                    armors = self.__res_left[0][:, [11, 6, 7, 8, 9]]
+                    armors = armors[np.logical_not(np.isnan(armors[:, 0]))]
+                    x0 = (armors[:, 1] + (armors[:, 3] - armors[:, 1]) / 2).reshape(-1, 1)
+                    y0 = (armors[:, 2] + (armors[:, 4] - armors[:, 2]) / 2).reshape(-1, 1)
+                    t_loc = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, 0], axis=1)
+                    armors = self.e_location[np.logical_not(np.isnan(self.e_location[:, 0]))]
+                    if armors.shape[0] != 0:
+                        x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
+                        y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
+                        e_loc = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, 0], axis=1)
+            self.loc_alarm.update(t_loc, e_loc)
             self.loc_alarm.show()
 
     def spin(self) -> None:
