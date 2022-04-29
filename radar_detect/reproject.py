@@ -13,9 +13,9 @@ from resources.config import color2enemy, enemy_case, real_size, enemy_color, ca
 
 
 class Reproject(object):
-    '''
+    """
     反投影预警
-    '''
+    """
     _iou_threshold = 0.8
 
     def __init__(self, name):
@@ -36,13 +36,14 @@ class Reproject(object):
         self._cache = None
         self._debug = DEBUG
         self._scene_init = False
+        self._pred_box = np.array([])
         self.push_T(self._tvec, self._rvec)
 
     def _plot_regin(self):
-        '''
+        """
         计算预警区域反投影坐标，用第一帧初始化了就可以了
         return: 预警区域反投影坐标
-        '''
+        """
         for r in self._region.keys():
             # 格式解析
             type, shape_type, team, location, height_type = r.split('_')
@@ -90,10 +91,10 @@ class Reproject(object):
         return self._scene_region
 
     def push_T(self, rvec, tvec):
-        '''
+        """
         输入相机位姿（世界到相机）
         return:相机到世界变换矩阵（4*4）,相机世界坐标
-        '''
+        """
         self.rvec = rvec
         self.tvec = tvec
         # 初始化预警区域字典
@@ -224,7 +225,10 @@ class Reproject(object):
             self._cache = cache.copy()
         else:
             self._cache = None
-        return rp_alarming, pred_bbox
+        self._pred_box = pred_bbox
+
+    def get_pred_box(self):
+        return self._pred_box
 
 
 if __name__ == "__main__":

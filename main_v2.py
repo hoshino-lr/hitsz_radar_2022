@@ -79,7 +79,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.hp_sence = HP_scene(enemy_color, lambda x: self.set_image(x, "blood"))
         self.text_api = lambda x, y, z: self.set_text(x, y, z)
         self.board_api = lambda x, y, z: self.set_board_text(x, y, z)
-        self.show_api = lambda x: self.set_image(x, "main_demo")
         self.show_map = lambda x: self.set_image(x, "map")
 
         self.record_object = []
@@ -124,7 +123,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.lidar.preload()
 
         if self.__serial:
-            self.hp_sence = HP_scene(enemy_color, self.show_api)
             ser = serial.Serial("/dev/ttyUSB0", 115200, timeout=1)
             self.read_thr = threading.Thread(target=read, args=(ser,))
             self.write_thr = threading.Thread(target=write, args=(ser,))
@@ -136,7 +134,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.repo_left = Reproject('cam_left')
         self.repo_right = Reproject('cam_right')
         self.loc_alarm = Alarm(enemy=enemy_color, api=self.show_map, touch_api=self.text_api,
-                               region=test_region, debug=False)
+                               using_Delaunay=self.__using_d, region=test_region, debug=False)
 
         T, T_ = self.repo_right.push_T(cam_config['cam_left']['rvec'], cam_config['cam_left']['tvec'])
         self.loc_alarm.push_T(T, T_, 0)
@@ -480,22 +478,16 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 armors = res_temp[:, [11, 13, 6, 7, 8, 9]]
                 cars = res_temp[:, [11, 0, 1, 2, 3]]
                 result = self.repo_left.check(armors, cars)
-                if result[0] is not None:
-                    self.text_api("INFO", "Repo left", str(result[0].keys()))
                 self.repo_left.update(None, self.__res_left[1])
         res_temp = self.__res_right[0]
         if isinstance(res_temp, np.ndarray):
             if res_temp.shape[0] == 0:
-                self.text_api("INFO", "Repo left", "")
                 self.e_location.clear()
-                self.text_api("INFO", "Repo right", "")
             else:
                 armors = res_temp[:, [11, 13, 6, 7, 8, 9]]
                 cars = res_temp[:, [11, 0, 1, 2, 3]]
                 result = self.repo_left.check(armors, cars)
                 self.e_location = result[1]
-                if result[0] is not None:
-                    self.text_api("INFO", "Repo right", str(result[0].keys()))
                 self.repo_right.update(None, self.__res_right[1])
 
     def update_missile(self) -> None:
