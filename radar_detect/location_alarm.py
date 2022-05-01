@@ -149,13 +149,13 @@ class Alarm(draw_map.CompeteMap):
                     # 基地预警发送，编码规则详见主程序类send_judge
                     base_alarming = True
                     # 车辆编号输出
-                    self._touch_api("INFO", "location_alarm_task_3", f"targets:{targets}")
+                    self._touch_api("INFO", "位置预警-信息输出", f"targets:{targets}")
                 else:
                     super(Alarm, self)._add_twinkle(loc)
                     alarming = True
                     if target in ['feipo', 'feipopre', 'gaodipre', 'gaodipre2']:
                         self._touch_api(
-                            "INFO", "location_alarm_task_2", f"team:{team} target region:{target} targets:{targets}")
+                            "INFO", "位置预警-信息输出", f"team:{team} target region:{target} targets:{targets}")
 
         return alarming, base_alarming
 
@@ -225,7 +225,7 @@ class Alarm(draw_map.CompeteMap):
             # 被预测id,debug输出
             for i in range(10):
                 if do_prediction[i]:
-                    self._touch_api("INFO", "location_alarm_location_debug", "{0} lp yes".format(armor_list[i]))
+                    self._touch_api("INFO", "位置预警-debug输出", "{0} lp yes".format(armor_list[i]))
 
         now[do_prediction] = v[do_prediction] + pre[1][do_prediction]
 
@@ -390,21 +390,24 @@ class Alarm(draw_map.CompeteMap):
                 self._location_prediction()
             if self._debug:
                 # 位置debug输出
+                str_debut_output = ""
                 for armor, loc in judge_loc.items():
-                    self._touch_api("INFO", "location_alram_location_debug", "{0} in ({1:.3f},{2:.3f},{3:.3f})".format(armor_list[int(armor) - 1], *loc))
+                    str_debut_output += "{0} in ({1:.3f},{1:.3f},{1:.3f})\n".format(armor_list[int(armor) - 1], *loc)
+
+                self._touch_api("INFO", "位置预警-debug输出", str_debut_output)
             for i in range(1, 11):
                 location[str(i)] = self._location[str(i)].copy()
 
             # 执行裁判系统发送
             # judge_loc为未预测的位置，作为logging保存，location为预测过的位置，作为小地图发送
-            self._touch_api("INFO", "location_alarm_task_1", f"judge_loc:{judge_loc} location:{location}")
+            self._touch_api("INFO", "位置预警-位置输出", f"judge_loc:{judge_loc} location:{location}")
 
             # 返回车辆位置字典
             return self._location
 
         else:
             self._touch_api(
-                "ERROR", "cam_number", "This update function only supports two_camera case, using update instead.")
+                "ERROR", "相机数目不符合", "This update function only supports two_camera case, using update instead.")
 
     def update(self, t_location, e_location):
         """
@@ -498,4 +501,4 @@ class Alarm(draw_map.CompeteMap):
 
         else:
             self._touch_api(
-                "ERROR", "cam_number", "This update function only supports single_camera case, using two_camera_merge_update instead.")
+                "ERROR", "相机数目不符合", "This update function only supports single_camera case, using two_camera_merge_update instead.")
