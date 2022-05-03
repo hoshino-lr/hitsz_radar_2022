@@ -116,7 +116,7 @@ class Reproject(object):
         T = np.linalg.inv(T)  # 矩阵求逆
         return T, (T @ (np.array([0, 0, 0, 1])))[:3]
 
-    def update(self, result, frame) -> None:
+    def update(self, frame) -> None:
         """
         更新一帧绘图
         """
@@ -129,8 +129,8 @@ class Reproject(object):
                 for p in recor:
                     cv2.circle(frame, tuple(p), 10, (0, 255, 0), -1)
                 cv2.polylines(frame, [recor], 1, (0, 0, 255))
-        if result is not None:
-            for i in result.keys():
+        if self.rp_alarming is not None:
+            for i in self.rp_alarming.keys():
                 recor = self._scene_region[i]
                 type, shape_type, team, location, height_type = i.split('_')
                 if color2enemy[team] != enemy_color:
@@ -138,23 +138,29 @@ class Reproject(object):
                 else:
                     cv2.polylines(frame, [recor], 1, (0, 255, 0))
 
-    def check(self, armors: ndarray, cars: ndarray) -> None:
+    def check(self, net_input) -> None:
         """
         预警预测
-
         Args:
+            net_input:输入
             armors:N,cls+对应的车辆预测框序号+装甲板bbox
             cars:N,cls+车辆bbox
         """
-        pred_bbox = np.array([])
+        armors = np.array([])
+        cars = np.array([])
+        if isinstance(net_input, np.ndarray):
+            if len(net_input):
+                armors = net_input[:, [11, 13, 6, 7, 8, 9]]
+                cars = net_input[:, [11, 0, 1, 2, 3]]
 
+        pred_bbox = np.array([])
         color_bbox = []
         cache = None  # 当前帧缓存框
         id = np.array([1, 2, 3, 4, 5])
         f_max = lambda x, y: (x + y + abs(x - y)) // 2
         f_min = lambda x, y: (x + y - abs(x - y)) // 2
-        if isinstance(armors, np.ndarray) and isinstance(cars, np.ndarray):
-            assert len(armors)
+        if isinstance(armors, np.ndarray) and isinstance(cars, np.ndarray) and len(armors):
+            # assert len(armors)
             pred_cls = []
             p_bbox = []  # IoU预测框（装甲板估计后的装甲板框）
             cache_pred = []  # 可能要缓存的当帧预测IoU预测框的原始框，缓存格式 id,x1,y1,x2,y2

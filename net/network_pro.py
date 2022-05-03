@@ -24,7 +24,7 @@ class Predictor(object):
     img_src = []
     output = []
     name = ""
-    img_show = True
+    img_show = False
 
     # net1参数
     net1_confThreshold = 0.3
@@ -235,8 +235,8 @@ class Predictor(object):
             anchor = self.net1_anchors[n * self.net1_grid[n][0] + c]
             xc = output[i, :]
             max_id = np.argmax(xc[5:])  # 选择置信度最高的 class
-            # if max_id != self.choose_type:  # 只选择最高的
-            #     continue
+            if max_id != self.choose_type:  # 只选择最高的
+                continue
             obj_conf = float(xc[4] * xc[5 + max_id])  # 置信度
             centerX = int(
                 (xc[0] * 2 - 0.5 + w) / self.net1_grid[n][2] * self.net2_inpWidth)
@@ -450,8 +450,6 @@ if __name__ == '__main__':
     import sys
 
     sys.path.append("..")  # 单独跑int的时候需要
-
-    multiprocessing.set_start_method("forkserver", force=True)
     cap = cv2.VideoCapture("/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/1.mp4")
     PICS = []
     while cap.isOpened():
@@ -470,8 +468,8 @@ if __name__ == '__main__':
         _, pic = pre1.detect_cars(frame)
         count += 1
         pic = cv2.resize(pic, (1280, 720))
-        cv2.imshow("asd", pic)
-        cv2.waitKey(1)
+        # cv2.imshow("asd", pic)
+        # cv2.waitKey(1)
         if time.time() - t1 > 1:
             print(f"fps:{count / (time.time() - t1)}")
             count = 0
