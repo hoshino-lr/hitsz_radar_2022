@@ -127,3 +127,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+/resources/models/best.engine
+/resources/models/best.onnx
+/resources/models/best.pt
+/resources/models/better.engine
+/resources/models/better.onnx
+/resources/models/net1.engine
+/resources/models/net1.onnx
+/resources/models/net2.engine
+/resources/models/net2.onnx
