@@ -23,7 +23,7 @@ cam_config = {
     "cam_right": {
         "id": "00F78889001",
         "size": (3072, 2048),
-        "video_path": "/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/1.mp4",
+        "video_path": "/home/mark/demo_resource/two_cam/1.mp4",
         "K_0": np.mat([[1273.6729986357857, 0.0, 598.3779780737999],
                        [0.0, 1274.0066230685838, 531.2012102435624],
                        [0.0, 0.0, 1.0]]),
@@ -43,7 +43,7 @@ cam_config = {
     "cam_left": {
         "id": "J37877236",
         "size": (3072, 2048),
-        "video_path": "/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/2.mp4",
+        "video_path": "/home/mark/demo_resource/two_cam/2.mp4",
         "K_0": np.mat([[1273.6729986357857, 0.0, 598.3779780737999],
                        [0.0, 1274.0066230685838, 531.2012102435624],
                        [0.0, 0.0, 1.0]]),
@@ -82,11 +82,11 @@ cam_config = {
 
 }
 
-net1_onnx = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net1_sim.onnx"
-net1_engine = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net1.engine"
+net1_onnx = os.path.dirname(os.path.abspath(__file__)) + "/models/net1.onnx"
+net1_engine = os.path.dirname(os.path.abspath(__file__)) + "/models/net1.engine"
 
-net2_onnx = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net2.onnx"
-net2_engine = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net2.engine"
+net2_onnx = os.path.dirname(os.path.abspath(__file__)) + "/models/net2.onnx"
+net2_engine = os.path.dirname(os.path.abspath(__file__)) + "/models/net2.engine"
 net1_cls = ['car', 'watcher', 'base']
 
 net2_cls_names = ["0", "1", "2", "3", "4",
@@ -191,12 +191,12 @@ Delaunary_points = [
                 ]
 
             ],
-            "cam_right": {
+            "cam_right": [
                 (),
                 [
                     # (world_points)
                 ]
-            }
+            ]
         }
     ],
     [
@@ -208,12 +208,12 @@ Delaunary_points = [
                 ]
 
             ],
-            "cam_right": {
+            "cam_right": [
                 (),
                 [
                     # (world_points)
                 ]
-            }
+            ]
         }
     ]
 ]
