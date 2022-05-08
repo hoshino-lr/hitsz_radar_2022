@@ -4,6 +4,7 @@ created by 黄继凡 2021/12
 最新修改 by 黄继凡 2021/5/8
 """
 
+from defer import AlreadyCalledDeferred
 import numpy as np
 from radar_detect.common import is_inside
 import mapping.draw_map as draw_map  # 引入draw_map模块，使用其中的CompeteMap类
@@ -130,7 +131,7 @@ class Alarm(draw_map.CompeteMap):
 
                         def f_dis(m):
                             return m @ (l - dw_p) / \
-                                   np.linalg.norm(m)  # 计算从下端点到物体点在各方向向量上的投影
+                                np.linalg.norm(m)  # 计算从下端点到物体点在各方向向量上的投影
 
                         if l_type == 'l':
                             dis = f_dis(m_l)
@@ -171,10 +172,10 @@ class Alarm(draw_map.CompeteMap):
         :param l:(cls+x+y+z) 一个id的位置
         :param camera_type:相机编号
         """
-        #定义函数内变量 z_reset_count 当z轴突变调整执行一定次数后，清空z轴缓存
-        if not hasattr(_adjust_z_one_armor,'z_reset_count'):
-            _adjust_z_one_armor.z_reset_count = 0
-    
+        # 定义函数内变量 z_reset_count 当z轴突变调整执行一定次数后，清空z轴缓存
+        if not hasattr(self._adjust_z_one_armor, 'z_reset_count'):
+            self._adjust_z_one_armor.z_reset_count = 0
+
         if isinstance(self._z_cache[camera_type], np.ndarray):
             # 检查上一帧缓存z坐标中有没有对应id
             mask = np.array(self._z_cache[camera_type][:, 0] == l[0])
@@ -187,7 +188,7 @@ class Alarm(draw_map.CompeteMap):
                         ori = l[1:].copy()
                         line = l[1:] - self._camera_position[camera_type]
                         ratio = (
-                                        z_0 - self._camera_position[camera_type][2]) / line[2]
+                            z_0 - self._camera_position[camera_type][2]) / line[2]
                         new_line = ratio * line
                         l[1:] = new_line + self._camera_position[camera_type]
                         if self._debug:
@@ -195,12 +196,14 @@ class Alarm(draw_map.CompeteMap):
                             # print('{0} from'.format(armor_list[(self._ids[int(l[0])]) - 1]), ori, 'to', l[1:])
                             print('{0} from'.format(
                                 armor_list[int(l[0]) - 1]), ori, 'to', l[1:])
+                        self._adjust_z_one_armor.z_reset_count += 1
 
-                        _adjust_z_one_armor.z_reset_count += 1
-
-        if(_adjust_z_one_armor.z_reset_count == 100):
-            adjust_z_one_armor.z_reset_count = 0
-            self._z_cache[camera_type] = None
+        if(self._adjust_z_one_armor.z_reset_count > 100):
+            self._adjust_z_one_armor.z_reset_count = 0
+            if self._two_Camera:
+                self._z_cache = [None, None]
+            else:
+                self._z_cache = [None]
 
     def show(self):
         """
@@ -242,7 +245,8 @@ class Alarm(draw_map.CompeteMap):
             # 被预测id,debug输出
             for i in range(10):
                 if do_prediction[i]:
-                    self._touch_api("INFO", "位置预警-debug输出", "{0} lp yes".format(armor_list[i]))
+                    self._touch_api("INFO", "位置预警-debug输出",
+                                    "{0} lp yes".format(armor_list[i]))
 
         now[do_prediction] = v[do_prediction] + pre[1][do_prediction]
 
@@ -373,7 +377,7 @@ class Alarm(draw_map.CompeteMap):
                         if not self._using_l1:
                             # 若_using_l1为真，则不取均值，以右相机为准
                             armor_pred_loc = (
-                                                     armor_pred_loc + l2.reshape(-1)) / 2
+                                armor_pred_loc + l2.reshape(-1)) / 2
                     else:
                         armor_pred_loc = l2.reshape(-1)
 
@@ -397,8 +401,10 @@ class Alarm(draw_map.CompeteMap):
                 pred_loc = np.stack(pred_loc, axis=0)
                 pred_loc[:, 2] = self._real_size[1] + pred_loc[:, 2]  # 坐标变换，平移
                 for i, armor in enumerate(pred_loc[:, 0]):
-                    self._location[str(armor)] = pred_loc[i, 1:3].tolist()  # 类成员只存(x,y)信息
-                    judge_loc[str(armor)] = pred_loc[i, 1:].tolist()  # 发送包存三维信息
+                    self._location[str(armor)] = pred_loc[i,
+                                                          1:3].tolist()  # 类成员只存(x,y)信息
+                    judge_loc[str(armor)] = pred_loc[i,
+                                                     1:].tolist()  # 发送包存三维信息
             location = {}
             # 位置预测
             if self._lp:
@@ -407,7 +413,8 @@ class Alarm(draw_map.CompeteMap):
                 # 位置debug输出
                 str_debut_output = ""
                 for armor, loc in judge_loc.items():
-                    str_debut_output += "{0} in ({1:.3f},{1:.3f},{1:.3f})\n".format(armor_list[int(armor) - 1], *loc)
+                    str_debut_output += "{0} in ({1:.3f},{1:.3f},{1:.3f})\n".format(
+                        armor_list[int(armor) - 1], *loc)
 
                 self._touch_api("INFO", "位置预警-debug输出", str_debut_output)
             for i in range(1, 11):
@@ -415,7 +422,8 @@ class Alarm(draw_map.CompeteMap):
 
             # 执行裁判系统发送
             # judge_loc为未预测的位置，作为logging保存，location为预测过的位置，作为小地图发送
-            self._touch_api("INFO", "位置预警-位置输出", f"judge_loc:{judge_loc} location:{location}")
+            self._touch_api("INFO", "位置预警-位置输出",
+                            f"judge_loc:{judge_loc} location:{location}")
 
             # 返回车辆位置字典
             return self._location
@@ -466,8 +474,8 @@ class Alarm(draw_map.CompeteMap):
                                            == armor].reshape(-1)
                             K_C = np.linalg.inv(self._K_O)
                             C = (
-                                        K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[
-                                    3] * 1000
+                                K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[
+                                3] * 1000
                             B = np.concatenate(
                                 [np.array(C).flatten(), np.ones(1)], axis=0)
                             l1[1:] = (self._T[0] @ B)[:3] / 1000
