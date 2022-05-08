@@ -1,7 +1,7 @@
 """
 位置预警类，还需要修改和完善
 created by 黄继凡 2021/12
-最新修改 by 黄继凡 2021/5/1
+最新修改 by 黄继凡 2021/5/8
 """
 
 import numpy as np
@@ -171,6 +171,10 @@ class Alarm(draw_map.CompeteMap):
         :param l:(cls+x+y+z) 一个id的位置
         :param camera_type:相机编号
         """
+        #定义函数内变量 z_reset_count 当z轴突变调整执行一定次数后，清空z轴缓存
+        if not hasattr(_adjust_z_one_armor,'z_reset_count'):
+            _adjust_z_one_armor.z_reset_count = 0
+    
         if isinstance(self._z_cache[camera_type], np.ndarray):
             # 检查上一帧缓存z坐标中有没有对应id
             mask = np.array(self._z_cache[camera_type][:, 0] == l[0])
@@ -191,6 +195,12 @@ class Alarm(draw_map.CompeteMap):
                             # print('{0} from'.format(armor_list[(self._ids[int(l[0])]) - 1]), ori, 'to', l[1:])
                             print('{0} from'.format(
                                 armor_list[int(l[0]) - 1]), ori, 'to', l[1:])
+
+                        _adjust_z_one_armor.z_reset_count += 1
+
+        if(_adjust_z_one_armor.z_reset_count == 100):
+            adjust_z_one_armor.z_reset_count = 0
+            self._z_cache[camera_type] = None
 
     def show(self):
         """
@@ -324,7 +334,7 @@ class Alarm(draw_map.CompeteMap):
                                 el1[1:] = (self._T[0] @ np.concatenate(
                                     [np.concatenate([el1[1:3], np.ones(1)], axis=0) * el1[3], np.ones(1)], axis=0))[:3]
                                 if self._z_a:
-                                    self._adjust_z_one_armor(el1, 1)
+                                    self._adjust_z_one_armor(el1, 0)
                                 al1 = el1
 
                 # 第二个相机处理
