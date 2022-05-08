@@ -10,10 +10,11 @@
 """
 import numpy as np
 import cv2 as cv
+import math
 
 
 def get_rgb(max_distance: float, min_distance: float, distance: float) -> tuple:
-    scale = max_distance - min_distance
+    scale = (max_distance - min_distance) / 10
     if distance < min_distance:
         r = 0
         g = 0
@@ -50,9 +51,10 @@ def pc_show(src: np.ndarray, depth: np.ndarray) -> None:
     if not src.shape[0]:
         return
     else:
-        for i in range(0, depth.shape[0] - 1):
-            for j in (0, depth.shape[1] - 1):
-                if depth[i][j] is np.nan:
+        for i in range(0, depth.shape[0] - 1, 15):
+            for j in range(0, depth.shape[1] - 1, 15):
+                v = depth[i][j]
+                if math.isnan(depth[i][j]):
                     continue
-                rgb = get_rgb(15, 2, depth[i][j])
-                cv.circle(src, (i, j), radius=1, color=rgb, thickness=-1)
+                rgb = get_rgb(20, 4, depth[i][j])
+                cv.circle(src, (j, i), radius=3, color=rgb, thickness=-1)

@@ -182,4 +182,4 @@ class CompeteMap(object):
                     rect = x.astype(int)
                     cv2.fillConvexPoly(self._out_map_twinkle, rect, (0,0,255))
             #减少预警次数
-            self._out_map_twinkle[r] -= 1
+            self._twinkle_event[r] -= 1

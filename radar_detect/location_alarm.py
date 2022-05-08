@@ -90,7 +90,7 @@ class Alarm(draw_map.CompeteMap):
         self._T[camera_type] = T.copy()
 
     def push_RT(self, rvec, tvec, camera_type):
-        if camera_type > 0 and not self._two_camera and self.using_d:
+        if not self._two_camera and not self.using_d:
             return
 
         self._loc_D[camera_type].push_T(rvec, tvec)
@@ -103,6 +103,7 @@ class Alarm(draw_map.CompeteMap):
         """
         alarming = False
         base_alarming = False
+        str_text = ""
         for loc in self._region.keys():
             alarm_type, shape_type, team, target, l_type = loc.split('_')
             targets = []
@@ -115,7 +116,7 @@ class Alarm(draw_map.CompeteMap):
                         # 矩形区域采用范围判断
                         if l[0] >= self._region[loc][0] and l[1] >= self._region[loc][3] and \
                                 l[0] <= self._region[loc][2] and l[1] <= self._region[loc][1]:
-                            targets.append(int(armor) - 1)
+                            targets.append(armor)
                     # base alarm
                     if shape_type == 'l' and color2enemy[team] != self._enemy:
                         # 直线检测
@@ -126,8 +127,11 @@ class Alarm(draw_map.CompeteMap):
                         dw_l = dw_p - up_p  # 直线向下的向量
                         m_r = np.float32([up_l[1], -up_l[0]])  # 方向向量，向右
                         m_l = np.float32([-up_l[1], up_l[0]])  # 方向向量，向左
-                        def f_dis(m): return m @ (l - dw_p) / \
-                            np.linalg.norm(m)  # 计算从下端点到物体点在各方向向量上的投影
+
+                        def f_dis(m):
+                            return m @ (l - dw_p) / \
+                                   np.linalg.norm(m)  # 计算从下端点到物体点在各方向向量上的投影
+
                         if l_type == 'l':
                             dis = f_dis(m_l)
                         if l_type == 'r':
@@ -137,11 +141,11 @@ class Alarm(draw_map.CompeteMap):
                         # 当物体位置在线段内侧，且距离小于阈值时，预警
                         if up_l @ (l - dw_p) > 0 and dw_l @ (l - up_p) > 0 and \
                                 dis_thres >= dis >= 0:
-                            targets.append(int(armor) - 1)
+                            targets.append(armor)
                     if shape_type == 'fp' and (target not in enemy_case or color2enemy[team] == self._enemy):
                         # 判断是否在凸四边形内
                         if is_inside(np.float32(self._region[loc][:8]).reshape(4, 2), point=l):
-                            targets.append(int(armor) - 1)
+                            targets.append(armor)
 
             if len(targets):
                 # 发送预警
@@ -153,9 +157,11 @@ class Alarm(draw_map.CompeteMap):
                 else:
                     super(Alarm, self)._add_twinkle(loc)
                     alarming = True
-                    if target in ['feipo', 'feipopre', 'gaodipre', 'gaodipre2']:
-                        self._touch_api(
-                            "INFO", "位置预警-信息输出", f"team:{team} target region:{target} targets:{targets}")
+                    targets_text = ' '.join(targets)
+                    str_text += f"{target}出现{team} {targets_text}\n"
+
+        self._touch_api(
+            "WARNING", "位置预警-信息输出", str_text)
 
         return alarming, base_alarming
 
@@ -177,7 +183,7 @@ class Alarm(draw_map.CompeteMap):
                         ori = l[1:].copy()
                         line = l[1:] - self._camera_position[camera_type]
                         ratio = (
-                            z_0 - self._camera_position[camera_type][2]) / line[2]
+                                        z_0 - self._camera_position[camera_type][2]) / line[2]
                         new_line = ratio * line
                         l[1:] = new_line + self._camera_position[camera_type]
                         if self._debug:
@@ -190,9 +196,10 @@ class Alarm(draw_map.CompeteMap):
         """
         执行预警闪烁并画点显示地图
         """
-        super(Alarm, self)._twinkle(self._region)
-        super(Alarm, self)._update(self._location)
-        super(Alarm, self)._show()
+        self._update(self._location)
+        self._refresh()
+        self._twinkle(self._region)
+        self._show()
 
     def _location_prediction(self):
         """
@@ -250,8 +257,6 @@ class Alarm(draw_map.CompeteMap):
         预警检测
         """
         alarming, base_alarming = self._check_alarm()
-
-        return alarming, base_alarming
 
     def two_camera_merge_update(self, locations, extra_locations):
         """
@@ -358,7 +363,7 @@ class Alarm(draw_map.CompeteMap):
                         if not self._using_l1:
                             # 若_using_l1为真，则不取均值，以右相机为准
                             armor_pred_loc = (
-                                armor_pred_loc + l2.reshape(-1)) / 2
+                                                     armor_pred_loc + l2.reshape(-1)) / 2
                     else:
                         armor_pred_loc = l2.reshape(-1)
 
@@ -451,18 +456,16 @@ class Alarm(draw_map.CompeteMap):
                                            == armor].reshape(-1)
                             K_C = np.linalg.inv(self._K_O)
                             C = (
-                                K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[3] * 1000
+                                        K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[
+                                    3] * 1000
                             B = np.concatenate(
                                 [np.array(C).flatten(), np.ones(1)], axis=0)
                             l1[1:] = (self._T[0] @ B)[:3] / 1000
-                            # TODO ：3.379是在解决测试场地中地图与官方坐标不匹配的问题。！！！
-                            l1[1] += 3.379
+
                         else:
                             l1 = locations[locations[:, 0]
                                            == armor].reshape(-1)
                             l1[1:] = self._loc_D[0].get_point_pos(l1)
-                            # TODO ：3.379是在解决测试场地中地图与官方坐标不匹配的问题。！！！
-                            l1[1] += 3.379
 
                         if self._z_a:
                             self._adjust_z_one_armor(l1, 0)
@@ -484,21 +487,10 @@ class Alarm(draw_map.CompeteMap):
                 self._location_prediction()
                 # 执行裁判系统发送
 
-            """
-            location = {}
-            
-            if self._debug:
-                # 位置debug输出
-                # for armor, loc in judge_loc.items():
-                #     print("{0} in ({1:.3f},{2:.3f},{3:.3f})".format(armor_list[int(armor) - 1], *loc))
-                pass
-            for i in range(1, 11):
-                location[str(i)] = self._location[str(i)].copy()
-            print(str({'task': 1, 'data': [judge_loc, location]}))
-            # 返回车辆位置字典
-            return self._location
-            """
-
         else:
             self._touch_api(
-                "ERROR", "相机数目不符合", "This update function only supports single_camera case, using two_camera_merge_update instead.")
+                "ERROR", "相机数目不符合", "This update function only supports single_camera case, using "
+                                    "two_camera_merge_update instead.")
+
+    def get_location(self):
+        return np.array(list(self._location.values()))[:5, :]

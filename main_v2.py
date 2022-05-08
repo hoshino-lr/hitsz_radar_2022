@@ -17,7 +17,7 @@ from PyQt5.QtCore import QTimer, Qt, QRect
 
 from resources.config import INIT_FRAME_PATH, \
     MAP_PATH, map_size, DEBUG, USEABLE, \
-    enemy_color, test_region, cam_config
+    enemy_color, test_region, cam_config, num2cam
 
 from mapping.ui_v2 import Ui_MainWindow
 from camera.cam_hk import Camera_HK
@@ -39,9 +39,9 @@ def process_detect(event, que, Event_Close, name):
     print(f"子线程开始: {name}")
     predictor = Predictor(name)
     if name == "cam_far":
-        cam = Camera_DH(name, DEBUG)
+        cam = Camera_DH(name, False)
     else:
-        cam = Camera_HK(name, DEBUG)
+        cam = Camera_HK(name, False)
     count = 0
     t1 = 0
     while not Event_Close.is_set():
@@ -52,12 +52,15 @@ def process_detect(event, que, Event_Close, name):
             pub(event, que, res)
             t1 = t1 + time.time() - t3
             count += 1
+            if count == 100:
+                fps = float(count) / t1
+                print(f'{name} count:{count} fps: {int(fps)}')
+                count = 0
+                t1 = 0
         else:
             pub(event, que, [result, frame])
     cam.destroy()
     predictor.stop()
-    fps = float(count) / t1
-    print(f'{name} count:{count} fps: {int(fps)}')
     print(f"相机网络子进程:{name} 退出")
     sys.exit()
 
@@ -73,18 +76,19 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
     def __init__(self):
         super(Mywindow, self).__init__()
         self.setupUi(self)
-        self.__ui_init()
-
         self.hp_scene = HP_scene(enemy_color, lambda x: self.set_image(x, "blood"))
         self.text_api = lambda x, y, z: self.set_text(x, y, z)
         self.board_api = lambda x, y, z: self.set_board_text(x, y, z)
         self.pnp_api = lambda x, y, z: self.set_pnp_text(x, y, z)
         self.show_map = lambda x: self.set_image(x, "map")
 
+        self.__ui_init()
         self.record_object = []
+
         self.epnp_image = QImage()
         self.item = None
         self.scene = QtWidgets.QGraphicsScene()  # 创建场景
+        self.pnp_zoom = 1
 
         self.__res_right = False
         self.__res_left = False
@@ -114,20 +118,19 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if self.__cam_far:
             self.__CamFar = Camera_DH("cam_far", DEBUG)
 
-        self.pnp_zoom = 1
-
         self.missile = Missile(enemy_color, self.text_api, self.board_api)
-        self.lidar = Radar('cam_left', text_api=self.text_api)
+        self.lidar = Radar('cam_left', text_api=self.text_api, imgsz=cam_config['cam_left']["size"], queue_size=100)
         self.e_location = np.array([])
 
         if self.__Lidar:
             self.lidar.start()
         else:
             # 读取预定的点云文件
-            self.lidar.preload()
+            pass
+            # self.lidar.preload()
 
         if self.__serial:
-            ser = serial.Serial("/dev/ttyUSB0", 115200, timeout=1)
+            ser = serial.Serial("/dev/ttyACM0", 115200, timeout=1)
             self.read_thr = threading.Thread(target=read, args=(ser,))
             self.write_thr = threading.Thread(target=write, args=(ser,))
             self.read_thr.setDaemon(True)
@@ -140,9 +143,12 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.loc_alarm = Alarm(enemy=enemy_color, api=self.show_map, touch_api=self.text_api,
                                using_Delaunay=self.__using_d, region=test_region, debug=False)
 
-        T, T_ = self.repo_right.push_T(cam_config['cam_left']['rvec'], cam_config['cam_left']['tvec'])
-        self.loc_alarm.push_T(T, T_, 0)
+        self.sp.read('cam_right')
+        T, T_ = self.repo_right.push_T(self.sp.rvec, self.sp.tvec)
+        self.sp.read('cam_left')
+        self.repo_left.push_T(self.sp.rvec, self.sp.tvec)
 
+        self.loc_alarm.push_T(T, T_, 0)
         self.start()
 
     def __ui_init(self):
@@ -199,13 +205,13 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             time_ = time.localtime(time.time())
             self.__save_title = f"resources/records/{time_.tm_mday}_{time_.tm_hour}_" \
                                 f"{time_.tm_min}"
-            fourcc = cv.VideoWriter_fourcc(*'MJPG')
-            self.record_object.append(cv.VideoWriter(self.__save_title + "_left", fourcc, 25,
+            fourcc = cv.VideoWriter_fourcc(*'MP42')
+            self.record_object.append(cv.VideoWriter(self.__save_title + "_left.avi", fourcc, 25,
                                                      cam_config['cam_left']['size']))
-            self.record_object.append(cv.VideoWriter(self.__save_title + "_right", fourcc, 25,
+            self.record_object.append(cv.VideoWriter(self.__save_title + "_right.avi", fourcc, 25,
                                                      cam_config['cam_right']['size']))
-            self.record_object.append(cv.VideoWriter(self.__save_title + "_far", fourcc, 25,
-                                                     cam_config['cam_far']['size']))
+            # self.record_object.append(cv.VideoWriter(self.__save_title + "_far.mp4", fourcc, 10,
+            #                                          cam_config['cam_far']['size']))
             self.record_state = True
         else:
             self.record_state = False
@@ -254,6 +260,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
     def epnp_calculate(self) -> None:
         result = self.sp.locate_pick()
         if result:
+            self.sp.save()
             self.sp.clc()
             self.pnp_textBrowser.clear()
             self.update_epnp(self.sp.translation, self.sp.rotation, self.view_change)
@@ -375,11 +382,12 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 self.feedback_textBrowser.pop(position)
         else:
             if _type == "ERROR":
-                msg = f"<font color='#FF0000'><b>[ERROR] {message}</b></font>"
+                msg = f"<font color='#FF0000'><b>{message}</b></font>"
             elif _type == "INFO":
-                msg = f"<font color='#404040'><b>[INFO] {message}</b></font>"
+                msg = f"<font color='#404040'><b>{message}</b></font>"
             else:
-                msg = f"<font color='#FF8033'><b>[WARNING] {message}</b></font>"
+                msg = f"<font color='#FF8033'><b>{message}</b></font>"
+            self.pnp_textBrowser[position] = msg.replace('\n', "<br />")
             self.feedback_textBrowser[position] = msg
         text = "<br \>".join(list(self.feedback_textBrowser.values()))  # css format to replace \n
         self.textBrowser.setText(text)
@@ -405,8 +413,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 msg = f"<font color='#404040'><b>{message}</b></font>"
             else:
                 msg = f"<font color='#FF8033'><b>{message}</b></font>"
+            self.pnp_textBrowser[position] = msg.replace('\n', "<br />")
             self.board_textBrowser[position] = msg
-
         text = "<br \>".join(list(self.board_textBrowser.values()))  # css format to replace \n
         self.condition.setText(text)
         return True
@@ -428,10 +436,10 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             if _type == "ERROR":
                 msg = f"<font color='#FF0000'><b>{message}</b></font>"
             elif _type == "INFO":
-                msg = f"<font color='#FF4040'><b>{message}</b></font>"
+                msg = f"<font color='#404040'><b>{message}</b></font>"
             else:
                 msg = f"<font color='#FF8033'><b>{message}</b></font>"
-            self.pnp_textBrowser[position] = msg
+            self.pnp_textBrowser[position] = msg.replace('\n', "<br />")
         text = "<br \>".join(list(self.pnp_textBrowser.values()))  # css format to replace \n
         self.pnp_condition.setText(text)
         return True
@@ -443,6 +451,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.PRE_right.start()
 
     def update_state(self) -> None:
+        self.set_board_text("INFO", "当前相机", f"当前相机为:{num2cam[self.view_change]}")
         if isinstance(self.__res_left, bool):
             self.set_board_text("ERROR", "左相机", "左相机寄了")
         else:
@@ -453,7 +462,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         else:
             self.set_board_text("INFO", "右相机", "右相机正常工作")
 
-        if self.__res_far:
+        if not self.__res_far:
             self.set_board_text("ERROR", "第三相机", "远相机寄了")
         else:
             self.set_board_text("INFO", "第三相机", "远相机正常工作")
@@ -462,19 +471,21 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if not self.view_change:
             self.set_image(self.__pic_left, "main_demo")
             if self.__pic_right is not None:
-                self.set_image(self.__res_right[:, 2000:3000].copy(), "side_demo")
+                self.set_image(self.__pic_right[:, 2000:3000].copy(), "side_demo")
         else:
             self.set_image(self.__pic_right, "main_demo")
             if self.__pic_left is not None:
-                self.set_image(self.__res_left[:, 500:1700].copy(), "side_demo")
+                self.set_image(self.__pic_left[:, 500:1700].copy(), "side_demo")
+        if self.__pic_far is not None:
+            self.set_image(self.__pic_far, "far_demo")
 
     def update_epnp(self, tvec: np.ndarray, rvec: np.ndarray, side: int) -> None:
-        if side:
+        if not side:
             T, T_ = self.repo_left.push_T(rvec, tvec)
             self.loc_alarm.push_T(T, T_, 0)
             self.loc_alarm.push_RT(rvec, tvec, 0)
         else:
-            self.repo_right.push_T(rvec, tvec)
+            self.repo_right.push_T(rvec, tvec, 1)
             self.loc_alarm.push_RT(rvec, tvec, 1)
 
     def update_reproject(self) -> None:
@@ -495,7 +506,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         e_loc = None
         if isinstance(self.__res_left, np.ndarray):
             if self.__res_left.shape[0] != 0:
-                if not self.using_d:
+                if not self.__using_d:
                     armors = self.__res_left[:, [11, 6, 7, 8, 9]]
                     armors[:, 3] = armors[:, 3] - armors[:, 1]
                     armors[:, 4] = armors[:, 4] - armors[:, 2]
@@ -505,8 +516,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                         x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
                         y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
                         t_loc = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, dph], axis=1)
-                    armors = self.e_location[np.logical_not(np.isnan(self.e_location[:, 0]))]
-                    if armors.shape[0] != 0:
+                    if self.e_location.shape[0] != 0:
+                        armors = self.e_location[np.logical_not(np.isnan(self.e_location[:, 0]))]
                         dph = self.lidar.detect_depth(rects=armors[:, 1:].tolist()).reshape(-1, 1)
                         x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
                         y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
@@ -517,12 +528,13 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                     x0 = (armors[:, 1] + (armors[:, 3] - armors[:, 1]) / 2).reshape(-1, 1)
                     y0 = (armors[:, 2] + (armors[:, 4] - armors[:, 2]) / 2).reshape(-1, 1)
                     t_loc = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, 0], axis=1)
-                    armors = self.e_location[np.logical_not(np.isnan(self.e_location[:, 0]))]
-                    if armors.shape[0] != 0:
+                    if self.e_location.shape[0] != 0:
+                        armors = self.e_location[np.logical_not(np.isnan(self.e_location[:, 0]))]
                         x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
                         y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
                         e_loc = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, 0], axis=1)
         self.loc_alarm.update(t_loc, e_loc)
+        self.loc_alarm.check()
         self.loc_alarm.show()
 
     def spin(self) -> None:
@@ -540,8 +552,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 self.record_object[0].write(self.__pic_left)
             if isinstance(self.__pic_right, np.ndarray):
                 self.record_object[1].write(self.__pic_right)
-            if not self.__res_far[0]:
-                self.record_object[2].write(self.__pic_far)
+            # if not self.__res_far[0]:
+            #     self.record_object[2].write(self.__pic_far)
 
         # if in epnp_mode , just show the images
         if not self.epnp_mode:
@@ -550,15 +562,18 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 pc_show(self.__pic_left, depth)
                 self.update_image()
             else:
-                self.update_image()
-                self.update_reproject()
+                self.update_state()
+                # self.update_reproject()
                 self.update_location_alarm()
                 # self.update_missile()
-
+                self.update_image()
         # update serial
         if self.__serial:
             Port_operate.get_message(self.hp_scene)
             self.hp_scene.show()
+            location = self.loc_alarm.get_location()
+            Port_operate.gain_positions(location)
+
             if Port_operate.change_view:
                 Port_operate.change_view = not Port_operate.change_view
                 self.view_change = int(not self.view_change)
@@ -569,9 +584,9 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 self.__CamFar.destroy()
             self._event_close.set()
             if self.__cam_left:
-                self.PRE_left.join(timeout=3)
+                self.PRE_left.join(timeout=1)
             if self.__cam_right:
-                self.PRE_right.join(timeout=3)
+                self.PRE_right.join(timeout=1)
             sys.exit()
 
 

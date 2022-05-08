@@ -242,27 +242,38 @@ class Camera_HK(Camera):
 
 if __name__ == "__main__":
     import time
-
+    import sys
+    sys.path.append("..")
     cv.namedWindow("test", cv.WINDOW_NORMAL)
-    cam_test = Camera("cam_left")
+
+    name = "cam_right"  # 唯一要改的参数
+    cam_test = Camera_HK(name)
     t1 = time.time()
-    count = 0
+    count_fps = 0
+    count_s = 0
+    count_max = 35
     while True:
         if cam_test.init_ok:
             t2 = time.time()
-            frame = cam_test.get_img()
-            count += 1
-            cv.imshow("test", frame)
+            res, frame = cam_test.get_img()
+            count_fps += 1
+            frame_show = cv.resize(frame, (1024, 682))
+            cv.imshow("test", frame_show)
             key = cv.waitKey(1)
-            if t2 - t1 >= 5:
-                fps = count / (t2 - t1)
-                count = 0
+            if t2 - t1 >= 8:
+                fps = count_fps / (t2 - t1)
+                count_fps = 0
                 t1 = time.time()
                 print(f"fps {fps}")
-            if key == ord('q'):
+            if key == ord('q') or not res or count_s >= count_max:
                 cam_test.destroy()
                 break
+            if key == ord('s'):
+                cv.imwrite(f"../resources/cam_data/{name}/{count_s}.jpg", frame)
+                print(f"../resources/cam_data/{name}/{count_s}.jpg")
+                count_s += 1
         else:
             break
-
     cv.destroyAllWindows()
+
+

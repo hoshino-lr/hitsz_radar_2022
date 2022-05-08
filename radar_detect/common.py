@@ -36,19 +36,19 @@ def is_inside(box: np.ndarray, point: np.ndarray):
 
 
 def armor_filter(armors: np.ndarray):
-    '''
+    """
     装甲板去重
 
-    :param armors 格式定义： [N,bbox(xyxy),conf,cls,bbox(xyxy),conf,cls,col,N]
+    :param armors 格式定义： [N,bbox(xyxy),conf,cls,bbox(xyxy),conf,cls,col, N]
 
     :return: armors np.ndarray 每个id都最多有一个装甲板
-    '''
+    """
     # 直接取最高置信度
-    ids = [1.0, 2.0, 3.0, 4.0, 5.0]
+    ids = [1, 2, 3, 4, 5]
     if armors.shape[0] != 0:
         results = []
         for i in ids:
-            mask = armors[:, 10] == i
+            mask = armors[:, 11] == i
             armors_mask = armors[mask]
             if armors_mask.shape[0]:
                 armor = armors_mask[np.argmax(armors_mask[:, 9])]

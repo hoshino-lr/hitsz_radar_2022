@@ -24,8 +24,8 @@ cam_config = {
         "id": "00F78889001",
         "size": (3072, 2048),
         "video_path": "/home/mark/demo_resource/two_cam/1.mp4",
-        "K_0": np.mat([[1273.6729986357857, 0.0, 598.3779780737999],
-                       [0.0, 1274.0066230685838, 531.2012102435624],
+        "K_0": np.mat([[2505.2629026927225, 0.0, 1529.4286325395244],
+                       [0.0, 2505.5722700649067, 1026.1378217662113],
                        [0.0, 0.0, 1.0]]),
         "C_0": np.mat([-0.2275028300247, 0.20188387553073965, -0.00032941427232237167, -0.0007610612612672920245,
                        0.09717811036906197]),
@@ -44,8 +44,8 @@ cam_config = {
         "id": "J37877236",
         "size": (3072, 2048),
         "video_path": "/home/mark/demo_resource/two_cam/2.mp4",
-        "K_0": np.mat([[1273.6729986357857, 0.0, 598.3779780737999],
-                       [0.0, 1274.0066230685838, 531.2012102435624],
+        "K_0": np.mat([[2551.020329744114, 0.0, 1495.9469657967131],
+                       [0.0, 2552.472255441562, 1062.7407379282765],
                        [0.0, 0.0, 1.0]]),
         "C_0": np.mat([[-0.22753846151806761], [0.2209031621277345], [-0.0006069352871209068], [-0.0006361387371312384],
                        [0.02412961227405689]]),
@@ -82,8 +82,8 @@ cam_config = {
 
 }
 
-net1_onnx = os.path.dirname(os.path.abspath(__file__)) + "/models/net1.onnx"
-net1_engine = os.path.dirname(os.path.abspath(__file__)) + "/models/net1.engine"
+net1_onnx = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/best.onnx"
+net1_engine = os.path.dirname(os.path.abspath(__file__)) + "/net_onnx/net1.engine"
 
 net2_onnx = os.path.dirname(os.path.abspath(__file__)) + "/models/net2.onnx"
 net2_engine = os.path.dirname(os.path.abspath(__file__)) + "/models/net2.engine"
@@ -191,12 +191,12 @@ Delaunary_points = [
                 ]
 
             ],
-            "cam_right": [
+            "cam_right": {
                 (),
                 [
                     # (world_points)
                 ]
-            ]
+            }
         }
     ],
     [
@@ -208,12 +208,12 @@ Delaunary_points = [
                 ]
 
             ],
-            "cam_right": [
+            "cam_right": {
                 (),
                 [
                     # (world_points)
                 ]
-            ]
+            }
         }
     ]
 ]

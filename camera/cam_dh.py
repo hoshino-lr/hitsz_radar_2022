@@ -31,14 +31,14 @@ class Camera_DH(Camera):
         self.__gain = self.__camera_config['gain']
         if not debug:
             try:
-                device_manager = gx.DeviceManager()
-                dev_num, dev_info_list = device_manager.update_device_list()
+                self.device_manager = gx.DeviceManager()
+                dev_num, dev_info_list = self.device_manager.update_device_list()
                 if dev_num == 0:
                     print("Number of enumerated devices is 0")
                     return
 
-                self.cam = gx.DeviceManager.open_device_by_sn(sn=self.__id,
-                                                              access_mode=gx.GxAccessMode.EXCLUSIVE)
+                self.cam = self.device_manager.open_device_by_sn(sn=self.__id,
+                                                            access_mode=gx.GxAccessMode.EXCLUSIVE)
                 # exit when the camera is a mono camera
                 if self.cam.PixelColorFilter.is_implemented() is False:
                     print("This sample does not support mono camera.")
@@ -89,7 +89,7 @@ class Camera_DH(Camera):
         #       % (raw_image.get_frame_id(), raw_image.get_height(), raw_image.get_width()))
 
         # get RGB image from raw image
-        rgb_image = raw_image.convert("BGR")
+        rgb_image = raw_image.convert("RGB")
         if rgb_image is None:
             print('[ERROR] Failed to convert RawImage to RGBImage')
             self.init_ok = False
@@ -101,7 +101,7 @@ class Camera_DH(Camera):
             print('[ERROR] Failed to get numpy array from RGBImage')
             self.init_ok = False
             return False
-
+        numpy_image = cv.cvtColor(numpy_image, cv.COLOR_RGB2BGR)
         self.__img = numpy_image
         return True
 
@@ -118,7 +118,7 @@ class Camera_DH(Camera):
             return False, self.__img
 
     def destroy(self) -> None:
-        if not self.__debug and self.init_ok:
+        if not self.__debug:
             # ch:停止取流 | en:Stop grab image
             # stop data acquisition
             self.cam.stream_off()
