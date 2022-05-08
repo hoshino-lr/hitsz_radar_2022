@@ -1,16 +1,13 @@
-''' 
+"""
 网络类（适合多进程） 使用tensorrtx 接口
 created by 李龙 in 2020/11
 最终修改版本 李龙 2021/1/16
-'''
-import multiprocessing
+"""
 import numpy as np
 import time
 import cv2
-import os
-from multiprocessing import Process
 from resources.config import net1_onnx, net2_onnx, net1_engine, \
-    net2_engine, net1_cls, net2_cls_names, net2_col_names, \
+    net2_engine, net1_cls, net2_cls_names,\
     enemy_color
 from net.tensorrtx import YoLov5TRT
 from radar_detect.common import armor_filter
@@ -18,13 +15,13 @@ from radar_detect.common import armor_filter
 
 class Predictor(object):
     """
-    格式定义： [N,bbox(xyxy),conf,cls,bbox(xyxy),conf,cls,col,N]
+    格式定义： [N,  [bbox(xyxy),conf,cls,bbox(xyxy),conf,cls,col,N]
     """
     # 输入图片与输出结果
     img_src = []
     output = []
     name = ""
-    img_show = False
+    img_show = True
 
     # net1参数
     net1_confThreshold = 0.3
@@ -468,8 +465,8 @@ if __name__ == '__main__':
         _, pic = pre1.detect_cars(frame)
         count += 1
         pic = cv2.resize(pic, (1280, 720))
-        # cv2.imshow("asd", pic)
-        # cv2.waitKey(1)
+        cv2.imshow("asd", pic)
+        cv2.waitKey(1)
         if time.time() - t1 > 1:
             print(f"fps:{count / (time.time() - t1)}")
             count = 0

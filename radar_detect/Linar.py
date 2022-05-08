@@ -68,7 +68,7 @@ class DepthQueue(object):
         # TODO: 如果点云有遮挡关系，则测距测到前或后不确定  其实我也遇到了这个问题
         # 更新策略，将进队点云投影点的z值与原来做比较，取均值
         s = np.stack([self.depth[ip[:, 1], ip[:, 0]], dpt], axis=1)
-        s = np.nanmean(s, axis=1)
+        s = np.nanmin(s, axis=1)
         self.depth[ip[:, 1], ip[:, 0]] = s
 
     def depth_detect_refine(self, r):

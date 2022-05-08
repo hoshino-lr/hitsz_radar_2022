@@ -86,7 +86,7 @@ class Reproject(object):
                     if shape_type == 'fp':
                         # 四点凸四边形类型，原理同上
                         cor = np.float32(self._region[r][:8]).reshape(-1, 2)
-                        cor[:, 1] -= self._real_size[1]  # 同上，原点变换
+                        # cor[:, 1] -= self._real_size[1]  # 同上，原点变换
                         if height_type == 'a':
                             height = np.ones((cor.shape[0], 1)) * self._region[r][8]
                         if height_type == 'd':
@@ -94,7 +94,7 @@ class Reproject(object):
                             height[1:3] *= self._region[r][9]
                             height[[0, 3]] *= self._region[r][8]
                     if isinstance(cor, np.ndarray) and isinstance(height, np.ndarray):
-                        cor = np.concatenate([cor, height], axis=1)  # 合并高度坐标
+                        cor = np.concatenate([cor, height], axis=1) * 1000  # 合并高度坐标 顺便把米转换为毫米
                         recor = cv2.projectPoints(cor, self._rvec, self._tvec, self._K_O, self._C_O)[0] \
                             .astype(int).reshape(-1, 2)  # 得到反投影坐标
                         self._scene_region[r] = recor  # 储存反投影坐标

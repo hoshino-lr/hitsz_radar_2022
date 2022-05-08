@@ -17,7 +17,7 @@ class CameraLocation(object):
     """
     将原本的 rvec 与 tvec 整合为一个对象
     """
-    checkpoint_dir = "../resources/cam_data/"
+    checkpoint_dir = os.path.dirname(os.path.abspath(__file__)) + "/../resources/cam_data/"
 
     @staticmethod
     def __last_checkpoint(cls) -> (int, str):

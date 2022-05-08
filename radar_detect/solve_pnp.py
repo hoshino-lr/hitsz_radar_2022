@@ -19,17 +19,16 @@ class SolvePnp(CameraLocation):
     def __init__(self, text_api):
         super(SolvePnp, self).__init__(self.rvec, self.tvec)
         self.debug = DEBUG
-        self.sel_cam(0)
         self._api = text_api
         self.sp_state = False
         self.side_text = ""
 
     def add_point(self, x: int, y: int) -> None:
         if self.count < self.count_max - 1:
-            self.imgPoints[self.count, :] = [float(x), float(y)]
+            self.imgPoints[self.count, :] = np.array([float(x), float(y)])
             self.count += 1
         elif self.count == self.count_max - 1:
-            self.imgPoints[self.count, :] = [float(x), float(y)]
+            self.imgPoints[self.count, :] = np.array([float(x), float(y)])
         self._update_info()
 
     def del_point(self) -> None:
@@ -46,7 +45,7 @@ class SolvePnp(CameraLocation):
         self.count_max = len(objNames[int(self.debug)][side_text])
         self.names = objNames[int(self.debug)][side_text]
         self.imgPoints = np.zeros((self.count_max, 2), dtype=np.float32)
-        self.objPoints = objPoints[int(self.debug)][side_text]
+        self.objPoints = objPoints[int(self.debug)][side_text] * 1000  # 米转换成毫米
         self.size = cam_config[side_text]['size']
         self.distCoeffs = cam_config[side_text]['C_0']
         self.cameraMatrix = cam_config[side_text]['K_0']
@@ -54,8 +53,21 @@ class SolvePnp(CameraLocation):
         self._update_info()
 
     def save(self) -> None:
-        self.save_to(self.side_text)
+        if self.debug:
+            text = "_debug"
+        else:
+            text = ""
+        self.save_to(self.side_text + text)
         self._update_info()
+
+    def read(self, name) -> None:
+        if self.debug:
+            text = "debug"
+        else:
+            text = ""
+        ca = self.from_checkpoint(f"{name}_{text}")
+        self.tvec = ca.translation
+        self.rvec = ca.rotation
 
     def clc(self) -> None:
         self.imgPoints = np.zeros((self.count_max, 2), dtype=np.float32)
@@ -73,11 +85,10 @@ class SolvePnp(CameraLocation):
         self._api("INFO", "side", f"当前相机位置：{self.side_text}")
         self._api("INFO", "sp+state", f"当前标注状态：{self.sp_state}")
         self._api("INFO", "count", f"当前点：{self.count + 1}")
-        text = ""
         for i in range(1, self.count_max + 1):
-            text += f"{self.names[i - 1]}\n" \
-                    f"x : {self.imgPoints[i][0]} y: {self.imgPoints[i][1]}"
-            if i != self.count:
+            text = f"{self.names[i - 1]}\n" \
+                    f"x : {self.imgPoints[i - 1][0]} y: {self.imgPoints[i - 1][1]}\n"
+            if i-1 != self.count:
                 self._api("INFO", f"count{i}", text)
             else:
                 self._api("ERROR", f"count{i}", text)  # 只是显示一种颜色
@@ -91,6 +102,8 @@ class SolvePnp(CameraLocation):
                                                   imagePoints=self.imgPoints)
             self.rotation = rvec
             self.translation = tvec
+            print(f"[INFO] rvec:{rvec}")
+            print(f"[INFO] tvec:{tvec}")
             self.sp_state = True
             self._update_info()
             return True

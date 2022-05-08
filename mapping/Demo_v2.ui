@@ -24,7 +24,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>0</number>
     </property>
     <widget class="QWidget" name="tab">
      <property name="minimumSize">
@@ -181,7 +181,10 @@
               <enum>QFrame::StyledPanel</enum>
              </property>
              <property name="text">
-              <string>TextLabel</string>
+              <string>condition</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
              </property>
             </widget>
            </item>

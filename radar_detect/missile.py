@@ -221,14 +221,14 @@ class Missile(object):
         elif time.time() - self._pre_stage_time > 2.:
             self._pre_stage = False
 
-    def detect_api(self, img: np.ndarray, region=None) -> None:
+    def detect_api(self, img: np.ndarray, Region=None) -> None:
         """
         开启第二阶段检测
         :param img: 检测图片
-        :param region: 检测区域
+        :param Region: 检测区域
         :return: None
         """
-        detect_flag = self._detect(img, region, self._stage)
+        detect_flag = self._detect(img, Region, self._stage)
         if self._stage:  # 若处于反导侦测阶段TWO_STAGE_TIME秒，则自动结束
             if time.time() - self._two_stage_time > 20.:
                 print("missile end")
