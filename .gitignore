@@ -136,3 +136,9 @@ dmypy.json
 /resources/models/net1.onnx
 /resources/models/net2.engine
 /resources/models/net2.onnx
+/.idea/.gitignore
+/.idea/hitsz_radar_2022.iml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/vcs.xml

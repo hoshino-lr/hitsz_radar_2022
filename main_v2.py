@@ -34,7 +34,6 @@ from radar_detect.missile import Missile
 from radar_detect.solve_pnp import SolvePnp
 from mapping.pc_show import pc_show
 
-
 def process_detect(event, que, Event_Close, name):
     # 多线程接收写法
     print(f"子线程开始: {name}")

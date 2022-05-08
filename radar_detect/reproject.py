@@ -1,7 +1,6 @@
 """
 反投影预警
 created by 牟俊宇 2020/12
-最新修改 by 牟俊宇 2021/1/15
 """
 from typing import Union, Any, Tuple
 from numpy import ndarray
@@ -11,25 +10,31 @@ import numpy as np
 import time
 
 from radar_detect.common import is_inside
-from resources.config import color2enemy, enemy_case, enemy_color, cam_config, \
-    DEBUG, test_region, region, real_size
+from resources.config import color2enemy, enemy_case, enemy_color, cam_config, DEBUG, test_region, region, real_size
 
 
 class Reproject(object):
     """
     反投影预警类
     """
+    _id = np.array([1, 2, 3, 4, 5])
     _iou_threshold = 0.8  # iou阈值
     _clock = 1  # 间隔一秒发送text
     _frame = 3  # 一秒钟需要检测到3帧
 
     def __init__(self, name, textapi):
+        """
+        Args:
+            name:相机名称
+            textapi:发送text的接口
+
+        """
         # 读取相机配置文件
         self._tvec = cam_config[name]['tvec']
         self._rvec = cam_config[name]['rvec']
         self._K_O = cam_config[name]['K_0']
         self._C_O = cam_config[name]['C_0']
-        if DEBUG:   # 若为debug模式
+        if DEBUG:  # 若为debug模式
             self._region = test_region
         else:
             self._region = region
@@ -43,7 +48,9 @@ class Reproject(object):
         # self._debug = DEBUG
         self._scene_init = False  # 初始化flag
         self._pred_box = np.array([])
+
         self._textapi = textapi  # 发送text的api
+
         self.rp_alarming = {}
 
         self._region_count = {}  # 检测区域计数
@@ -100,6 +107,15 @@ class Reproject(object):
                         self._scene_region[r] = recor  # 储存反投影坐标
                         self._scene_init = True
 
+    def init_flag(self) -> bool:
+        """
+        查询是否初始化
+
+        Returns:
+            若初始化，则为true
+        """
+        return self._scene_init
+
     def push_T(self, rvec: ndarray, tvec: ndarray) -> Tuple[Union[ndarray, Any], Any]:
         """
         输入相机位姿（世界到相机）
@@ -116,13 +132,16 @@ class Reproject(object):
         T = np.linalg.inv(T)  # 矩阵求逆
         return T, (T @ (np.array([0, 0, 0, 1])))[:3]
 
-    def update(self, frame) -> None:
+    def update(self, frame: ndarray) -> None:
         """
         更新一帧绘图
+
+        Args:
+            frame: 一帧图像
         """
-        for i in self._scene_region.keys():
-            recor = self._scene_region[i]
-            type, shape_type, team, location, height_type = i.split('_')
+        for r in self._scene_region.keys():
+            recor = self._scene_region[r]
+            type, shape_type, team, location, height_type = r.split('_')
             if color2enemy[team] != enemy_color:
                 continue
             else:
@@ -130,9 +149,9 @@ class Reproject(object):
                     cv2.circle(frame, tuple(p), 10, (0, 255, 0), -1)
                 cv2.polylines(frame, [recor], 1, (0, 0, 255))
         if self.rp_alarming is not None:
-            for i in self.rp_alarming.keys():
-                recor = self._scene_region[i]
-                type, shape_type, team, location, height_type = i.split('_')
+            for r in self.rp_alarming.keys():
+                recor = self._scene_region[r]
+                type, shape_type, team, location, height_type = r.split('_')
                 if color2enemy[team] != enemy_color:
                     continue
                 else:
@@ -141,35 +160,35 @@ class Reproject(object):
     def check(self, net_input) -> None:
         """
         预警预测
+
         Args:
             net_input:输入
-            armors:N,cls+对应的车辆预测框序号+装甲板bbox
-            cars:N,cls+车辆bbox
         """
-        armors = np.array([])
-        cars = np.array([])
+        armors = np.array([])  # 装甲板
+        cars = np.array([])  # 车
+
         if isinstance(net_input, np.ndarray):
             if len(net_input):
-                armors = net_input[:, [11, 13, 6, 7, 8, 9]]
-                cars = net_input[:, [11, 0, 1, 2, 3]]
+                armors = net_input[:, [11, 13, 6, 7, 8, 9]]  # N,class+对应的车辆预测框序号+装甲板bbox
+                cars = net_input[:, [11, 0, 1, 2, 3]]  # N,class+车辆bbox
 
         pred_bbox = np.array([])
-        color_bbox = []
+        nocolor_bbox = []
+
         cache = None  # 当前帧缓存框
-        id = np.array([1, 2, 3, 4, 5])
+        
         f_max = lambda x, y: (x + y + abs(x - y)) // 2
         f_min = lambda x, y: (x + y - abs(x - y)) // 2
         if isinstance(armors, np.ndarray) and isinstance(cars, np.ndarray) and len(armors):
-            # assert len(armors)
-            pred_cls = []
+            pred_cls = []  # IoU预测的车辆种类
             p_bbox = []  # IoU预测框（装甲板估计后的装甲板框）
             cache_pred = []  # 可能要缓存的当帧预测IoU预测框的原始框，缓存格式 id,x1,y1,x2,y2
-            cache = np.concatenate(
-                [armors[:, 0].reshape(-1, 1), np.stack([cars[int(i)] for i in armors[:, 1]], axis=0)], axis=1)
-            cls = armors[:, 0].reshape(-1, 1)
+            cls = armors[:, 0].reshape(-1, 1)  # 车辆编号
+            cache = np.concatenate([cls, np.stack([cars[int(i)] for i in armors[:, 1]], axis=0)], axis=1)
+            
             # 以下为IOU预测
             if isinstance(self._cache, np.ndarray):
-                for i in id:
+                for i in self._id:
                     mask = self._cache[:, 0] == i
                     if not (cls == i).any() and mask.any():
                         cache_bbox = self._cache[mask][:, 2:]
@@ -202,7 +221,8 @@ class Reproject(object):
                 pred_bbox = np.concatenate(
                     [np.stack(pred_cls, axis=0).reshape(-1, 1), np.stack(p_bbox, axis=0).reshape(-1, 4)],
                     axis=1)
-            # 默认使用bounding box为points四点
+                
+            # 默认使用装甲板bounding box为points四点
             x1 = armors[:, 2].reshape(-1, 1)
             y1 = armors[:, 3].reshape(-1, 1)
             x2 = armors[:, 4].reshape(-1, 1)
@@ -211,24 +231,24 @@ class Reproject(object):
             # 对仅预测出颜色的敌方预测框进行数据整合
             for i in cars:
                 if i[0] == 0:
-                    color_bbox.append(i)
-            if len(color_bbox):
-                color_bbox = np.stack(color_bbox, axis=0)
-            if isinstance(color_bbox, np.ndarray):
+                    nocolor_bbox.append(i)
+            if len(nocolor_bbox):
+                nocolor_bbox = np.stack(nocolor_bbox, axis=0)
+            if isinstance(nocolor_bbox, np.ndarray):
                 # 预估装甲板位置，见技术报告
-                color_cls = color_bbox[:, 0].reshape(-1, 1)
-                color_bbox[:, 3] = (color_bbox[:, 3] - color_bbox[:, 1]) // 3
-                color_bbox[:, 4] = (color_bbox[:, 4] - color_bbox[:, 2]) // 5
-                color_bbox[:, 1] += color_bbox[:, 3]
-                color_bbox[:, 2] += color_bbox[:, 4] * 3
-                x1 = color_bbox[:, 1]
-                y1 = color_bbox[:, 2]
-                x2 = x1 + color_bbox[:, 3]
-                y2 = y1 + color_bbox[:, 4]
-                color_fp = np.stack([x1, y1, x2, y1, x2, y2, x1, y2], axis=1)
+                nocolor_cls = nocolor_bbox[:, 0].reshape(-1, 1)
+                nocolor_bbox[:, 3] = (nocolor_bbox[:, 3] - nocolor_bbox[:, 1]) // 3
+                nocolor_bbox[:, 4] = (nocolor_bbox[:, 4] - nocolor_bbox[:, 2]) // 5
+                nocolor_bbox[:, 1] += nocolor_bbox[:, 3]
+                nocolor_bbox[:, 2] += nocolor_bbox[:, 4] * 3
+                x1 = nocolor_bbox[:, 1]
+                y1 = nocolor_bbox[:, 2]
+                x2 = x1 + nocolor_bbox[:, 3]
+                y2 = y1 + nocolor_bbox[:, 4]
+                nocolor_points = np.stack([x1, y1, x2, y1, x2, y2, x1, y2], axis=1)
                 # 与之前的数据进行整合
-                points = np.concatenate([points, color_fp], axis=0)
-                cls = np.concatenate([cls, color_cls], axis=0)
+                points = np.concatenate([points, nocolor_points], axis=0)
+                cls = np.concatenate([cls, nocolor_cls], axis=0)
             points = points.reshape((-1, 4, 2))
             for r in self._scene_region.keys():
                 # 判断对于各个预测框，是否有点在该区域内
@@ -239,8 +259,8 @@ class Reproject(object):
                     self.rp_alarming = {r: alarm_target.reshape(1, -1)}
         # 储存为上一帧的框
         if isinstance(cache, np.ndarray):
-            for i in id:
-                assert cache[cache[:, 0] == i].reshape(-1, 6).shape[0] <= 1
+            for i in self._id:
+                assert cache[cache[:, 0] == i].reshape(-1, 5).shape[0] <= 1
             self._cache = cache.copy()
         else:
             self._cache = None
