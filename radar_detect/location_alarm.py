@@ -7,7 +7,7 @@ created by 黄继凡 2021/12
 import numpy as np
 from radar_detect.common import is_inside
 import mapping.draw_map as draw_map  # 引入draw_map模块，使用其中的CompeteMap类
-from resources.config import armor_list, color2enemy, enemy_case, cam_config, real_size
+from resources.config import armor_list, color2enemy, enemy_case, cam_config, real_size, region, test_region
 from radar_detect.location_Delaunay import location_Delaunay
 
 
@@ -21,11 +21,11 @@ class Alarm(draw_map.CompeteMap):
     """
     # param
 
-    _pred_time = 10  # 预测几次
+    _pred_time = 5   # 预测几次  一开始是10
     _pred_ratio = 0.2  # 预测速度比例
 
-    _ids = {1: 6, 2: 7, 3: 8, 4: 9, 5: 10, 8: 1,
-            9: 2, 10: 3, 11: 4, 12: 5}  # 装甲板编号到标准编号
+    # _ids = {1: 6, 2: 7, 3: 8, 4: 9, 5: 10, 8: 1,
+    #         9: 2, 10: 3, 11: 4, 12: 5}  # 装甲板编号到标准编号
     _lp = True  # 是否位置预测
     _z_a = True  # 是否进行z轴突变调整
     _z_thre = 0.2  # z轴突变调整阈值
@@ -33,7 +33,7 @@ class Alarm(draw_map.CompeteMap):
     _using_l1 = True  # 不用均值，若两个都有预测只用右相机预测值
     using_d = False
 
-    def __init__(self, region: dict, api, touch_api, enemy, using_Delaunay=False, two_Camera=False, debug=False):
+    def __init__(self, api, touch_api, enemy, using_Delaunay=False, two_Camera=False, debug=False):
         """
         :param region:预警区域
         :param api:主程序显示api，传入画图程序进行调用（不跨线程使用,特别是Qt）
@@ -42,9 +42,15 @@ class Alarm(draw_map.CompeteMap):
         :param two_Camera:是否使用两个相机
         :param debug:debug模式
         """
-        super(Alarm, self).__init__(region, real_size, enemy, api)
+        if debug:
+            super(Alarm, self).__init__(test_region, real_size, enemy, api)
+            self._region = test_region
+        else:
+            super(Alarm, self).__init__(region, real_size, enemy, api)
+            self._region = region
+        self.reset_thre = 100
+        self.reset_count = 0
 
-        self._region = region
         # location 车辆位置字典，键为字符'1'-'10'，值为车辆的位置数组
         self._location = {}
         if two_Camera:
@@ -112,7 +118,7 @@ class Alarm(draw_map.CompeteMap):
                 l = np.float32(self._location[armor])
                 if alarm_type == 'm' or alarm_type == 'a':  # 若为位置预警
                     if shape_type == 'r' and (
-                            target not in enemy_case or color2enemy[team] == self._enemy):  # 对于特殊地点，只考虑对敌方进行预警
+                            target in enemy_case or color2enemy[team] == self._enemy):  # 对于特殊地点，只考虑对敌方进行预警
                         # 矩形区域采用范围判断
                         if l[0] >= self._region[loc][0] and l[1] >= self._region[loc][3] and \
                                 l[0] <= self._region[loc][2] and l[1] <= self._region[loc][1]:
@@ -485,8 +491,15 @@ class Alarm(draw_map.CompeteMap):
 
             if self._lp:
                 self._location_prediction()
-                # 执行裁判系统发送
 
+            if self.reset_count == self.reset_thre:
+                self.reset_count = 0
+                for i in range(1, 11):  # 初始化位置为全零
+                    self._location[str(i)] = [0, 0]
+                # 前两帧位置为全零
+                self._location_cache = [self._location.copy(), self._location.copy()]
+            else:
+                self.reset_count += 1
         else:
             self._touch_api(
                 "ERROR", "相机数目不符合", "This update function only supports single_camera case, using "

@@ -6,7 +6,7 @@ draw_map.py
 import cv2
 import numpy as np
 
-from resources.config import MAP_PATH, map_size
+from resources.config import MAP_PATH, map_size, enemy2color
 
 
 class CompeteMap(object):
@@ -89,8 +89,8 @@ class CompeteMap(object):
         在canvas绘制预警区域（canvas 原始地图 _map）
         '''
         for r in region.keys():
-            alarm_type, shape_type, _, _, _ = r.split('_')
-            if alarm_type == 'm' or alarm_type == 'a': # 预警类型判断，若为map或all类型
+            alarm_type, shape_type, team, _, _ = r.split('_')
+            if (alarm_type == 'm' or alarm_type == 'a') and team == enemy2color[self._enemy]: # 预警类型判断，若为map或all类型
                 if shape_type == 'l':
                     # 直线预警
                     rect = region[r] # 获得直线两端点，为命名统一命名为rect

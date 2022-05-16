@@ -351,9 +351,6 @@ class Predictor(object):
                 cv2.putText(self.img_src, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf,
                             lineType=cv2.LINE_AA)
 
-        # self.img_src = cv2.resize(self.img_src, (640, 640))
-        # cv2.imshow("img_src", self.img_src)
-
     def thread_detect(self):
         # 多线程接收写法
         count = 0

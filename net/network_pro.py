@@ -6,9 +6,8 @@ created by 李龙 in 2020/11
 import numpy as np
 import time
 import cv2
-from resources.config import net1_onnx, net2_onnx, net1_engine, \
-    net2_engine, net1_cls, net2_cls_names,\
-    enemy_color
+from resources.config import net1_engine, net2_engine, \
+    net1_cls, net2_cls_names, enemy_color
 from net.tensorrtx import YoLov5TRT
 from radar_detect.common import armor_filter
 
@@ -21,14 +20,13 @@ class Predictor(object):
     img_src = []
     output = []
     name = ""
-    img_show = True
+    img_show = False
 
     # net1参数
-    net1_confThreshold = 0.3
+    net1_confThreshold = 0.4
     net1_nmsThreshold = 0.45
     net1_inpHeight = 640
     net1_inpWidth = 640
-    net1_onnx_file = net1_onnx
     net1_trt_file = net1_engine
     # 不检测base
 
@@ -38,12 +36,11 @@ class Predictor(object):
     net1_strides = [8, 16, 32]
 
     # net2参数
-    net2_confThreshold = 0.25
-    net2_nmsThreshold = 0.2
+    net2_confThreshold = 0.4
+    net2_nmsThreshold = 0.35
     net2_inpHeight = 640
     net2_inpWidth = 640
     net2_box_num = 25200
-    net2_onnx_file = net2_onnx
     net2_trt_file = net2_engine
 
     net2_grid = []
@@ -113,7 +110,7 @@ class Predictor(object):
         if self.img_show and res.shape != 0:  # 画图
             self.net_show(res)
         # self.net2_time += time.time() - start
-        armor_filter(res)
+        res = armor_filter(res)
         return res, self.img_src
 
     def detect_armor(self, src):
@@ -252,6 +249,7 @@ class Predictor(object):
         res = []
 
         if len(indices):
+            indices = indices.reshape(-1, 1)
             for i in indices:
                 # 暂时为完成 boxes 转 numpy
                 bbox = [float(x) for x in bboxes[i[0]]]
@@ -310,7 +308,7 @@ class Predictor(object):
             xc = output[i, :]
             cls_id = np.argmax(xc[15:15 + 9])  # 选择置信度最高的 class
             col_id = np.argmax(xc[24:])  # 选择置信度最高的 color
-            if col_id != self.enemy_color and cls_id in range(1, 6):
+            if col_id != self.enemy_color or cls_id not in range(1, 6):
                 continue
             obj_conf = float(xc[4])  # 置信度
             centerX = int(
@@ -332,6 +330,7 @@ class Predictor(object):
 
         if len(indices):
             res = []
+            indices = indices.reshape(-1, 1)
             for i in indices:
                 res.append([bboxes[i[0]][0], bboxes[i[0]][1], bboxes[i[0]][2],
                             bboxes[i[0]][3], confidences[i[0]],
@@ -447,7 +446,7 @@ if __name__ == '__main__':
     import sys
 
     sys.path.append("..")  # 单独跑int的时候需要
-    cap = cv2.VideoCapture("/home/hoshino/CLionProjects/LCR_sjtu/demo_resource/two_cam/1.mp4")
+    cap = cv2.VideoCapture("/home/mark/hitsz_radar/1.mp4")
     PICS = []
     while cap.isOpened():
         res, frame = cap.read()
@@ -465,8 +464,8 @@ if __name__ == '__main__':
         _, pic = pre1.detect_cars(frame)
         count += 1
         pic = cv2.resize(pic, (1280, 720))
-        cv2.imshow("asd", pic)
-        cv2.waitKey(1)
+        # cv2.imshow("asd", pic)
+        # cv2.waitKey(1)
         if time.time() - t1 > 1:
             print(f"fps:{count / (time.time() - t1)}")
             count = 0

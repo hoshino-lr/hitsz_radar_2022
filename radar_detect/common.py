@@ -31,8 +31,8 @@ def is_inside(box: np.ndarray, point: np.ndarray):
     b = np.cross(BM, BC)
     c = np.cross(CM, CD)
     d = np.cross(DM, DA)
-    return a >= 0 and b >= 0 and c >= 0 and d >= 0 or \
-           a <= 0 and b <= 0 and c <= 0 and d <= 0
+    return (a >= 0 and b >= 0 and c >= 0 and d >= 0) or \
+           (a <= 0 and b <= 0 and c <= 0 and d <= 0)
 
 
 def armor_filter(armors: np.ndarray):
@@ -55,6 +55,9 @@ def armor_filter(armors: np.ndarray):
                 results.append(armor)
         if len(results):
             armors = np.stack(results, axis=0)
+            for i in range(0, len(results)):
+                armors[i][13] = i
+    return armors
 
 
 def car_classify(frame_m, red=True):

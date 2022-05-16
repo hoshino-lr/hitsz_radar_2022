@@ -2,6 +2,7 @@
 多线程管理类
 mul_manager.py
 用于多线程间的信息发布与接收
+注意。文件没有被使用
 created by 李龙 
 """
 import time
