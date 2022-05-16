@@ -7,7 +7,8 @@ created by 李龙 in 2022/1
 """
 from os import wait
 from multiprocessing import Queue, Process, Event
-
+import cv2 as cv
+import time
 
 def thread_detect(event, que, name):
     """
@@ -41,8 +42,6 @@ def thread_detect(event, que, name):
     predictor1.stop()
 
 
-
-
 def pub(event, que, data):
     """
     pub 函数
@@ -67,14 +66,16 @@ def sub(event, que):
     :param event 多进程事件
     :param que 传输队列
     """
-    _wait = event.wait(timeout=0.1)
+    _wait = event.wait(timeout=0.04)
     if _wait:
         try:
             re_data = que.get_nowait()
         except:
             print("[ERROR] sub process can't get data!")
-            re_data = None, None
+            re_data = False, None
         event.clear()
         return re_data
     else:
-        return None, None
+        return False, None
+
+

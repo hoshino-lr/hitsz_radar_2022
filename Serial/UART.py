@@ -9,7 +9,7 @@ from .port_operation import Port_operate
 from resources.config import enemy_color
 from .HP_show import HP_scene
 
-buffer = [0]
+buffer = [0] * 50
 bufferbyte = 0
 cmd_id = 0
 r_id = 1
@@ -37,12 +37,12 @@ def read(ser):
     global buffer
     global bufferbyte
     global cmd_id
-    cmd_use = {0x0001, 0x0002, 0x0003, 0x0101, 0x0105}
+    cmd_use = [0x0001, 0x0002, 0x0003, 0x0101, 0x0105]
     bufferbyte = 0
     while True:
         s = int().from_bytes(ser.read(1), 'big')
 
-        if bufferbyte > 50:
+        if bufferbyte >= 50:
             bufferbyte = 0
         buffer[bufferbyte] = s
 
@@ -60,12 +60,12 @@ def read(ser):
         # 处理cmd_id
         if bufferbyte == 6:
             cmd_id = (0x0000 | buffer[5]) | (buffer[6] << 8)
-
-        # 对内容进行判断
-        if not cmd_id in cmd_use:
-            bufferbyte = 0
-            continue
-            # 比赛状态数据
+            # print(f"[INFO] cmd_id:{cmd_id}")
+            # 对内容进行判断
+            if not cmd_id in cmd_use:
+                bufferbyte = 0
+                continue
+        # 比赛状态数据
         if bufferbyte == 19 and cmd_id == 0x0001:
             if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 20):
                 # 处理比赛信息
@@ -83,7 +83,7 @@ def read(ser):
 
         # 机器人血量统计
         if bufferbyte == 40 and cmd_id == 0x0003:
-            if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 40):
+            if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 41):
                 # 统计血量
                 Port_operate.Robot_HP(buffer)
                 read_init(buffer)
@@ -125,20 +125,21 @@ def Map_Transmit(ser):
     else:
         flag = True
     # 敌方判断
-    if enemy_color == 1:
+    if enemy_color == 0:
         # 敌方为红方
         if flag:
-            Port_operate.Map(r_id, np.float32(x), np.float(y), ser)
+            # print(f"[INFO] 输出 {r_id} {x} {y}")
+            Port_operate.Map(r_id, np.float32(x), np.float32(y), ser)
             time.sleep(0.1)
             loop_send += 1
         if r_id == 5:
             r_id = 1
         else:
             r_id += 1
-    if enemy_color == 0:
+    if enemy_color == 1:
         # 敌方为蓝方
         if flag:
-            Port_operate.Map(b_id, np.float32(x), np.float(y), ser)
+            Port_operate.Map(b_id, np.float32(x), np.float32(y), ser)
             time.sleep(0.1)
             loop_send += 1
         if b_id == 105:

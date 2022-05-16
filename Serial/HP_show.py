@@ -10,11 +10,11 @@ from resources.config import enemy2color, unit_list
 class HP_scene(object):
     _stage_max = 5  # 5格血量条
     _size = (400, 310)
-    _font_size = 1
+    _font_size = 0.8
     _outpost = 1500  # 前哨站血量上限
     _base = 5000  # 基地血量上限
     _guard = 600  # 哨兵血量上限
-    _font = cv2.FONT_HERSHEY_COMPLEX
+    _font = cv2.FONT_HERSHEY_TRIPLEX
 
     def __init__(self, enemy, show_api):
         """
@@ -24,11 +24,11 @@ class HP_scene(object):
         :param show_api:在主UI显示调用的api f(img:np.ndarray)
         """
         self._scene = np.ones((self._size[1], self._size[0], 3), dtype=np.uint8)
-        self._scene *= 255
+        self._scene *= 240
         self._show_api = show_api
         self._enemy = enemy
         self._puttext = lambda txt, x, y, color: cv2.putText(self._scene, txt, (x, y), self._font,
-                                                             self._font_size, color, 2, cv2.LINE_AA)
+                                                             self._font_size, color, 1, cv2.LINE_AA)
         # init title
         if enemy2color[self._enemy] == 'red':
             self.our_color = (255, 0, 0)
@@ -134,7 +134,7 @@ class HP_scene(object):
         """
         和其他绘制类一样，显示
         """
-        return self._out_scene
+        self._show_api(self._out_scene)
 
     def refresh(self):
         """

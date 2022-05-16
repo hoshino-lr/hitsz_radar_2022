@@ -34,34 +34,43 @@ from radar_detect.missile import Missile
 from radar_detect.solve_pnp import SolvePnp
 from mapping.pc_show import pc_show
 
+
 def process_detect(event, que, Event_Close, name):
     # 多线程接收写法
     print(f"子线程开始: {name}")
     predictor = Predictor(name)
-    if name == "cam_far":
-        cam = Camera_DH(name, False)
-    else:
-        cam = Camera_HK(name, False)
+    cam = Camera_HK(name, False)
     count = 0
+    count_error = 0
     t1 = 0
-    while not Event_Close.is_set():
-        result, frame = cam.get_img()
-        if result and frame is not None:
-            t3 = time.time()
-            res = predictor.detect_cars(frame)
-            pub(event, que, res)
-            t1 = t1 + time.time() - t3
-            count += 1
-            if count == 100:
-                fps = float(count) / t1
-                print(f'{name} count:{count} fps: {int(fps)}')
-                count = 0
-                t1 = 0
-        else:
-            pub(event, que, [result, frame])
-    cam.destroy()
-    predictor.stop()
-    print(f"相机网络子进程:{name} 退出")
+    try:
+        while not Event_Close.is_set():
+            result, frame = cam.get_img()
+            if result and frame is not None:
+                t3 = time.time()
+                res = predictor.detect_cars(frame)
+                pub(event, que, res)
+                t1 = t1 + time.time() - t3
+                count += 1
+                if count == 100:
+                    fps = float(count) / t1
+                    print(f'{name} count:{count} fps: {int(fps)}')
+                    count = 0
+                    t1 = 0
+            else:
+                count_error += 1
+                pub(event, que, [result, frame])
+                if count_error == 100:
+                    cam.destroy()
+                    del cam
+                    cam = Camera_HK(name, False)
+                    count_error = 0
+        predictor.stop()
+        cam.destroy()
+        print(f"相机网络子进程:{name} 退出")
+    except Exception as e:
+        print(e)
+        print(f"相机网络子进程:{name} 寄了")
     sys.exit()
 
 
@@ -141,13 +150,15 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.repo_left = Reproject('cam_left', self.text_api)
         self.repo_right = Reproject('cam_right', self.text_api)
         self.loc_alarm = Alarm(enemy=enemy_color, api=self.show_map, touch_api=self.text_api,
-                               using_Delaunay=self.__using_d, region=test_region, debug=False)
-
-        self.sp.read('cam_right')
-        T, T_ = self.repo_right.push_T(self.sp.rvec, self.sp.tvec)
-        self.sp.read('cam_left')
-        self.repo_left.push_T(self.sp.rvec, self.sp.tvec)
-
+                               using_Delaunay=self.__using_d, debug=False)
+        try:
+            self.sp.read('cam_right_blue')
+            self.repo_right.push_T(self.sp.rvec, self.sp.tvec)
+            self.sp.read('cam_left_blue')
+            T, T_ = self.repo_left.push_T(self.sp.rvec, self.sp.tvec)
+        except Exception as e:
+            print("[ERROR] using default data")
+            T, T_ = self.repo_left.push_T(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"])
         self.loc_alarm.push_T(T, T_, 0)
         self.start()
 
@@ -202,19 +213,23 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
 
     def record_on_clicked(self) -> None:
         if not self.record_state:
-            time_ = time.localtime(time.time())
-            self.__save_title = f"resources/records/{time_.tm_mday}_{time_.tm_hour}_" \
-                                f"{time_.tm_min}"
+            self.record.setText("录制 正在录制")
             fourcc = cv.VideoWriter_fourcc(*'MP42')
-            self.record_object.append(cv.VideoWriter(self.__save_title + "_left.avi", fourcc, 25,
+            time_ = time.localtime(time.time())
+            save_title = f"resources/records/{time_.tm_mday}_{time_.tm_hour}_" \
+                         f"{time_.tm_min}"
+            self.record_object.append(cv.VideoWriter(save_title + "_left.avi", fourcc, 12,
                                                      cam_config['cam_left']['size']))
-            self.record_object.append(cv.VideoWriter(self.__save_title + "_right.avi", fourcc, 25,
+            self.record_object.append(cv.VideoWriter(save_title + "_right.avi", fourcc, 12,
                                                      cam_config['cam_right']['size']))
-            # self.record_object.append(cv.VideoWriter(self.__save_title + "_far.mp4", fourcc, 10,
-            #                                          cam_config['cam_far']['size']))
+            self._record_thr = threading.Thread(target=self.mul_record)
+            self._record_thr.setDaemon(True)
             self.record_state = True
+            self._record_thr.start()
         else:
+            self.record.setText("录制")
             self.record_state = False
+            self._record_thr.join()
             self.record_object.clear()
 
     def showpc_on_clicked(self) -> None:
@@ -387,10 +402,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 msg = f"<font color='#404040'><b>{message}</b></font>"
             else:
                 msg = f"<font color='#FF8033'><b>{message}</b></font>"
-            self.pnp_textBrowser[position] = msg.replace('\n', "<br />")
+            self.feedback_textBrowser[position] = msg.replace('\n', "<br />")
             self.feedback_textBrowser[position] = msg
-        text = "<br \>".join(list(self.feedback_textBrowser.values()))  # css format to replace \n
-        self.textBrowser.setText(text)
         return True
 
     def set_board_text(self, _type: str, position: str, message: str) -> bool:
@@ -413,10 +426,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 msg = f"<font color='#404040'><b>{message}</b></font>"
             else:
                 msg = f"<font color='#FF8033'><b>{message}</b></font>"
-            self.pnp_textBrowser[position] = msg.replace('\n', "<br />")
+            self.board_textBrowser[position] = msg.replace('\n', "<br />")
             self.board_textBrowser[position] = msg
-        text = "<br \>".join(list(self.board_textBrowser.values()))  # css format to replace \n
-        self.condition.setText(text)
         return True
 
     def set_pnp_text(self, _type: str, position: str, message: str) -> bool:
@@ -466,6 +477,10 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.set_board_text("ERROR", "第三相机", "远相机寄了")
         else:
             self.set_board_text("INFO", "第三相机", "远相机正常工作")
+        text = "<br \>".join(list(self.feedback_textBrowser.values()))  # css format to replace \n
+        self.textBrowser.setText(text)
+        text = "<br \>".join(list(self.board_textBrowser.values()))  # css format to replace \n
+        self.condition.setText(text)
 
     def update_image(self) -> None:
         if not self.view_change:
@@ -485,17 +500,19 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.loc_alarm.push_T(T, T_, 0)
             self.loc_alarm.push_RT(rvec, tvec, 0)
         else:
-            self.repo_right.push_T(rvec, tvec, 1)
+            self.repo_right.push_T(rvec, tvec)
             self.loc_alarm.push_RT(rvec, tvec, 1)
 
     def update_reproject(self) -> None:
         if self.__cam_left:
             self.repo_left.check(self.__res_left)
-            self.repo_left.update(self.__pic_left)
+            if not self.record_state:
+                self.repo_left.update(self.__pic_left)
             self.e_location = self.repo_left.get_pred_box()
         if self.__cam_right:
             self.repo_right.check(self.__res_right)
-            self.repo_right.update(self.__pic_right)
+            if not self.record_state:
+                self.repo_right.update(self.__pic_right)
 
     def update_missile(self) -> None:
         if isinstance(self.__res_left, bool) and not self.__res_left:
@@ -546,15 +563,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if self.__cam_far:
             self.__res_far, self.__pic_far = self.__CamFar.get_img()
 
-        # record images
-        if self.record_state:
-            if isinstance(self.__pic_left, np.ndarray):
-                self.record_object[0].write(self.__pic_left)
-            if isinstance(self.__pic_right, np.ndarray):
-                self.record_object[1].write(self.__pic_right)
-            # if not self.__res_far[0]:
-            #     self.record_object[2].write(self.__pic_far)
-
         # if in epnp_mode , just show the images
         if not self.epnp_mode:
             if self.show_pc_state and isinstance(self.__pic_left, np.ndarray):
@@ -563,7 +571,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 self.update_image()
             else:
                 self.update_state()
-                # self.update_reproject()
+                self.update_reproject()
                 self.update_location_alarm()
                 # self.update_missile()
                 self.update_image()
@@ -588,6 +596,16 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             if self.__cam_right:
                 self.PRE_right.join(timeout=1)
             sys.exit()
+
+    def mul_record(self):
+        while True:
+            if self.record_state:
+                if not isinstance(self.__res_left, bool):
+                    self.record_object[0].write(self.__pic_left)
+                if not isinstance(self.__res_right, bool):
+                    self.record_object[1].write(self.__pic_right)
+            else:
+                break
 
 
 class LOGGER(object):
@@ -619,6 +637,8 @@ class LOGGER(object):
 
     def write(self, message):
         self.terminal.write(message)
+        if message == '\n':
+            return
         if "[ERROR]" in message:
             self.logger.error(message)
         elif "[WARNING]" in message:
