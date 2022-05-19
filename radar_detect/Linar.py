@@ -68,7 +68,7 @@ class DepthQueue(object):
         # TODO: 如果点云有遮挡关系，则测距测到前或后不确定  其实我也遇到了这个问题
         # 更新策略，将进队点云投影点的z值与原来做比较，取均值
         s = np.stack([self.depth[ip[:, 1], ip[:, 0]], dpt], axis=1)
-        s = np.nanmin(s, axis=1)
+        s = np.nanmedian(s, axis=1)
         self.depth[ip[:, 1], ip[:, 0]] = s
 
     def depth_detect_refine(self, r):
@@ -77,11 +77,11 @@ class DepthQueue(object):
 
         :return: (x0,y0,z) x0,y0是中心点在归一化相机平面的坐标前两位，z为其对应在相机坐标系中的z坐标值
         '''
-        # center = np.float32([r[0] + r[2] / 2, r[1] + r[3] / 2])
-        # # 采用以中心点为基准点扩大一倍的装甲板框，并设置ROI上界和下界，防止其超出像素平面范围
-        # area = self.depth[int(max(0, center[1] - r[3])):int(min(center[1] + r[3], self.size[1] - 1)),
-        #        int(max(center[0] - r[2], 0)):int(min(center[0] + r[2], self.size[0] - 1))]
-        area = self.depth[int(r[1]):int(r[1]+r[3]),int(r[0]):int(r[0] + r[2])]
+        center = np.float32([r[0] + r[2] / 2, r[1] + r[3] / 2])
+        # 采用以中心点为基准点扩大一倍的装甲板框，并设置ROI上界和下界，防止其超出像素平面范围
+        area = self.depth[int(max(0, center[1] - r[3]/2)):int(min(center[1] + r[3]/2, self.size[1] - 1)),
+               int(max(center[0] - r[2]/2, 0)):int(min(center[0] + r[2]/2, self.size[0] - 1))]
+        # area = self.depth[int(r[1]):int(r[1]+r[3]),int(r[0]):int(r[0] + r[2])]
         z = np.nanmean(area) if not np.isnan(area).all() else np.nan  # 当对应ROI全为nan，则直接返回为nan
 
         return z
@@ -138,7 +138,7 @@ class Radar(object):
 
     __record_max_times = 100  # 最大存点云数量
 
-    def __init__(self, name,text_api, queue_size=200, imgsz=(1024, 1024)):
+    def __init__(self, name,text_api, queue_size=300, imgsz=(1024, 1024)):
         '''
         雷达处理类，对每个相机都要创建一个对象
 

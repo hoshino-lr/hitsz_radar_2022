@@ -36,6 +36,9 @@ class Camera_HK(Camera):
         self.__exposure = self.__camera_config['exposure']
         self.__gain = self.__camera_config['gain']
         if not self.__debug:
+            # ch:创建相机实例 | en:Creat Camera Object
+            self.cam = MvCamera()
+
             SDKVersion = MvCamera.MV_CC_GetSDKVersion()
             print("SDKVersion[0x%x]" % SDKVersion)
 
@@ -71,9 +74,6 @@ class Camera_HK(Camera):
                 # ch:选择设备并创建句柄 | en:Select device and create handle
                 self.__stDeviceList = cast(deviceList.pDeviceInfo[int(nConnectionNum)],
                                            POINTER(MV_CC_DEVICE_INFO)).contents
-
-                # ch:创建相机实例 | en:Creat Camera Object
-                self.cam = MvCamera()
 
                 ret = self.cam.MV_CC_CreateHandle(self.__stDeviceList)
                 if ret != 0:
@@ -221,19 +221,22 @@ class Camera_HK(Camera):
     def destroy(self) -> None:
         if not self.__debug:
             # ch:停止取流 | en:Stop grab image
-            ret = self.cam.MV_CC_StopGrabbing()
-            if ret != 0:
-                print("stop grabbing fail! ret[0x%x]" % ret)
+            try:
+                ret = self.cam.MV_CC_StopGrabbing()
+                if ret != 0:
+                    print("stop grabbing fail! ret[0x%x]" % ret)
 
-            # ch:关闭设备 | Close device
-            ret = self.cam.MV_CC_CloseDevice()
-            if ret != 0:
-                print("close deivce fail! ret[0x%x]" % ret)
+                # ch:关闭设备 | Close device
+                ret = self.cam.MV_CC_CloseDevice()
+                if ret != 0:
+                    print("close deivce fail! ret[0x%x]" % ret)
 
-            # ch:销毁句柄 | Destroy handle
-            ret = self.cam.MV_CC_DestroyHandle()
-            if ret != 0:
-                print("destroy handle fail! ret[0x%x]" % ret)
+                # ch:销毁句柄 | Destroy handle
+                ret = self.cam.MV_CC_DestroyHandle()
+                if ret != 0:
+                    print("destroy handle fail! ret[0x%x]" % ret)
+            except Exception as e:
+                print(e)
             self.init_ok = False
         else:
             self.cap.release()
@@ -246,7 +249,7 @@ if __name__ == "__main__":
     sys.path.append("..")
     cv.namedWindow("test", cv.WINDOW_NORMAL)
 
-    name = "cam_right"  # 唯一要改的参数
+    name = "cam_left"  # 唯一要改的参数
     cam_test = Camera_HK(name)
     t1 = time.time()
     count_fps = 0

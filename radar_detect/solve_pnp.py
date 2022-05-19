@@ -6,7 +6,7 @@ created by 黄继凡 2021/1
 import cv2
 import numpy as np
 from radar_detect.location import CameraLocation
-from resources.config import objPoints, objNames, DEBUG, cam_config
+from resources.config import objPoints, objNames, DEBUG, cam_config, enemy2color, enemy_color
 
 
 class SolvePnp(CameraLocation):
@@ -38,14 +38,18 @@ class SolvePnp(CameraLocation):
 
     def sel_cam(self, side) -> None:
         if side == 0:
-            side_text = 'cam_left'
+            side_text = f'cam_left_{enemy2color[enemy_color]}'
         else:
-            side_text = 'cam_right'
+            side_text = f'cam_right_{enemy2color[enemy_color]}'
         self.side_text = side_text
         self.count_max = len(objNames[int(self.debug)][side_text])
         self.names = objNames[int(self.debug)][side_text]
         self.imgPoints = np.zeros((self.count_max, 2), dtype=np.float32)
         self.objPoints = objPoints[int(self.debug)][side_text] * 1000  # 米转换成毫米
+        if side == 0:
+            side_text = f'cam_left'
+        else:
+            side_text = f'cam_right'
         self.size = cam_config[side_text]['size']
         self.distCoeffs = cam_config[side_text]['C_0']
         self.cameraMatrix = cam_config[side_text]['K_0']
@@ -62,10 +66,10 @@ class SolvePnp(CameraLocation):
 
     def read(self, name) -> None:
         if self.debug:
-            text = "debug"
+            text = "_debug"
         else:
             text = ""
-        ca = self.from_checkpoint(f"{name}_{text}")
+        ca = self.from_checkpoint(f"{name}{text}")
         self.tvec = ca.translation
         self.rvec = ca.rotation
 
@@ -87,7 +91,7 @@ class SolvePnp(CameraLocation):
         self._api("INFO", "count", f"当前点：{self.count + 1}")
         for i in range(1, self.count_max + 1):
             text = f"{self.names[i - 1]}\n" \
-                    f"x : {self.imgPoints[i - 1][0]} y: {self.imgPoints[i - 1][1]}\n"
+                    f"x : {self.imgPoints[i - 1][0]} y: {self.imgPoints[i - 1][1]}"
             if i-1 != self.count:
                 self._api("INFO", f"count{i}", text)
             else:
@@ -99,7 +103,11 @@ class SolvePnp(CameraLocation):
             _, rvec, tvec, _ = cv2.solvePnPRansac(objectPoints=self.objPoints,
                                                   distCoeffs=self.distCoeffs,
                                                   cameraMatrix=self.cameraMatrix,
-                                                  imagePoints=self.imgPoints)
+                                                  imagePoints=self.imgPoints,
+                                                  iterationsCount=1000,
+                                                  reprojectionError=3,
+                                                  confidence=0.99,
+                                                  flags=cv2.SOLVEPNP_DLS)
             self.rotation = rvec
             self.translation = tvec
             print(f"[INFO] rvec:{rvec}")

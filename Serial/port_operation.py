@@ -77,15 +77,15 @@ class Port_operate(object):
 
     @staticmethod
     def Update_gamedata(buffer):
-        if Port_operate._Now_Stage < 2 and ((buffer[7] >> 4) == 2 or (buffer[7] >> 4) == 3 or (buffer[7] >> 4) == 4):
+        if Port_operate._Now_stage < 2 and ((buffer[7] >> 4) == 2 or (buffer[7] >> 4) == 3 or (buffer[7] >> 4) == 4):
             # 从自检阶段开始表示比赛开始
             Port_operate._Game_Start_Flag = True
             Port_operate._set_max_flag = True
-        if Port_operate._Now_Stage < 5 and (buffer[7] >> 4) == 5:
+        if Port_operate._Now_stage < 5 and (buffer[7] >> 4) == 5:
             # 比赛结束
             Port_operate._Game_End_Flag = True
             Port_operate._max_hp = Port_operate._init_hp.copy()
-        Port_operate._Now_Stage = buffer[7] >> 4
+        Port_operate._Now_stage = buffer[7] >> 4
         Port_operate.Remain_time = (0x0000 | buffer[8]) | (buffer[9] << 8)
 
     @staticmethod
@@ -125,7 +125,7 @@ class Port_operate(object):
         # 更新hp信息框
         hp_scene.refresh()
         hp_scene.update(Port_operate._HP, Port_operate._max_hp)
-        hp_scene.update_stage(Port_operate._stage[Port_operate._Now_Stage], Port_operate.Remain_time,
+        hp_scene.update_stage(Port_operate._stage[Port_operate._Now_stage], Port_operate.Remain_time,
                               Port_operate._BO + 1, BO)
 
     @staticmethod
@@ -150,7 +150,7 @@ class Port_operate(object):
     @staticmethod
     def Receive_Robot_Data(buffer):
         # 车间通信
-        if (0x0000 | buffer[7]) | (buffer[8] << 8) == 0x0200:
-            Port_operate.change_view = True
-        if (0x0000 | buffer[7]) | (buffer[8] << 8) == 0x0201:
-            Port_operate.missile_stage = True
+        if buffer[13] == 0:
+            pass
+        if buffer[14] == 0:
+            pass

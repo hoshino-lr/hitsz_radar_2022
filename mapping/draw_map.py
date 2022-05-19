@@ -6,7 +6,7 @@ draw_map.py
 import cv2
 import numpy as np
 
-from resources.config import MAP_PATH, map_size
+from resources.config import MAP_PATH, map_size, enemy2color
 
 
 class CompeteMap(object):
@@ -56,11 +56,11 @@ class CompeteMap(object):
         self._out_map_twinkle = self._map.copy()
 
     def _update(self, location: dict):
-        '''
+        """
         更新车辆位置
 
         :param location:车辆位置字典 索引为'1'-'10',内容为车辆位置数组(2,)
-        '''
+        """
         if self._enemy:
             self._out_map = cv2.rotate(self._out_map_twinkle, cv2.ROTATE_90_COUNTERCLOCKWISE)
         else:
@@ -78,19 +78,19 @@ class CompeteMap(object):
             self._draw_circle(_loc_map, int(armor))
 
     def _show(self):
-        '''
+        """
         调用show_api展示
-        '''
+        """
         self._show_api(self._out_map)
 
     def _draw_region(self, region:dict):
-        '''
+        """
         param region
         在canvas绘制预警区域（canvas 原始地图 _map）
-        '''
+        """
         for r in region.keys():
-            alarm_type, shape_type, _, _, _ = r.split('_')
-            if alarm_type == 'm' or alarm_type == 'a': # 预警类型判断，若为map或all类型
+            alarm_type, shape_type, team, _, _ = r.split('_')
+            if (alarm_type == 'm' or alarm_type == 'a') and team == enemy2color[self._enemy]: # 预警类型判断，若为map或all类型
                 if shape_type == 'l':
                     # 直线预警
                     rect = region[r] # 获得直线两端点，为命名统一命名为rect
@@ -118,11 +118,11 @@ class CompeteMap(object):
                         cv2.line(self._map, f(rect[i]), f(rect[(i + 1) % 4]), (0, 255, 0), 2)
 
     def _draw_circle(self, location, armor: int):
-        '''
+        """
         画定位点
-        '''
+        """
         img = self._out_map
-        color = (255 * (armor // 6), 0, 255 * (1 - armor // 6))  # 解算颜色
+        color = (255 * self._enemy, 0, 255 * (1 - self._enemy))  # 解算颜色
         armor = armor - 5 * (armor > 5)  # 将编号统一到1-5
         cv2.circle(img, tuple(location), self._circle_size, color, -1)  # 内部填充
         cv2.circle(img, tuple(location), self._circle_size, (0, 0, 0), 1)  # 外边框

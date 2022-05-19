@@ -71,8 +71,8 @@ class Reproject(object):
                         lt = self._region[r][:2].copy()
                         rd = self._region[r][2:4].copy()
                         # 因原点不同，进行坐标变换
-                        lt[1] = self._real_size[1] - lt[1]
-                        rd[1] = self._real_size[1] - rd[1]
+                        # lt[1] = self._real_size[1] - lt[1]
+                        # rd[1] = self._real_size[1] - rd[1]
                         # 另外两点坐标
                         ld = [lt[0], rd[1]]
                         rt = [rd[0], lt[1]]
@@ -126,8 +126,8 @@ class Reproject(object):
             if color2enemy[team] != enemy_color:
                 continue
             else:
-                for p in recor:
-                    cv2.circle(frame, tuple(p), 10, (0, 255, 0), -1)
+                # for p in recor:
+                #     cv2.circle(frame, tuple(p), 10, (0, 255, 0), -1)
                 cv2.polylines(frame, [recor], 1, (0, 0, 255))
         if self.rp_alarming is not None:
             for i in self.rp_alarming.keys():
@@ -146,8 +146,8 @@ class Reproject(object):
             armors:N,cls+对应的车辆预测框序号+装甲板bbox
             cars:N,cls+车辆bbox
         """
-        armors = np.array([])
-        cars = np.array([])
+        armors = None
+        cars = None
         if isinstance(net_input, np.ndarray):
             if len(net_input):
                 armors = net_input[:, [11, 13, 6, 7, 8, 9]]
@@ -159,13 +159,16 @@ class Reproject(object):
         id = np.array([1, 2, 3, 4, 5])
         f_max = lambda x, y: (x + y + abs(x - y)) // 2
         f_min = lambda x, y: (x + y - abs(x - y)) // 2
-        if isinstance(armors, np.ndarray) and isinstance(cars, np.ndarray) and len(armors):
-            # assert len(armors)
+        if isinstance(armors, np.ndarray) and isinstance(cars, np.ndarray):
             pred_cls = []
             p_bbox = []  # IoU预测框（装甲板估计后的装甲板框）
             cache_pred = []  # 可能要缓存的当帧预测IoU预测框的原始框，缓存格式 id,x1,y1,x2,y2
-            cache = np.concatenate(
-                [armors[:, 0].reshape(-1, 1), np.stack([cars[int(i)] for i in armors[:, 1]], axis=0)], axis=1)
+            try:
+                cache = np.concatenate(
+                    [armors[:, 0].reshape(-1, 1), np.stack([cars[int(i)] for i in armors[:, 1]], axis=0)], axis=1)
+            except:
+                print("mmp")
+                pass
             cls = armors[:, 0].reshape(-1, 1)
             # 以下为IOU预测
             if isinstance(self._cache, np.ndarray):
