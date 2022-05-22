@@ -66,7 +66,7 @@ def sub(event, que):
     :param event 多进程事件
     :param que 传输队列
     """
-    _wait = event.wait(timeout=0.04)
+    _wait = event.wait(timeout=0.1)
     if _wait:
         try:
             re_data = que.get_nowait()

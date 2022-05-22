@@ -71,8 +71,8 @@ class Reproject(object):
                         lt = self._region[r][:2].copy()
                         rd = self._region[r][2:4].copy()
                         # 因原点不同，进行坐标变换
-                        lt[1] = self._real_size[1] - lt[1]
-                        rd[1] = self._real_size[1] - rd[1]
+                        # lt[1] = self._real_size[1] - lt[1]
+                        # rd[1] = self._real_size[1] - rd[1]
                         # 另外两点坐标
                         ld = [lt[0], rd[1]]
                         rt = [rd[0], lt[1]]
@@ -126,17 +126,10 @@ class Reproject(object):
             if color2enemy[team] != enemy_color:
                 continue
             else:
-                # for p in recor:
-                #     cv2.circle(frame, tuple(p), 10, (0, 255, 0), -1)
-                cv2.polylines(frame, [recor], 1, (0, 0, 255))
-        if self.rp_alarming is not None:
-            for i in self.rp_alarming.keys():
-                recor = self._scene_region[i]
-                type, shape_type, team, location, height_type = i.split('_')
-                if color2enemy[team] != enemy_color:
-                    continue
+                if i in self.rp_alarming.keys():
+                    cv2.polylines(frame, [recor], isClosed=1, color=(0, 255, 0), lineType=0)
                 else:
-                    cv2.polylines(frame, [recor], 1, (0, 255, 0))
+                    cv2.polylines(frame, [recor], isClosed=1, color=(0, 0, 255), lineType=0)
 
     def check(self, net_input) -> None:
         """
@@ -148,6 +141,7 @@ class Reproject(object):
         """
         armors = None
         cars = None
+        self.rp_alarming = {}
         if isinstance(net_input, np.ndarray):
             if len(net_input):
                 armors = net_input[:, [11, 13, 6, 7, 8, 9]]
@@ -166,9 +160,9 @@ class Reproject(object):
             try:
                 cache = np.concatenate(
                     [armors[:, 0].reshape(-1, 1), np.stack([cars[int(i)] for i in armors[:, 1]], axis=0)], axis=1)
-            except:
-                print("mmp")
-                pass
+            except Exception as e:
+                print(f"[ERROR] {e}")
+
             cls = armors[:, 0].reshape(-1, 1)
             # 以下为IOU预测
             if isinstance(self._cache, np.ndarray):
@@ -254,26 +248,27 @@ class Reproject(object):
 
     def push_text(self):
         if self._scene_init:
-            str_output = ""
             for r in self.rp_alarming.keys():
                 # 格式解析
                 _, _, _, location, _ = r.split('_')
                 if self._time[f'{location}'] == 0:
                     self._start[f'{location}'] = time.time()
                     self._region_count[f'{location}'] += 1
+                    self._end[f'{location}'] = time.time()
+                    self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
                 else:
                     self._end[f'{location}'] = time.time()
                     self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
                     if self._time[f'{location}'] <= 1:
                         self._region_count[f'{location}'] += 1
-                    if self._time[f'{location}'] == self._clock:
+                    if self._time[f'{location}'] >= self._clock:
                         self._time[f'{location}'] = 0
-                        if self._region_count[f'{location}'] == self._frame:
-                            str_output += f"在{location}处有敌人！！！\n"
+                        if self._region_count[f'{location}'] >= self._frame:
+                            self._textapi("WARNING", f"反投影{location}", f"在{location}处有敌人！！！\n")
                             self._region_count[f'{location}'] = 0
-            self._textapi("WARNING", "反投影", str_output)
         else:
             self._textapi("WARNING", "反投影", "未初始化！！！")
+
 
 
 if __name__ == "__main__":

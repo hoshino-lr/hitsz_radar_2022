@@ -249,7 +249,7 @@ if __name__ == "__main__":
     sys.path.append("..")
     cv.namedWindow("test", cv.WINDOW_NORMAL)
 
-    name = "cam_right"  # 唯一要改的参数
+    name = "cam_left"  # 唯一要改的参数
     cam_test = Camera_HK(name)
     t1 = time.time()
     count_fps = 0

@@ -150,7 +150,7 @@ class Port_operate(object):
     @staticmethod
     def Receive_Robot_Data(buffer):
         # 车间通信
-        if (0x0000 | buffer[7]) | (buffer[8] << 8) == 0x0200:
-            Port_operate.change_view = True
-        if (0x0000 | buffer[7]) | (buffer[8] << 8) == 0x0201:
-            Port_operate.missile_stage = True
+        if buffer[13] == 0:
+            pass
+        if buffer[14] == 0:
+            pass

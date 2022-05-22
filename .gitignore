@@ -1,147 +1,3 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-/resources/models/best.engine
-/resources/models/best.onnx
-/resources/models/best.pt
-/resources/models/better.engine
-/resources/models/better.onnx
-/resources/models/net1.engine
-/resources/models/net1.onnx
-/resources/models/net2.engine
-/resources/models/net2.onnx
-/.idea/.gitignore
-/.idea/hitsz_radar_2022.iml
-/.idea/misc.xml
-/.idea/modules.xml
-/.idea/inspectionProfiles/profiles_settings.xml
-/.idea/vcs.xml
 /resources/cam_data/cam_left/0.jpg
 /resources/cam_data/cam_right/0.jpg
 /resources/cam_data/cam_left/1.jpg
@@ -249,9 +105,105 @@ dmypy.json
 /resources/cam_data/cam_right/33.jpg
 /resources/cam_data/cam_left/34.jpg
 /resources/cam_data/cam_right/34.jpg
+/logs/2022-05-08 22-49-58.log
+/logs/2022-05-08 22-50-10.log
+/logs/2022-05-08 22-58-29.log
+/logs/2022-05-08 22-58-40.log
+/logs/2022-05-08 23-13-56.log
+/logs/2022-05-08 23-20-06.log
+/logs/2022-05-08 23-20-44.log
+/logs/2022-05-08 23-35-59.log
+/logs/2022-05-08 23-38-04.log
+/logs/2022-05-08 23-38-19.log
+/logs/2022-05-08 23-43-17.log
+/logs/2022-05-08 23-47-08.log
+/logs/2022-05-08 23-47-30.log
+/logs/2022-05-08 23-48-54.log
+/logs/2022-05-08 23-49-07.log
+/logs/2022-05-08 23-49-36.log
+/logs/2022-05-08 23-49-58.log
+/logs/2022-05-08 23-53-25.log
+/logs/2022-05-08 23-53-43.log
+/logs/2022-05-08 23-53-58.log
+/logs/2022-05-08 23-54-58.log
+/logs/2022-05-08 23-55-11.log
+/logs/2022-05-08 23-55-27.log
+/logs/2022-05-09 00-00-24.log
+/logs/2022-05-09 00-00-46.log
+/logs/2022-05-09 00-05-15.log
+/logs/2022-05-09 00-07-50.log
+/logs/2022-05-09 00-31-43.log
+/logs/2022-05-09 00-37-25.log
+/logs/2022-05-10 20-42-17.log
+/logs/2022-05-10 20-44-08.log
+/logs/2022-05-11 03-12-58.log
+/logs/2022-05-11 03-13-31.log
+/logs/2022-05-11 03-13-38.log
+/logs/2022-05-11 03-54-43.log
+/logs/2022-05-11 03-58-09.log
+/logs/2022-05-11 04-02-00.log
+/logs/2022-05-11 04-02-48.log
+/logs/2022-05-11 04-06-05.log
+/logs/2022-05-11 04-12-49.log
+/logs/2022-05-11 04-19-59.log
+/logs/2022-05-11 06-46-26.log
+/logs/2022-05-11 06-47-07.log
+/logs/2022-05-11 07-28-10.log
+/logs/2022-05-11 07-32-27.log
+/logs/2022-05-11 07-34-21.log
+/logs/2022-05-11 07-41-52.log
+/logs/2022-05-11 07-44-35.log
+/logs/2022-05-11 07-49-51.log
+/logs/2022-05-11 07-52-46.log
+/logs/2022-05-11 07-55-09.log
+/logs/2022-05-11 07-57-12.log
+/logs/2022-05-11 07-58-35.log
+/logs/2022-05-11 08-04-57.log
+/logs/2022-05-11 08-09-36.log
+/logs/2022-05-11 08-10-57.log
+/logs/2022-05-11 08-19-43.log
+/logs/2022-05-11 08-21-55.log
+/logs/2022-05-11 08-22-16.log
+/logs/2022-05-11 08-25-52.log
+/logs/2022-05-11 08-30-52.log
+/logs/2022-05-11 08-31-32.log
+/logs/2022-05-11 08-32-45.log
+/logs/2022-05-11 08-33-40.log
+/logs/2022-05-11 08-38-12.log
+/logs/2022-05-11 08-38-49.log
+/logs/2022-05-11 08-40-35.log
+/logs/2022-05-11 08-41-22.log
+/logs/2022-05-11 08-42-12.log
+/logs/2022-05-11 08-42-38.log
+/logs/2022-05-11 08-42-57.log
+/logs/2022-05-11 08-43-14.log
+/logs/2022-05-11 08-43-37.log
+/logs/2022-05-11 08-44-05.log
+/logs/2022-05-11 08-45-02.log
+/logs/2022-05-11 08-48-01.log
+/logs/2022-05-11 08-50-21.log
+/logs/2022-05-11 08-50-54.log
+/logs/2022-05-11 08-51-19.log
+/logs/2022-05-11 14-11-31.log
+/logs/2022-05-11 15-07-27.log
+/logs/2022-05-11 15-10-21.log
+/logs/2022-05-11 15-12-07.log
+/logs/2022-05-11 15-12-45.log
+/logs/2022-05-11 15-21-33.log
+/logs/2022-05-11 16-29-59.log
+/logs/2022-05-11 16-49-14.log
+/logs/2022-05-11 17-38-09.log
+/logs/2022-05-11 17-39-26.log
+/logs/2022-05-11 17-40-12.log
+/logs/2022-05-11 19-03-15.log
+/logs/2022-05-11 19-06-47.log
+/logs/2022-05-11 19-19-31.log
+/logs/2022-05-11 19-20-37.log
+/logs/2022-05-11 19-22-38.log
+/logs/2022-05-11 19-31-19.log
+/logs/2022-05-11 19-33-21.log
 /resources/net_onnx/best.engine
 /resources/net_onnx/best.onnx
-/resources/map.jpg
 /resources/net_onnx/net1.engine
 /resources/net1.engine
 /resources/net_onnx/net1_sim.onnx

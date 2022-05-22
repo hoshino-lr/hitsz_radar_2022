@@ -3,16 +3,14 @@ network class
 适合多线程调用，使用pytrt 接口
 '''
 
-import pytrt
-import numpy as np
-import time
-from pathlib import Path
-import cv2
 import sys
-import random
 from threading import Thread
-from resources.config import net1_onnx,net2_onnx,net1_engine,net2_engine  \
-    ,net1_cls,net2_cls_names,net2_col_names
+
+import cv2
+import numpy as np
+import pytrt
+
+from resources.config import net1_engine, net2_engine
 
 
 def scale_coords(img1_shape, coords, img0_shape):
@@ -364,7 +362,7 @@ class Predictor(object):
 if __name__ == '__main__':
     sys.path.append("..")
     # 偷懒，直接用了yolov5中的不少函数来检测网络
-    from mul_manager.mul_manager import MulManager
+
 
 
 

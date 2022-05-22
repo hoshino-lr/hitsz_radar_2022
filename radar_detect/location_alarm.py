@@ -21,14 +21,14 @@ class Alarm(draw_map.CompeteMap):
     """
     # param
 
-    _pred_time = 5   # 预测几次  一开始是10
+    _pred_time = 5  # 预测几次  一开始是10
     _pred_ratio = 0.2  # 预测速度比例
 
     # _ids = {1: 6, 2: 7, 3: 8, 4: 9, 5: 10, 8: 1,
     #         9: 2, 10: 3, 11: 4, 12: 5}  # 装甲板编号到标准编号
     _lp = True  # 是否位置预测
     _z_a = True  # 是否进行z轴突变调整
-    _z_thre = 0.2  # z轴突变调整阈值
+    _z_thre = 0.2  # z轴突变调整
     _ground_thre = 100  # 地面阈值，我们最后调到了100就是没用这个阈值，看情况调
     _using_l1 = True  # 不用均值，若两个都有预测只用右相机预测值
     using_d = False
@@ -454,16 +454,15 @@ class Alarm(draw_map.CompeteMap):
                 pred_loc = []
                 if self._z_a:
                     cache_pred = []
-                # for armor in self._ids.keys():
+                locations[1:3] = np.around(locations[1:3])
                 for armor in range(1, 11):
                     if (locations[:, 0] == armor).any():
                         if not self.using_d:
                             l1 = locations[locations[:, 0]
                                            == armor].reshape(-1)
                             K_C = np.linalg.inv(self._K_O)
-                            C = (
-                                        K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[
-                                    3] * 1000
+                            C = (K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[
+                                3] * 1000
                             B = np.concatenate(
                                 [np.array(C).flatten(), np.ones(1)], axis=0)
                             l1[1:] = (self._T[0] @ B)[:3] / 1000
@@ -471,8 +470,9 @@ class Alarm(draw_map.CompeteMap):
                         else:
                             l1 = locations[locations[:, 0]
                                            == armor].reshape(-1)
-                            l1[1:] = self._loc_D[0].get_point_pos(l1)
-
+                            l1[1:] = self._loc_D[0].get_point_pos(l1).reshape(-1)
+                            if np.isnan(l1).any():
+                                continue
                         if self._z_a:
                             self._adjust_z_one_armor(l1, 0)
                             cache_pred.append(l1[[0, 3]])
@@ -488,6 +488,8 @@ class Alarm(draw_map.CompeteMap):
                     for i, armor in enumerate(cls):
                         self._location[str(int(armor))] = l[i, 1:3].tolist()
                         judge_loc[str(armor)] = l[i, 1:].tolist()
+
+            #self._location["2"] = [3,3]
 
             if self._lp:
                 self._location_prediction()
@@ -507,3 +509,29 @@ class Alarm(draw_map.CompeteMap):
 
     def get_location(self):
         return np.array(list(self._location.values()))[:5, :]
+
+    def pc_location(self, armor: np.ndarray):
+        """
+        显示点云定位
+        """
+        self._refresh()
+        if not self.using_d:
+            l1 = armor.reshape(-1)
+            K_C = np.linalg.inv(self._K_O)
+            C = (K_C @ np.concatenate([l1[0:2], np.ones(1)], axis=0).reshape(3, 1)) * l1[2] * 1000
+            B = np.concatenate(
+                [np.array(C).flatten(), np.ones(1)], axis=0)
+            l1 = (self._T[0] @ B)[:3] / 1000
+
+        else:
+            l1 = armor.reshape(-1)
+            l1 = self._loc_D[0].get_point_pos(l1).reshape(-1)
+            print(l1)
+        try:
+            self._update({'6': l1})
+            self._show()
+        except:
+            pass
+
+    def pc_draw(self, frame):
+        self._loc_D[0].draw_points(frame=frame)

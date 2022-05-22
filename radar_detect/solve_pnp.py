@@ -66,10 +66,10 @@ class SolvePnp(CameraLocation):
 
     def read(self, name) -> None:
         if self.debug:
-            text = "debug"
+            text = "_debug"
         else:
             text = ""
-        ca = self.from_checkpoint(f"{name}")
+        ca = self.from_checkpoint(f"{name}{text}")
         self.tvec = ca.translation
         self.rvec = ca.rotation
 
@@ -91,7 +91,7 @@ class SolvePnp(CameraLocation):
         self._api("INFO", "count", f"当前点：{self.count + 1}")
         for i in range(1, self.count_max + 1):
             text = f"{self.names[i - 1]}\n" \
-                    f"x : {self.imgPoints[i - 1][0]} y: {self.imgPoints[i - 1][1]}\n"
+                    f"x : {self.imgPoints[i - 1][0]} y: {self.imgPoints[i - 1][1]}"
             if i-1 != self.count:
                 self._api("INFO", f"count{i}", text)
             else:
@@ -103,7 +103,11 @@ class SolvePnp(CameraLocation):
             _, rvec, tvec, _ = cv2.solvePnPRansac(objectPoints=self.objPoints,
                                                   distCoeffs=self.distCoeffs,
                                                   cameraMatrix=self.cameraMatrix,
-                                                  imagePoints=self.imgPoints)
+                                                  imagePoints=self.imgPoints,
+                                                  iterationsCount=1000,
+                                                  reprojectionError=3,
+                                                  confidence=0.99,
+                                                  flags=cv2.SOLVEPNP_DLS)
             self.rotation = rvec
             self.translation = tvec
             print(f"[INFO] rvec:{rvec}")

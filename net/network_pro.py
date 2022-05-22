@@ -23,8 +23,8 @@ class Predictor(object):
     img_show = False
 
     # net1参数
-    net1_confThreshold = 0.4
-    net1_nmsThreshold = 0.45
+    net1_confThreshold = 0.3
+    net1_nmsThreshold = 0.4
     net1_inpHeight = 640
     net1_inpWidth = 640
     net1_trt_file = net1_engine
@@ -37,7 +37,7 @@ class Predictor(object):
 
     # net2参数
     net2_confThreshold = 0.4
-    net2_nmsThreshold = 0.35
+    net2_nmsThreshold = 0.45
     net2_inpHeight = 640
     net2_inpWidth = 640
     net2_box_num = 25200
@@ -85,7 +85,6 @@ class Predictor(object):
 
         self.img_src = src.copy()
         # 图像预处理
-        # start = time.time()
         img = cv2.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv2.INTER_LINEAR)
         img = img[:, :, ::-1].transpose(2, 0, 1)
         img = np.ascontiguousarray(img)
@@ -93,23 +92,19 @@ class Predictor(object):
         img /= 255.0
 
         net1_output = self._net1.infer(img, 1)[0]
-        res = self.net1_process(net1_output)
-        # self.net1_time += time.time() - start
+        res = self.net1_process_sjtu(net1_output)
+
         if res.shape[0] != 0:
             # get Jigsaw
-            # start = time.time()
             res[:, :4] = self.scale_coords((640, 640), res[:, :4], self.img_src.shape).round()
             net2_img = self.jigsaw(res[:, :4], self.img_src)
-            # self.jaw_time += time.time() - start
             # Rescale boxes from img_size to im0 size
-            # start = time.time()
             net2_output = self.detect_armor(net2_img)
             net2_output = self.net2_output_process(net2_output, det_points=res[:, :4], shape=self.img_src.shape)
             res = np.concatenate([res, net2_output], axis=1)
 
         if self.img_show and res.shape != 0:  # 画图
             self.net_show(res)
-        # self.net2_time += time.time() - start
         res = armor_filter(res)
         return res, self.img_src
 
@@ -138,6 +133,7 @@ class Predictor(object):
         bboxes = []
         output = output.reshape(-1, 26)
         choose = output[:, 4] > self.net1_confThreshold
+        output = self.sigmoid(output)
         output = output[choose]
         choose = np.where(choose == True)[0]
         for i in range(0, len(choose)):
@@ -176,11 +172,12 @@ class Predictor(object):
             classIds.append(max_id)
             confidences.append(obj_conf)
 
-        # NMS筛选
+        # NMS筛选.resh
         indices = cv2.dnn.NMSBoxes(bboxes, confidences, self.net1_confThreshold, self.net1_nmsThreshold)
         res = []
 
         if len(indices):
+            indices = indices.reshape(-1, 1)
             for i in indices:
                 # 暂时为完成 boxes 转 numpy 
                 bbox = [float(x) for x in bboxes[i[0]]]
@@ -446,26 +443,24 @@ if __name__ == '__main__':
     import sys
 
     sys.path.append("..")  # 单独跑int的时候需要
-    cap = cv2.VideoCapture("/home/mark/hitsz_radar/1.mp4")
-    PICS = []
-    while cap.isOpened():
-        res, frame = cap.read()
-        if res:
-            PICS.append(frame)
-        else:
-            break
+    cap = cv2.VideoCapture("/home/mark/hitsz_radar/resources/records/11_19_42_left.avi")
 
     count = 0
     t2 = time.time()
     t1 = time.time()
     pre1 = Predictor('cam_left')
 
-    for frame in PICS:
+    while cap.isOpened():
+        res, frame = cap.read()
+        if not res:
+            break
         _, pic = pre1.detect_cars(frame)
         count += 1
         pic = cv2.resize(pic, (1280, 720))
-        # cv2.imshow("asd", pic)
-        # cv2.waitKey(1)
+        cv2.imshow("asd", pic)
+        res = cv2.waitKey(1)
+        if res == ord('q'):
+            break
         if time.time() - t1 > 1:
             print(f"fps:{count / (time.time() - t1)}")
             count = 0
