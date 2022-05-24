@@ -209,3 +209,90 @@
 /resources/net_onnx/net1_sim.onnx
 /resources/net_onnx/net2.engine
 /resources/net_onnx/net2.onnx
+/resources/records/20_15_50_left.avi
+/resources/records/20_15_50_right.avi
+/resources/records/20_16_4_left.avi
+/resources/records/20_16_4_right.avi
+/resources/records/20_16_21_left.avi
+/resources/records/20_16_21_right.avi
+/resources/records/20_16_34_left.avi
+/resources/records/20_16_34_right.avi
+/resources/records/20_17_37_left.avi
+/resources/records/20_17_37_right.avi
+/resources/records/20_18_10_left.avi
+/resources/records/20_18_10_right.avi
+/resources/records/20_18_20_left.avi
+/resources/records/20_18_20_right.avi
+/resources/records/20_18_26_left.avi
+/resources/records/20_18_26_right.avi
+/resources/records/20_18_30_left.avi
+/resources/records/20_18_30_right.avi
+/logs/2022-05-19 23-51-09.log
+/logs/2022-05-19 23-53-12.log
+/logs/2022-05-19 23-54-38.log
+/logs/2022-05-20 14-10-13.log
+/logs/2022-05-20 14-11-32.log
+/logs/2022-05-20 14-12-28.log
+/logs/2022-05-20 14-13-05.log
+/logs/2022-05-20 14-13-33.log
+/logs/2022-05-20 14-32-47.log
+/logs/2022-05-20 14-33-46.log
+/logs/2022-05-20 15-40-25.log
+/logs/2022-05-20 15-46-35.log
+/logs/2022-05-20 15-56-59.log
+/logs/2022-05-20 16-15-28.log
+/logs/2022-05-20 16-53-12.log
+/logs/2022-05-20 17-02-01.log
+/logs/2022-05-20 17-02-29.log
+/logs/2022-05-20 17-56-44.log
+/logs/2022-05-20 18-08-25.log
+/logs/2022-05-20 18-10-02.log
+/logs/2022-05-20 18-23-09.log
+/logs/2022-05-20 18-25-42.log
+/2022-05-20-16-06-50.bag
+/2022-05-20-16-22-06.bag
+/logs/2022-05-22 17-13-43.log
+/logs/2022-05-22 17-20-29.log
+/logs/2022-05-22 18-39-46.log
+/logs/2022-05-22 18-51-16.log
+/logs/2022-05-22 18-53-38.log
+/logs/2022-05-22 19-16-17.log
+/logs/2022-05-22 19-23-28.log
+/logs/2022-05-22 19-24-29.log
+/logs/2022-05-22 19-32-55.log
+/logs/2022-05-22 19-34-29.log
+/logs/2022-05-22 19-35-31.log
+/logs/2022-05-22 19-37-05.log
+/logs/2022-05-22 19-41-16.log
+/logs/2022-05-22 19-43-20.log
+/logs/2022-05-22 19-51-36.log
+/logs/2022-05-22 19-55-14.log
+/logs/2022-05-22 19-56-11.log
+/logs/2022-05-22 20-02-16.log
+/logs/2022-05-22 20-06-26.log
+/logs/2022-05-22 20-12-57.log
+/logs/2022-05-22 20-31-18.log
+/logs/2022-05-22 20-32-27.log
+/logs/2022-05-22 20-34-36.log
+/logs/2022-05-22 20-35-21.log
+/logs/2022-05-22 20-39-31.log
+/logs/2022-05-22 20-41-38.log
+/logs/2022-05-22 20-47-57.log
+/logs/2022-05-22 20-49-29.log
+/logs/2022-05-22 20-50-58.log
+/logs/2022-05-22 20-54-47.log
+/logs/2022-05-22 21-53-21.log
+/logs/2022-05-22 21-54-09.log
+/logs/2022-05-22 21-55-18.log
+/logs/2022-05-22 21-55-44.log
+/logs/2022-05-22 22-05-05.log
+/logs/2022-05-22 22-08-18.log
+/resources/drive/cam_drive.cpython-38-x86_64-linux-gnu.so
+/resources/map.jpg
+/resources/net_onnx/net1.onnx
+/resources/net_onnx/net1_sjtu.engine
+/resources/net_onnx/net1_sjtu.onnx
+/resources/net_onnx/net1_sjtu_16.engine
+/net/pytrt.cpython-38-x86_64-linux-gnu.so
+/resources/drive/pytrt.cpython-38-x86_64-linux-gnu.so
+/.idea/workspace.xml
