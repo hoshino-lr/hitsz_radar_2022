@@ -98,7 +98,6 @@ class location_Delaunay(object):
                     first_edge = res[1]
                     second_edge = self.Dly.getEdge(first_edge, cv.SUBDIV2D_NEXT_AROUND_LEFT)
                     third_edge = self.Dly.getEdge(second_edge, cv.SUBDIV2D_NEXT_AROUND_LEFT)
-                    print(f"{first_edge % 4}_{second_edge%4}_{third_edge%4}")
                     w_point = self._cal_pos_triangle(
                         np.array([self.Dly.edgeDst(first_edge)[1],
                                   self.Dly.edgeDst(second_edge)[1],
@@ -118,8 +117,6 @@ class location_Delaunay(object):
                     w_point = self._cal_pos_vertex(np.ndarray(self.cam_points[res[2]]))
             except Exception as e:
                 w_point = np.ndarray((3, 1), dtype=np.float64) * np.nan
-                print(f"[ERROR] {e}")
-                print(f"[ERROR] {l[1:3]}")
             return w_point
 
     def _cal_pos_edge(self, pts: np.ndarray, pt) -> np.ndarray:

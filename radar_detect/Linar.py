@@ -79,8 +79,8 @@ class DepthQueue(object):
         '''
         center = np.float32([r[0] + r[2] / 2, r[1] + r[3] / 2])
         # 采用以中心点为基准点扩大一倍的装甲板框，并设置ROI上界和下界，防止其超出像素平面范围
-        area = self.depth[int(max(0, center[1] - r[3]/2)):int(min(center[1] + r[3]/2, self.size[1] - 1)),
-               int(max(center[0] - r[2]/2, 0)):int(min(center[0] + r[2]/2, self.size[0] - 1))]
+        area = self.depth[int(max(0, center[1] - r[3])):int(min(center[1] + r[3], self.size[1] - 1)),
+               int(max(center[0] - r[2], 0)):int(min(center[0] + r[2], self.size[0] - 1))]
         # area = self.depth[int(r[1]):int(r[1]+r[3]),int(r[0]):int(r[0] + r[2])]
         z = np.nanmean(area) if not np.isnan(area).all() else np.nan  # 当对应ROI全为nan，则直接返回为nan
 

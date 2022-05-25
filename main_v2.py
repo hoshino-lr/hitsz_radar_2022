@@ -150,18 +150,23 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.repo_right = Reproject('cam_right', self.text_api)
         self.loc_alarm = Alarm(enemy=enemy_color, api=self.show_map, touch_api=self.text_api,
                                using_Delaunay=self.__using_d, debug=False)
-
         try:
             self.sp.read(f'cam_left_{enemy2color[enemy_color]}')
-            T, T_ = self.repo_left.push_T(self.sp.rvec, self.sp.tvec)
+            self.repo_left.push_T(self.sp.rvec, self.sp.tvec)
+            self.loc_alarm.push_T(self.sp.rvec, self.sp.tvec, 0)
             self.loc_alarm.push_RT(self.sp.rvec, self.sp.tvec, 0)
+        except Exception as e:
+            print(f"[ERROR] {e}")
+            self.repo_left.push_T(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"])
+            self.loc_alarm.push_T(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"], 0)
+            self.loc_alarm.push_RT(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"], 0)
+        try:
             self.sp.read(f'cam_right_{enemy2color[enemy_color]}')
             self.repo_right.push_T(self.sp.rvec, self.sp.tvec)
         except Exception as e:
-            print("[ERROR] using default data")
-            T, T_ = self.repo_left.push_T(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"])
+            print(f"[ERROR] {e}")
+            self.repo_right.push_T(cam_config["cam_right"]["rvec"], cam_config["cam_right"]["tvec"])
 
-        self.loc_alarm.push_T(T, T_, 0)
         self.start()
 
     def __ui_init(self):
@@ -181,13 +186,13 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.set_image(frame_m, "map")
         del frame, frame_m
 
+        self.time_textBrowser = {}
         self.feedback_textBrowser = {}  # textBrowser信息列表
         self.board_textBrowser = {}
         self.pnp_textBrowser = {}
 
         self.sp = SolvePnp(self.pnp_api)
         # 反馈信息栏，显示初始化
-        self.set_text("textBrowser", "start", "initializing...")
         # 雷达和位姿估计状态反馈栏，初始化为全False
         self.record_state = False  # 0:停止 1:开始
         self.epnp_mode = False  # 0:停止 1:开始
@@ -312,12 +317,15 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             y = int(event.y() / self.main_demo.height() * 2048)
             w = 10
             h = 5
+            # 格式定义： [N, [bbox(xyxy), conf, cls, bbox(xyxy), conf, cls, col, N]
+            self.repo_left.check(np.array([x, y, w, h, 1., 1, x, y, w, h, 1., 1., 1., 0]).reshape(1, -1))
             if not self.__using_d:
                 dph = self.lidar.detect_depth(rects=[[x - 5, y - 2.5, w, h]]).reshape(-1, 1)
                 if not np.any(np.isnan(dph)):
                     self.loc_alarm.pc_location(np.concatenate([np.array([[x, y]]), dph], axis=1))
             else:
-                self.loc_alarm.pc_location(np.concatenate([np.ones((1, 1)), np.array([[x, y]]), np.zeros((1, 1))], axis=1))
+                self.loc_alarm.pc_location(
+                    np.concatenate([np.ones((1, 1)), np.array([[x, y]]), np.zeros((1, 1))], axis=1))
 
     # 暂时不支持 epnp_change_view
     def epnp_change_view(self) -> None:
@@ -417,6 +425,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 msg = f"<font color='#FF8033'><b>{message}</b></font>"
             self.feedback_textBrowser[position] = msg.replace('\n', "<br />")
             self.feedback_textBrowser[position] = msg
+            self.time_textBrowser[position] = time.time()
         return True
 
     def set_board_text(self, _type: str, position: str, message: str) -> bool:
@@ -490,6 +499,10 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.set_board_text("ERROR", "第三相机", "远相机寄了")
         else:
             self.set_board_text("INFO", "第三相机", "远相机正常工作")
+        temp_t = time.time()
+        for pos in list(self.feedback_textBrowser.keys()):
+            if temp_t - self.time_textBrowser[pos] > 2:
+                self.feedback_textBrowser.pop(pos)
         text = "<br \>".join(list(self.feedback_textBrowser.values()))  # css format to replace \n
         self.textBrowser.setText(text)
         text = "<br \>".join(list(self.board_textBrowser.values()))  # css format to replace \n
@@ -531,6 +544,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if isinstance(self.__res_left, bool) and not self.__res_left:
             self.missile.detect_api(self.__pic_left, None)
 
+    #位置预警函数，更新各个预警区域的预警次数
     def update_location_alarm(self) -> None:
         t_loc = None
         e_loc = None
@@ -563,7 +577,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                         x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
                         y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
                         e_loc = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, np.zeros(x0.shape)], axis=1)
-        self.loc_alarm.update(t_loc, e_loc)
+        self.loc_alarm.update(t_loc, None)
         self.loc_alarm.check()
         self.loc_alarm.show()
 
@@ -584,7 +598,12 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 else:
                     depth = self.lidar.read()
                     pc_show(self.__pic_left, depth)
+                self.loc_alarm.check()
+                self.loc_alarm.show()
+                self.repo_left.update(self.__pic_left)
+                self.repo_left.push_text()
                 self.update_image()
+                self.update_state()
             else:
                 self.update_state()
                 self.update_reproject()

@@ -380,7 +380,7 @@ class Predictor(object):
             pass
         else:
             for i in net2_input:
-                count = i[0] // 213 + i[1] // 213 * 3
+                count = i[0] // 213 + (i[1] // 213) * 3
                 i[0] %= 213
                 i[1] %= 213
                 i[2] = i[0] + i[2]

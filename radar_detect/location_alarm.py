@@ -4,6 +4,7 @@ created by 黄继凡 2021/12
 最新修改 by 黄继凡 2021/5/1
 """
 
+import cv2 as cv
 import numpy as np
 from radar_detect.common import is_inside
 import mapping.draw_map as draw_map  # 引入draw_map模块，使用其中的CompeteMap类
@@ -22,16 +23,19 @@ class Alarm(draw_map.CompeteMap):
     # param
 
     _pred_time = 5  # 预测几次  一开始是10
-    _pred_ratio = 0.2  # 预测速度比例
+    _pred_ratio = 0  # 预测速度比例
 
-    # _ids = {1: 6, 2: 7, 3: 8, 4: 9, 5: 10, 8: 1,
-    #         9: 2, 10: 3, 11: 4, 12: 5}  # 装甲板编号到标准编号
+    con_thre = 0.6  # 置信度阈值
+    con_decre1 = 0.075  # 置信度没超过阈值时的衰减速度
+    con_incre = 0.10  # 置信度增加速度
+    con_decre2 = 0.05 # 置信度超过阈值时的衰减速度
+
     _lp = True  # 是否位置预测
-    _z_a = True  # 是否进行z轴突变调整
-    _z_thre = 0.2  # z轴突变调整阈值
+    _z_a = False  # 是否进行z轴突变调整
+    _z_thre = 0.2  # z轴突变调整
     _ground_thre = 100  # 地面阈值，我们最后调到了100就是没用这个阈值，看情况调
     _using_l1 = True  # 不用均值，若两个都有预测只用右相机预测值
-    using_d = False
+    using_d = False # 是否使用德劳内算法（三角定位算法）
 
     def __init__(self, api, touch_api, enemy, using_Delaunay=False, two_Camera=False, debug=False):
         """
@@ -42,17 +46,25 @@ class Alarm(draw_map.CompeteMap):
         :param two_Camera:是否使用两个相机
         :param debug:debug模式
         """
+        self._debug = debug
         if debug:
             super(Alarm, self).__init__(test_region, real_size, enemy, api)
             self._region = test_region
         else:
             super(Alarm, self).__init__(region, real_size, enemy, api)
             self._region = region
-        self.reset_thre = 100
+
+
+        self.reset_thre = 300
         self.reset_count = 0
 
-        # location 车辆位置字典，键为字符'1'-'10'，值为车辆的位置数组
+        # location 车辆位置字典，键为字符'1'-'5'，值为车辆的位置数组
         self._location = {}
+        # confidence 车辆置信度字典，键为字符'1'-'5'，值为车辆的位置数组
+        self._confidence = {}
+        # 相机模式选择和是否选择德劳内算法定位
+        self._two_camera = two_Camera
+        self.using_d = using_Delaunay
         if two_Camera:
             # 分别为z坐标缓存，相机世界坐标系位置，以及（相机到世界）转移矩阵
             self._z_cache = [None, None]
@@ -67,38 +79,51 @@ class Alarm(draw_map.CompeteMap):
             self._T = [None]
             if using_Delaunay:
                 self._loc_D = [location_Delaunay("cam_left", debug)]
+
+        # 相机内参
         self._K_O = cam_config['cam_left']['K_0']
-        self._location_pred_time = np.zeros(10, dtype=int)  # 预测次数记录
+
+        self._location_pred_time = np.zeros(5, dtype=int)  # 预测次数记录
+
+        # 敌人颜色
         self._enemy = enemy
+        # 显示api
         self._touch_api = touch_api
-        self._debug = debug
-        self._two_camera = two_Camera
-        self.using_d = using_Delaunay
+
+        # 对错误值进行预测
+        self.thre_predict = [4, 25]
+
         # 判断x各行是否为全零的函数
         self._f_equal_zero = lambda x: np.isclose(
             np.sum(x, axis=1), np.zeros(x.shape[0]))
-        for i in range(1, 11):  # 初始化位置为全零
-            self._location[str(i)] = [0, 0]
-        # 前两帧位置为全零
-        self._location_cache = [self._location.copy(), self._location.copy()]
 
-    def push_T(self, T, camera_position, camera_type):
+        for i in range(1, 6):  # 初始化位置为全零
+            self._location[str(i)] = [0, 0]
+            self._confidence[i] = 0
+        # 前两帧位置为全零
+        self._location_cache = self._location.copy()
+
+    def push_T(self, rvec, tvec, camera_type):
         """
         位姿信息
-        :param T:相机到世界转移矩阵
-        :param camera_position:相机在世界坐标系坐标
+        :param rvec:旋转矩阵
+        :param tvec:平移矩阵
         :param camera_type:相机编号，若为单相机填0
         """
         if camera_type > 0 and not self._two_camera:
             return
 
+        T = np.eye(4)
+        T[:3, :3] = cv.Rodrigues(rvec)[0]  # 旋转向量转化为旋转矩阵
+        T[:3, 3] = tvec.reshape(-1)  # 加上平移向量
+        T = np.linalg.inv(T)  # 矩阵求逆
+        camera_position = (T @ (np.array([0, 0, 0, 1])))[:3]
         self._camera_position[camera_type] = camera_position.copy()
         self._T[camera_type] = T.copy()
 
     def push_RT(self, rvec, tvec, camera_type):
         if not self._two_camera and not self.using_d:
             return
-
         self._loc_D[camera_type].push_T(rvec, tvec)
 
     def _check_alarm(self):
@@ -114,14 +139,16 @@ class Alarm(draw_map.CompeteMap):
             alarm_type, shape_type, team, target, l_type = loc.split('_')
             targets = []
             # 检测敌方
-            for armor in list(self._location.keys())[0 + self._enemy * 5:5 + self._enemy * 5]:
+            for armor in list(self._location.keys())[0:5]:
                 l = np.float32(self._location[armor])
                 if alarm_type == 'm' or alarm_type == 'a':  # 若为位置预警
                     if shape_type == 'r' and (
                             target in enemy_case or color2enemy[team] == self._enemy):  # 对于特殊地点，只考虑对敌方进行预警
                         # 矩形区域采用范围判断
-                        if l[0] >= self._region[loc][0] and l[1] >= self._region[loc][3] and \
-                                l[0] <= self._region[loc][2] and l[1] <= self._region[loc][1]:
+                        # if l[0] >= self._region[loc][0] and l[1] >= self._region[loc][3] and \
+                        #         l[0] <= self._region[loc][2] and l[1] <= self._region[loc][1]:
+                        if l[0] <= self._region[loc][0] and l[1] >= self._region[loc][3] and \
+                               l[0] >= self._region[loc][2] and l[1] <= self._region[loc][1]:
                             targets.append(armor)
                     # base alarm
                     if shape_type == 'l' and color2enemy[team] != self._enemy:
@@ -212,57 +239,42 @@ class Alarm(draw_map.CompeteMap):
         位置预测
         """
 
-        # 次数统计
-        # 若次数为1则不能预测，此时time_equal_one对应元素为1 time_equal_zero对应元素为0
-        time_equal_one = self._location_pred_time == 1
-        time_equal_zero = self._location_pred_time == 0
-
         # 上两帧位置 (2,N)
-        pre = np.stack([np.float32(list(self._location_cache[0].values())),
-                        np.float32(list(self._location_cache[1].values()))], axis=0)
+        pre = np.float32(list(self._location_cache.values()))
         # 该帧预测位置
         now = np.float32(list(self._location.values()))
 
-        pre2_zero = self._f_equal_zero(pre[0])  # the third latest frame 倒数第二帧
-        pre1_zero = self._f_equal_zero(pre[1])  # the second latest frame 倒数第一帧
+        pre1_zero = self._f_equal_zero(pre)  # the last frame 上一帧
         now_zero = self._f_equal_zero(now)  # the latest frame 当前帧
 
-        # 仅对该帧全零，上两帧均不为0的id做预测
-        do_prediction = np.logical_and(
-            np.logical_and(
-                np.logical_and(np.logical_not(pre2_zero), np.logical_not(pre1_zero)), now_zero),
-            np.logical_not(time_equal_one))
-        v = self._pred_ratio * (pre[1] - pre[0])  # move vector between frame
+        # 仅对该帧全零，上帧不为0的id做预测
+        do_prediction = np.logical_and(np.logical_not(pre1_zero), now_zero)
 
         if self._debug:
             # 被预测id,debug输出
-            for i in range(10):
+            for i in range(5):
                 if do_prediction[i]:
                     self._touch_api("INFO", "位置预警-debug输出", "{0} lp yes".format(armor_list[i]))
 
-        now[do_prediction] = v[do_prediction] + pre[1][do_prediction]
-
-        set_time = np.logical_and(
-            do_prediction, time_equal_zero)  # 次数为0且该帧做预测的设置为最大次数
-        reset = np.logical_and(np.logical_not(now_zero),
-                               time_equal_one)  # 对当前帧不为0，且次数为1的进行次数重置
-        self._location_pred_time[reset] = 0
-        self._location_pred_time[set_time] = self._pred_time + 1
-        self._location_pred_time[do_prediction] -= 1  # 对做预测的进行次数衰减
+        now[do_prediction] = pre[do_prediction]
 
         # 预测填入
-        for i in range(1, 11):
-            self._location[str(i)] = now[i - 1].tolist()
+        for i in range(1, 6):
+            if self._confidence[i] >= self.con_thre:
+                self._location[str(i)] = now[i - 1].tolist()
+            else:
+                self._location[str(i)] = [0, 0]
 
         # push new data
-        self._location_cache[0] = self._location_cache[1].copy()
-        self._location_cache[1] = self._location.copy()
+        self._location_cache = self._location.copy()
+
+
 
     def check(self):
         """
         预警检测
         """
-        alarming, base_alarming = self._check_alarm()
+        self._check_alarm()
 
     def two_camera_merge_update(self, locations, extra_locations):
         """
@@ -272,7 +284,7 @@ class Alarm(draw_map.CompeteMap):
         """
         if self._two_camera:
             # init location
-            for i in range(1, 11):
+            for i in range(1, 6):
                 self._location[str(i)] = [0, 0]
             rls = []
             ex_rls = []
@@ -406,7 +418,7 @@ class Alarm(draw_map.CompeteMap):
                     str_debut_output += "{0} in ({1:.3f},{1:.3f},{1:.3f})\n".format(armor_list[int(armor) - 1], *loc)
 
                 self._touch_api("INFO", "位置预警-debug输出", str_debut_output)
-            for i in range(1, 11):
+            for i in range(1, 6):
                 location[str(i)] = self._location[str(i)].copy()
 
             # 执行裁判系统发送
@@ -422,7 +434,6 @@ class Alarm(draw_map.CompeteMap):
 
     def update(self, t_location, e_location):
         """
-
         #单相机使用
         :param t_location: the predicted locations [N,cls+x+y+z]
         :param e_location: iou prediction [:,cls+x0+y0+z]
@@ -431,7 +442,7 @@ class Alarm(draw_map.CompeteMap):
         if not self._two_camera:
 
             # 位置信息初始化，上次信息已保存至cache
-            for i in range(1, 11):
+            for i in range(1, 6):
                 self._location[str(i)] = [0, 0]
 
             locations = None
@@ -448,35 +459,46 @@ class Alarm(draw_map.CompeteMap):
                     locations = np.concatenate([locations, ex_rls], axis=0)
                 else:
                     locations = ex_rls
-
             judge_loc = {}
             if isinstance(locations, np.ndarray):
                 pred_loc = []
                 if self._z_a:
                     cache_pred = []
                 locations[1:3] = np.around(locations[1:3])
-                for armor in range(1, 11):
+                for armor in range(1, 6):
                     if (locations[:, 0] == armor).any():
                         if not self.using_d:
                             l1 = locations[locations[:, 0]
                                            == armor].reshape(-1)
+
                             K_C = np.linalg.inv(self._K_O)
                             C = (K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[
                                 3] * 1000
                             B = np.concatenate(
                                 [np.array(C).flatten(), np.ones(1)], axis=0)
                             l1[1:] = (self._T[0] @ B)[:3] / 1000
-
                         else:
                             l1 = locations[locations[:, 0]
                                            == armor].reshape(-1)
                             l1[1:] = self._loc_D[0].get_point_pos(l1).reshape(-1)
-                            if np.isnan(l1).any():
-                                continue
+                        if np.isnan(l1).any():
+                            continue
+                        # 异常值处理
+                        if l1[1] > self.thre_predict[1] or l1[1] < self.thre_predict[0]:
+                            continue
+                        self._confidence[armor] = min(1.1, self._confidence[armor] + self.con_incre)
+                        if self._confidence[armor] < self.con_thre:
+                            continue
                         if self._z_a:
                             self._adjust_z_one_armor(l1, 0)
                             cache_pred.append(l1[[0, 3]])
                         pred_loc.append(l1.reshape(-1))
+                    else:
+                        if self._confidence[armor] > self.con_thre:
+                            self._confidence[armor] -= self.con_decre2
+                        else:
+                            self._confidence[armor] -= self.con_decre1
+                            self._confidence[armor] = max(0, self._confidence[armor])
 
                 if len(pred_loc):
                     l = np.stack(pred_loc, axis=0)
@@ -494,10 +516,10 @@ class Alarm(draw_map.CompeteMap):
 
             if self.reset_count == self.reset_thre:
                 self.reset_count = 0
-                for i in range(1, 11):  # 初始化位置为全零
+                for i in range(1, 6):  # 初始化位置为全零
                     self._location[str(i)] = [0, 0]
-                # 前两帧位置为全零
-                self._location_cache = [self._location.copy(), self._location.copy()]
+                # 前一帧位置为全零
+                self._location_cache = self._location.copy()
             else:
                 self.reset_count += 1
         else:
@@ -520,11 +542,9 @@ class Alarm(draw_map.CompeteMap):
             B = np.concatenate(
                 [np.array(C).flatten(), np.ones(1)], axis=0)
             l1 = (self._T[0] @ B)[:3] / 1000
-
         else:
             l1 = armor.reshape(-1)
             l1 = self._loc_D[0].get_point_pos(l1).reshape(-1)
-            print(l1)
         try:
             self._update({'6': l1})
             self._show()
