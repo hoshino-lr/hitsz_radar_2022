@@ -150,18 +150,23 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.repo_right = Reproject('cam_right', self.text_api)
         self.loc_alarm = Alarm(enemy=enemy_color, api=self.show_map, touch_api=self.text_api,
                                using_Delaunay=self.__using_d, debug=False)
-
         try:
             self.sp.read(f'cam_left_{enemy2color[enemy_color]}')
-            T, T_ = self.repo_left.push_T(self.sp.rvec, self.sp.tvec)
+            self.repo_left.push_T(self.sp.rvec, self.sp.tvec)
+            self.loc_alarm.push_T(self.sp.rvec, self.sp.tvec, 0)
             self.loc_alarm.push_RT(self.sp.rvec, self.sp.tvec, 0)
+        except Exception as e:
+            print(f"[ERROR] {e}")
+            self.repo_left.push_T(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"])
+            self.loc_alarm.push_T(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"], 0)
+            self.loc_alarm.push_RT(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"], 0)
+        try:
             self.sp.read(f'cam_right_{enemy2color[enemy_color]}')
             self.repo_right.push_T(self.sp.rvec, self.sp.tvec)
         except Exception as e:
-            print("[ERROR] using default data")
-            T, T_ = self.repo_left.push_T(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"])
+            print(f"[ERROR] {e}")
+            self.repo_right.push_T(cam_config["cam_right"]["rvec"], cam_config["cam_right"]["tvec"])
 
-        self.loc_alarm.push_T(T, T_, 0)
         self.start()
 
     def __ui_init(self):
@@ -539,6 +544,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if isinstance(self.__res_left, bool) and not self.__res_left:
             self.missile.detect_api(self.__pic_left, None)
 
+    #位置预警函数，更新各个预警区域的预警次数
     def update_location_alarm(self) -> None:
         t_loc = None
         e_loc = None
@@ -571,7 +577,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                         x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
                         y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
                         e_loc = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, np.zeros(x0.shape)], axis=1)
-        self.loc_alarm.update(t_loc, e_loc)
+        self.loc_alarm.update(t_loc, None)
         self.loc_alarm.check()
         self.loc_alarm.show()
 
@@ -592,6 +598,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 else:
                     depth = self.lidar.read()
                     pc_show(self.__pic_left, depth)
+                self.loc_alarm.check()
+                self.loc_alarm.show()
                 self.repo_left.update(self.__pic_left)
                 self.repo_left.push_text()
                 self.update_image()

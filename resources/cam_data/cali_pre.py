@@ -47,7 +47,7 @@ def calibrate_single(imgNums, CheckerboardSize, Nx_cor, Ny_cor, name, saveFile=F
             cv2.drawChessboardCorners(frame, (Nx_cor, Ny_cor), corners, ok)
             count += 1
             print('NO.' + str(count))
-            cv2.imshow('frame', frame)
+            cv2.imshow('frame', cv2.resize(frame, (1024, 648)))
             cv2.waitKey(500)
 
     global mtx, dist
@@ -89,4 +89,4 @@ def calibrate_single(imgNums, CheckerboardSize, Nx_cor, Ny_cor, name, saveFile=F
 
 
 if __name__ == "__main__":
-    mtx, dist, K, D = calibrate_single(35, 25, 11, 8, name="cam_right", saveFile=False)
+    mtx, dist, K, D = calibrate_single(35, 25, 11, 8, name="cam_left", saveFile=False)

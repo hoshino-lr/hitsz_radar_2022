@@ -103,18 +103,10 @@ class Reproject(object):
     def push_T(self, rvec: ndarray, tvec: ndarray) -> Tuple[Union[ndarray, Any], Any]:
         """
         输入相机位姿（世界到相机）
-
-        Returns:
-            返回值: 相机到世界变换矩阵（4*4）,相机世界坐标
         """
         self._rvec = rvec
         self._tvec = tvec
         self._plot_regin()  # 初始化预警区域字典
-        T = np.eye(4)
-        T[:3, :3] = cv2.Rodrigues(rvec)[0]  # 旋转向量转化为旋转矩阵
-        T[:3, 3] = tvec.reshape(-1)  # 加上平移向量
-        T = np.linalg.inv(T)  # 矩阵求逆
-        return T, (T @ (np.array([0, 0, 0, 1])))[:3]
 
     def update(self, frame) -> None:
         """

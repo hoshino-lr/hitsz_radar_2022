@@ -20,7 +20,7 @@ class Predictor(object):
     img_src = []
     output = []
     name = ""
-    img_show = False
+    img_show = True
 
     # net1参数
     net1_confThreshold = 0.3
@@ -172,12 +172,11 @@ class Predictor(object):
             classIds.append(max_id)
             confidences.append(obj_conf)
 
-        # NMS筛选.resh
+        # NMS筛选
         indices = cv2.dnn.NMSBoxes(bboxes, confidences, self.net1_confThreshold, self.net1_nmsThreshold)
         res = []
 
         if len(indices):
-            indices = indices.reshape(-1, 1)
             for i in indices:
                 # 暂时为完成 boxes 转 numpy 
                 bbox = [float(x) for x in bboxes[i[0]]]
@@ -381,7 +380,7 @@ class Predictor(object):
             pass
         else:
             for i in net2_input:
-                count = i[0] // 213 + i[1] // 213 * 3
+                count = i[0] // 213 + (i[1] // 213) * 3
                 i[0] %= 213
                 i[1] %= 213
                 i[2] = i[0] + i[2]
@@ -443,7 +442,7 @@ if __name__ == '__main__':
     import sys
 
     sys.path.append("..")  # 单独跑int的时候需要
-    cap = cv2.VideoCapture("/home/mark/hitsz_radar/resources/records/11_19_42_left.avi")
+    cap = cv2.VideoCapture("/home/hoshino/视频/11_19_42_left.avi")
 
     count = 0
     t2 = time.time()
