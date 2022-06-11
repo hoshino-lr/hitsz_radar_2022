@@ -10,15 +10,15 @@ from resources.config import MAP_PATH, map_size, enemy2color
 
 
 class CompeteMap(object):
-    '''
+    """
     小地图绘制类
     draw_map.py
 
     使用顺序 twinkle->update->show->refresh
-    '''
+    """
     # 类内变量
     _circle_size = 10
-    _twinkle_times = 3  # 闪烁次数
+    _twinkle_times = 29  # 闪烁次数
 
     def __init__(self, region, real_size, enemy, api):
         """
@@ -48,18 +48,18 @@ class CompeteMap(object):
                 self._out_map_twinkle, cv2.ROTATE_90_CLOCKWISE)
 
         self._twinkle_event = {}
-    
+
     def _refresh(self):
         """
         闪烁画面复制canvas,刷新
         """
         self._out_map_twinkle = self._map.copy()
 
-    def _update(self, location: dict):
+    def _update(self, location: dict, last_location: dict):
         """
         更新车辆位置
-
-        :param location:车辆位置字典 索引为'1'-'10',内容为车辆位置数组(2,)
+        :param last_location:车辆位置字典 索引为'1'-'5',内容为车辆位置数组(2,)
+        :param location:车辆位置字典 索引为'1'-'5',内容为车辆位置数组(2,)
         """
         if self._enemy:
             self._out_map = cv2.rotate(self._out_map_twinkle, cv2.ROTATE_90_COUNTERCLOCKWISE)
@@ -67,15 +67,20 @@ class CompeteMap(object):
             self._out_map = cv2.rotate(self._out_map_twinkle, cv2.ROTATE_90_CLOCKWISE)
         _loc_map = [0, 0]
         for armor in location.keys():
+            mode = 1
             ori_x = int(location[armor][0] / self._real_size[0] * map_size[0])
             ori_y = int((self._real_size[1] - location[armor][1]) / self._real_size[1] * map_size[1])
+            if not ori_x:
+                mode = 0
+                ori_x = int(last_location[armor][0] / self._real_size[0] * map_size[0])
+                ori_y = int((self._real_size[1] - last_location[armor][1]) / self._real_size[1] * map_size[1])
             # 位置翻转
             if self._enemy:
                 _loc_map = ori_y, map_size[0] - ori_x
             else:
                 _loc_map = map_size[1] - ori_y, ori_x
-            # 画定位点；armor为字符'1'-'10'
-            self._draw_circle(_loc_map, int(armor))
+            # 画定位点；armor为字符'1'-'5'
+            self._draw_circle(_loc_map, int(armor), dtype=mode)
 
     def _show(self):
         """
@@ -83,17 +88,17 @@ class CompeteMap(object):
         """
         self._show_api(self._out_map)
 
-    def _draw_region(self, region:dict):
+    def _draw_region(self, region: dict):
         """
         param region
         在canvas绘制预警区域（canvas 原始地图 _map）
         """
         for r in region.keys():
             alarm_type, shape_type, team, _, _ = r.split('_')
-            if (alarm_type == 'm' or alarm_type == 'a') and team == enemy2color[self._enemy]: # 预警类型判断，若为map或all类型
+            if (alarm_type == 'm' or alarm_type == 'a') and team == enemy2color[self._enemy]:  # 预警类型判断，若为map或all类型
                 if shape_type == 'l':
                     # 直线预警
-                    rect = region[r] # 获得直线两端点，为命名统一命名为rect
+                    rect = region[r]  # 获得直线两端点，为命名统一命名为rect
                     # 将实际世界坐标系坐标转换为地图上的像素位置
                     cv2.line(self._map, (int(rect[0] * map_size[0] // self._real_size[0]),
                                          int((self._real_size[1] - rect[1]) * map_size[1] // self._real_size[1])),
@@ -117,14 +122,18 @@ class CompeteMap(object):
                     for i in range(4):
                         cv2.line(self._map, f(rect[i]), f(rect[(i + 1) % 4]), (0, 255, 0), 2)
 
-    def _draw_circle(self, location, armor: int):
+    def _draw_circle(self, location, armor: int, dtype: int):
         """
         画定位点
         """
         img = self._out_map
         color = (255 * self._enemy, 0, 255 * (1 - self._enemy))  # 解算颜色
+        last_color = (127 * self._enemy, 0, 127 * (1 - self._enemy))  # 解算颜色
         armor = armor - 5 * (armor > 5)  # 将编号统一到1-5
-        cv2.circle(img, tuple(location), self._circle_size, color, -1)  # 内部填充
+        if dtype:
+            cv2.circle(img, tuple(location), self._circle_size, color, -1)  # 内部填充
+        else:
+            cv2.circle(img, tuple(location), self._circle_size, last_color, -1)  # 内部填充
         cv2.circle(img, tuple(location), self._circle_size, (0, 0, 0), 1)  # 外边框
         # 数字
         cv2.putText(img, str(armor),
@@ -132,42 +141,34 @@ class CompeteMap(object):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6 * self._circle_size / 10, (255, 255, 255), 2)
 
     def _add_twinkle(self, region: str):
-        '''
+        """
         预警事件添加函数
-
         :param region:要预警的区域名
-        '''
+        """
         if region not in self._twinkle_event.keys():
             # 若不在预警字典内，则该事件从未被预警过，添加预警事件
-            # 预警字典内存有各个预警项目的剩余预警次数(*2,表示亮和灭)
-            # _twinkle_times 类内变量，初始为3
-            self._twinkle_event[region] = self._twinkle_times * 2
+            # _twinkle_times 类内变量，初始为29
+            self._twinkle_event[region] = self._twinkle_times
         else:
-            if self._twinkle_event[region] % 2 == 0:
-                # 剩余预警次数为偶数，当前灭，则添加至最大预警次数
-                self._twinkle_event[region] = self._twinkle_times * 2
-            else:
-                # 剩余预警次数为奇数，当前亮，则添加至最大预警次数加一次灭过程
-                self._twinkle_event[region] = self._twinkle_times * 2 + 1
+            self._twinkle_event[region] = self._twinkle_times - 9 + (self._twinkle_event[region] % 10)
 
     def _twinkle(self, region):
-        '''
+        """
         闪烁执行类
 
         :param region:所有预警区域
-        '''
-        #对_twinkle_event字典进行遍历，r为字典中的键
+        """
+        # 对_twinkle_event字典进行遍历，r为字典中的键
         for r in self._twinkle_event.keys():
             if self._twinkle_event[r] == 0:
                 # 不能再预警
                 continue
-            if self._twinkle_event[r] % 2 == 0:
+            if self._twinkle_event[r] % 10 >= 5:
                 # 当前灭，且还有预警次数，使其亮
-                _, shape_type, _, _, _ = r.split(
-                    '_')  # region格式见tmp_config.py文件
+                _, shape_type, _, _, _ = r.split('_')  # region格式见tmp_config.py文件
                 # 闪
                 if shape_type == 'r':
-                    rect = region[r] # rect(x0,y0,x1,y1)
+                    rect = region[r]  # rect(x0,y0,x1,y1)
                     cv2.rectangle(self._out_map_twinkle,
                                   (int(rect[0] * map_size[0] // self._real_size[0]),
                                    int((self._real_size[1] - rect[1]) * map_size[1] // self._real_size[1])),
@@ -178,8 +179,8 @@ class CompeteMap(object):
                     x = np.float32(region[r][:8]).reshape(4, 2)
                     x[:, 0] = (x[:, 0] * map_size[0] // self._real_size[0])
                     x[:, 1] = ((self._real_size[1] - x[:, 1]) * map_size[1] // self._real_size[1])
-
                     rect = x.astype(int)
-                    cv2.fillConvexPoly(self._out_map_twinkle, rect, (0,0,255))
-            #减少预警次数
+                    cv2.fillConvexPoly(self._out_map_twinkle, rect, (0, 0, 255))
+
+            # 减少预警次数
             self._twinkle_event[r] -= 1

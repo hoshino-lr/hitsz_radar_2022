@@ -29,20 +29,16 @@ class Reproject(object):
         self._rvec = cam_config[name]['rvec']
         self._K_O = cam_config[name]['K_0']
         self._C_O = cam_config[name]['C_0']
-        if DEBUG:   # 若为debug模式
+        if DEBUG:  # 若为debug模式
             self._region = test_region
         else:
             self._region = region
         self._scene_region = {}  # 反投影位置图形
-        # self._color_bbox = None
-        # self._size = (1024, 1024)
-
+        self._name = name
         self._enemy = enemy_color
         self._real_size = real_size  # 真实尺寸
-        self._cache = None
-        # self._debug = DEBUG
         self._scene_init = False  # 初始化flag
-        self._pred_box = np.array([])
+        self.fly = False
         self._textapi = textapi  # 发送text的api
         self.rp_alarming = {}
 
@@ -70,9 +66,6 @@ class Reproject(object):
                         # 引入左上右下两点
                         lt = self._region[r][:2].copy()
                         rd = self._region[r][2:4].copy()
-                        # 因原点不同，进行坐标变换
-                        # lt[1] = self._real_size[1] - lt[1]
-                        # rd[1] = self._real_size[1] - rd[1]
                         # 另外两点坐标
                         ld = [lt[0], rd[1]]
                         rt = [rd[0], lt[1]]
@@ -100,7 +93,7 @@ class Reproject(object):
                         self._scene_region[r] = recor  # 储存反投影坐标
                         self._scene_init = True
 
-    def push_T(self, rvec: ndarray, tvec: ndarray) -> Tuple[Union[ndarray, Any], Any]:
+    def push_T(self, rvec: ndarray, tvec: ndarray) -> None:
         """
         输入相机位姿（世界到相机）
         """
@@ -114,7 +107,7 @@ class Reproject(object):
         """
         for i in self._scene_region.keys():
             recor = self._scene_region[i]
-            type, shape_type, team, location, height_type = i.split('_')
+            _, shape_type, team, location, height_type = i.split('_')
             if color2enemy[team] != enemy_color:
                 continue
             else:
@@ -128,69 +121,19 @@ class Reproject(object):
         预警预测
         Args:
             net_input:输入
-            armors:N,cls+对应的车辆预测框序号+装甲板bbox
-            cars:N,cls+车辆bbox
         """
-        armors = None
-        cars = None
+        armors = None  # armors:N,cls+对应的车辆预测框序号+装甲板bbox
+        cars = None  # cars:N,cls+车辆bbox
+        self.fly = False
         self.rp_alarming = {}
-        if isinstance(net_input, np.ndarray):
+        if isinstance(net_input, np.ndarray):  # 解析网络输入
             if len(net_input):
                 armors = net_input[:, [11, 13, 6, 7, 8, 9]]
                 cars = net_input[:, [11, 0, 1, 2, 3]]
 
-        pred_bbox = np.array([])
         color_bbox = []
-        cache = None  # 当前帧缓存框
-        id = np.array([1, 2, 3, 4, 5])
-        f_max = lambda x, y: (x + y + abs(x - y)) // 2
-        f_min = lambda x, y: (x + y - abs(x - y)) // 2
         if isinstance(armors, np.ndarray) and isinstance(cars, np.ndarray):
-            pred_cls = []
-            p_bbox = []  # IoU预测框（装甲板估计后的装甲板框）
-            cache_pred = []  # 可能要缓存的当帧预测IoU预测框的原始框，缓存格式 id,x1,y1,x2,y2
-            try:
-                cache = np.concatenate(
-                    [armors[:, 0].reshape(-1, 1), np.stack([cars[int(i)] for i in armors[:, 1]], axis=0)], axis=1)
-            except Exception as e:
-                print(f"[ERROR] {e}")
-
             cls = armors[:, 0].reshape(-1, 1)
-            # 以下为IOU预测
-            if isinstance(self._cache, np.ndarray):
-                for i in id:
-                    mask = self._cache[:, 0] == i
-                    if not (cls == i).any() and mask.any():
-                        cache_bbox = self._cache[mask][:, 2:]
-                        # 计算交并比
-                        cache_bbox = np.repeat(cache_bbox, len(cars), axis=0)
-                        x1 = f_max(cache_bbox[:, 0], cars[:, 1])  # 交集左上角x
-                        x2 = f_min(cache_bbox[:, 2], cars[:, 3])  # 交集右下角x
-                        y1 = f_max(cache_bbox[:, 1], cars[:, 2])  # 交集左上角y
-                        y2 = f_min(cache_bbox[:, 3], cars[:, 4])  # 交集右下角y
-                        overlap = f_max(np.zeros((x1.shape)), x2 - x1) * f_max(np.zeros((y1.shape)), y2 - y1)
-                        union = (cache_bbox[:, 2] - cache_bbox[:, 0]) * (cache_bbox[:, 3] - cache_bbox[:, 1])
-                        iou = (overlap / union)
-
-                        if np.max(iou) > self._iou_threshold:  # 当最大iou超过阈值值才预测
-                            now_bbox = cars[np.argmax(iou)].copy()  # x1,y1,x2,y2
-                            # TODO:可以加入Debug
-
-                            # 装甲板位置估计
-                            now_bbox[3] = now_bbox[3] // 3
-                            now_bbox[4] = now_bbox[4] // 5
-                            now_bbox[2] += now_bbox[4] * 3
-                            now_bbox[1] += now_bbox[3]
-                            # TODO：Debug绘制装甲板
-                            now_bbox = now_bbox.reshape(-1, 5)
-                            pred_cls.append(np.array([i]))  # 预测出的装甲板类型
-                            p_bbox.append(now_bbox[:, 1:].reshape(-1, 4))  # 预测出的bbox
-
-            if len(pred_cls):
-                # 将cls和四点合并
-                pred_bbox = np.concatenate(
-                    [np.stack(pred_cls, axis=0).reshape(-1, 1), np.stack(p_bbox, axis=0).reshape(-1, 4)],
-                    axis=1)
             # 默认使用bounding box为points四点
             x1 = armors[:, 2].reshape(-1, 1)
             y1 = armors[:, 3].reshape(-1, 1)
@@ -226,41 +169,39 @@ class Reproject(object):
                 alarm_target = cls[mask]  # 需要预警的装甲板种类
                 if len(alarm_target):
                     self.rp_alarming = {r: alarm_target.reshape(1, -1)}
-        # 储存为上一帧的框
-        if isinstance(cache, np.ndarray):
-            for i in id:
-                assert cache[cache[:, 0] == i].reshape(-1, 6).shape[0] <= 1
-            self._cache = cache.copy()
-        else:
-            self._cache = None
-        self._pred_box = pred_bbox
 
-    def get_pred_box(self):
-        return self._pred_box
-
-    def push_text(self):
+    def push_text(self) -> None:
+        """
+        发送信息
+        """
         if self._scene_init:
             for r in self.rp_alarming.keys():
                 # 格式解析
                 _, _, _, location, _ = r.split('_')
-                if self._time[f'{location}'] == 0:
-                    self._start[f'{location}'] = time.time()
-                    self._region_count[f'{location}'] += 1
-                    self._end[f'{location}'] = time.time()
-                    self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
+                if location == "3号高地":
+                    for i in self.rp_alarming[r]:
+                        if i == 1:
+                            self._textapi("WARNING", f"反投影{location}", f"在{location}处有英雄！！！\n")
                 else:
-                    self._end[f'{location}'] = time.time()
-                    self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
-                    if self._time[f'{location}'] <= 1:
+                    if self._time[f'{location}'] == 0:
+                        self._start[f'{location}'] = time.time()
                         self._region_count[f'{location}'] += 1
-                    if self._time[f'{location}'] >= self._clock:
-                        self._time[f'{location}'] = 0
-                        if self._region_count[f'{location}'] >= self._frame:
-                            self._textapi("WARNING", f"反投影{location}", f"在{location}处有敌人！！！\n")
-                            self._region_count[f'{location}'] = 0
+                        self._end[f'{location}'] = time.time()
+                        self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
+                    else:
+                        self._end[f'{location}'] = time.time()
+                        self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
+                        if self._time[f'{location}'] <= 1:
+                            self._region_count[f'{location}'] += 1
+                        if self._time[f'{location}'] >= self._clock:
+                            if self._region_count[f'{location}'] >= self._frame:
+                                if location == "飞坡":
+                                    self.fly = True
+                                self._textapi("WARNING", f"反投影{location}", f"在{location}处有敌人！！！\n")
+                                self._region_count[f'{location}'] = 0
+                            self._time[f'{location}'] = 0
         else:
             self._textapi("WARNING", "反投影", "未初始化！！！")
-
 
 
 if __name__ == "__main__":

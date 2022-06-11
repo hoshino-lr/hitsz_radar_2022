@@ -64,6 +64,7 @@ def read(ser):
             if not cmd_id in cmd_use:
                 bufferbyte = 0
                 continue
+
         # 比赛状态数据
         if bufferbyte == 19 and cmd_id == 0x0001:
             if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 20):
@@ -110,7 +111,7 @@ def read(ser):
                 continue
 
         # 云台手通信
-        if bufferbyte == 19 and cmd_id == 0x301:  # 2bite数据
+        if bufferbyte == 19 and cmd_id == 0x0301:  # 2bite数据
             if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 19):
                 # 比赛阶段信息
                 Port_operate.Receive_Robot_Data(buffer)
@@ -134,7 +135,6 @@ def Map_Transmit(ser):
     if enemy_color == 0:
         # 敌方为红方
         if flag:
-            # print(f"[INFO] 输出 {r_id} {x} {y}")
             Port_operate.Map(r_id, np.float32(x), np.float32(y), ser)
             time.sleep(0.1)
             loop_send += 1
@@ -159,6 +159,23 @@ def Map_Transmit(ser):
     nID = (nID + 1) % 5
 
 
+def Hero_Transmit(ser):
+    # 英雄飞坡预警
+    alarm_type = Port_operate.get_alarm_type()
+    alarm_type = 1
+    # 敌方判断
+    if enemy_color == 0:
+        # 敌方为红方
+        my_id = 109
+        Port_operate.Hero_alarm(101, my_id, alarm_type, ser)
+    if enemy_color == 1:
+        # 敌方为蓝方
+        my_id = 9
+        Port_operate.Hero_alarm(1, my_id, alarm_type, ser)
+    time.sleep(0.1)
+
+
 def write(ser):
     while True:
         Map_Transmit(ser)
+        Hero_Transmit(ser)

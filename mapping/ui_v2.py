@@ -187,6 +187,8 @@ class Ui_MainWindow(object):
         self.pnp_demo.mousePressEvent = MainWindow.epnp_mouseEvent
         self.pnp_demo.wheelEvent = MainWindow.epnp_wheelEvent
         self.main_demo.mouseMoveEvent = MainWindow.pc_mouseEvent
+        self.condition.keyPressEvent = MainWindow.condition_key_on_clicked
+        self.condition.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.tabWidget.currentChanged.connect(MainWindow.epnp_on_clicked)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 

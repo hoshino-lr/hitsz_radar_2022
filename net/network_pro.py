@@ -4,10 +4,11 @@ created by 李龙 in 2020/11
 最终修改版本 李龙 2021/1/16
 """
 import numpy as np
+import threading
 import time
-import cv2
+import cv2 as cv
 from resources.config import net1_engine, net2_engine, \
-    net1_cls, net2_cls_names, enemy_color
+    net1_cls, net2_cls_names, enemy_color, cam_config
 from net.tensorrtx import YoLov5TRT
 from radar_detect.common import armor_filter
 
@@ -17,10 +18,10 @@ class Predictor(object):
     格式定义： [N,  [bbox(xyxy),conf,cls,bbox(xyxy),conf,cls,col,N]
     """
     # 输入图片与输出结果
-    img_src = []
     output = []
     name = ""
-    img_show = True
+    img_show = False
+    record_state = False
 
     # net1参数
     net1_confThreshold = 0.3
@@ -53,11 +54,12 @@ class Predictor(object):
         初始化函数
         :param _name 
         """
+        self.pic_update = False
         # net1初始化
         self._net1 = YoLov5TRT(self.net1_trt_file)
         # net2初始化
         self._net2 = YoLov5TRT(self.net2_trt_file)
-
+        self.img_src = np.zeros(cam_config[_name]["size"])
         self.name = _name  # 选择的相机是左还是右
         self.choose_type = 0  # 只选择检测cars类，不检测哨兵和基地
         self.enemy_color = not enemy_color
@@ -84,8 +86,9 @@ class Predictor(object):
         # 检测函数
 
         self.img_src = src.copy()
+        self.pic_update = True
         # 图像预处理
-        img = cv2.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv2.INTER_LINEAR)
+        img = cv.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv.INTER_LINEAR)
         img = img[:, :, ::-1].transpose(2, 0, 1)
         img = np.ascontiguousarray(img)
         img = img.astype(np.float32)
@@ -113,7 +116,7 @@ class Predictor(object):
         :param src 输入一张640x640的图片
         :param res 输出一个(N,7)的array 或是None
         """
-        img = cv2.resize(src, (self.net2_inpHeight, self.net2_inpWidth), interpolation=cv2.INTER_LINEAR)
+        img = cv.resize(src, (self.net2_inpHeight, self.net2_inpWidth), interpolation=cv.INTER_LINEAR)
         # Convert
         img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x640x640
         img = np.ascontiguousarray(img)
@@ -173,7 +176,7 @@ class Predictor(object):
             confidences.append(obj_conf)
 
         # NMS筛选
-        indices = cv2.dnn.NMSBoxes(bboxes, confidences, self.net1_confThreshold, self.net1_nmsThreshold)
+        indices = cv.dnn.NMSBoxes(bboxes, confidences, self.net1_confThreshold, self.net1_nmsThreshold)
         res = []
 
         if len(indices):
@@ -241,7 +244,7 @@ class Predictor(object):
             confidences.append(obj_conf)
 
         # NMS筛选
-        indices = cv2.dnn.NMSBoxes(bboxes, confidences, self.net1_confThreshold, self.net1_nmsThreshold)
+        indices = cv.dnn.NMSBoxes(bboxes, confidences, self.net1_confThreshold, self.net1_nmsThreshold)
         res = []
 
         if len(indices):
@@ -321,8 +324,8 @@ class Predictor(object):
             confidences.append(obj_conf)
 
         # NMS筛选
-        indices = cv2.dnn.NMSBoxes(bboxes, confidences,
-                                   self.net2_confThreshold, self.net2_nmsThreshold)
+        indices = cv.dnn.NMSBoxes(bboxes, confidences,
+                                  self.net2_confThreshold, self.net2_nmsThreshold)
 
         if len(indices):
             res = []
@@ -359,7 +362,7 @@ class Predictor(object):
         for i in det_points:
             try:
                 cut_img = img_src[int(i[1]):int(i[3]), int(i[0]):int(i[2])]
-                cut_img = cv2.resize(cut_img, (213, 213))
+                cut_img = cv.resize(cut_img, (213, 213))
                 u = count % 3 * 213
                 v = count // 3 * 213
                 jig_picture[v:v + 213, u:u + 213] = cut_img.copy()
@@ -425,24 +428,51 @@ class Predictor(object):
             # Plots one bounding box on image img
             if not np.isnan(i[11]):
                 c1, c2 = (int(i[6]), int(i[7])), (int(i[8]), int(i[9]))
-                cv2.rectangle(self.img_src, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+                cv.rectangle(self.img_src, c1, c2, color, thickness=tl, lineType=cv.LINE_AA)
             c1, c2 = (int(i[0]), int(i[1])), (int(i[2]), int(i[3]))
-            cv2.rectangle(self.img_src, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+            cv.rectangle(self.img_src, c1, c2, color, thickness=tl, lineType=cv.LINE_AA)
 
             if label:
                 tf = max(tl - 1, 1)  # font thickness
-                t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
+                t_size = cv.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
                 c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
-                cv2.rectangle(self.img_src, c1, c2, color, -1, cv2.LINE_AA)  # filled
-                cv2.putText(self.img_src, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf,
-                            lineType=cv2.LINE_AA)
+                cv.rectangle(self.img_src, c1, c2, color, -1, cv.LINE_AA)  # filled
+                cv.putText(self.img_src, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf,
+                           lineType=cv.LINE_AA)
+
+    def record_on_clicked(self) -> None:
+        if not self.record_state:
+            fourcc = cv.VideoWriter_fourcc(*'MP42')
+            time_ = time.localtime(time.time())
+            save_title = f"resources/records/{time_.tm_mday}_{time_.tm_hour}_" \
+                         f"{time_.tm_min}"
+            _, cam = self.name.split("_")
+            self.record_object = cv.VideoWriter(save_title + "_" + cam + ".avi", fourcc, 10,
+                                                cam_config[self.name]['size'])
+            self._record_thr = threading.Thread(target=self.mul_record)
+            self._record_thr.setDaemon(True)
+            self.record_state = True
+            self._record_thr.start()
+        else:
+            self.record_state = False
+            self._record_thr.join()
+            del self.record_object
+
+    def mul_record(self):
+        while True:
+            if self.record_state:
+                if self.pic_update:
+                    self.record_object.write(self.img_src)
+                    self.pic_update = False
+            else:
+                break
 
 
 if __name__ == '__main__':
     import sys
 
     sys.path.append("..")  # 单独跑int的时候需要
-    cap = cv2.VideoCapture("/home/hoshino/视频/11_19_42_left.avi")
+    cap = cv.VideoCapture("/home/hoshino/视频/11_19_42_left.avi")
 
     count = 0
     t2 = time.time()
@@ -455,9 +485,9 @@ if __name__ == '__main__':
             break
         _, pic = pre1.detect_cars(frame)
         count += 1
-        pic = cv2.resize(pic, (1280, 720))
-        cv2.imshow("asd", pic)
-        res = cv2.waitKey(1)
+        pic = cv.resize(pic, (1280, 720))
+        cv.imshow("asd", pic)
+        res = cv.waitKey(1)
         if res == ord('q'):
             break
         if time.time() - t1 > 1:

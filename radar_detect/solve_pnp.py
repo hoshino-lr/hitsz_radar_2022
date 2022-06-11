@@ -100,14 +100,20 @@ class SolvePnp(CameraLocation):
     # 四点标定函数
     def locate_pick(self) -> bool:
         if self.imgPoints.all():  # 粗暴的判断
-            _, rvec, tvec, _ = cv2.solvePnPRansac(objectPoints=self.objPoints,
-                                                  distCoeffs=self.distCoeffs,
-                                                  cameraMatrix=self.cameraMatrix,
-                                                  imagePoints=self.imgPoints,
-                                                  iterationsCount=1000,
-                                                  reprojectionError=3,
-                                                  confidence=0.99,
-                                                  flags=cv2.SOLVEPNP_DLS)
+            try:
+                _, rvec, tvec, _ = cv2.solvePnPRansac(objectPoints=self.objPoints,
+                                                      distCoeffs=self.distCoeffs,
+                                                      cameraMatrix=self.cameraMatrix,
+                                                      imagePoints=self.imgPoints,
+                                                      iterationsCount=1000,
+                                                      reprojectionError=3,
+                                                      confidence=0.99,
+                                                      flags=cv2.SOLVEPNP_EPNP)
+            except Exception as e:
+                print(f"[ERROR] {e}")
+                self.sp_state = False
+                self._update_info()
+                return False
             self.rotation = rvec
             self.translation = tvec
             print(f"[INFO] rvec:{rvec}")

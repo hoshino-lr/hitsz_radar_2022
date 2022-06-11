@@ -1,52 +1,54 @@
 """
 位置预警类，还需要修改和完善
-created by 黄继凡 2021/12
-最新修改 by 黄继凡 2021/5/1
+created by 黄继凡 2022/12
+最新修改 by 李龙 2022/5/30
 """
 
 import cv2 as cv
 import numpy as np
 from radar_detect.common import is_inside
 import mapping.draw_map as draw_map  # 引入draw_map模块，使用其中的CompeteMap类
-from resources.config import armor_list, color2enemy, enemy_case, cam_config, real_size, region, test_region
+from resources.config import armor_list, color2enemy, enemy_color, enemy_case, cam_config, real_size, region, test_region, choose
 from radar_detect.location_Delaunay import location_Delaunay
 
 
 class Alarm(draw_map.CompeteMap):
     """
     预警类，继承自地图画图类
-    v2:
     删除原先的refresh、show函数，
     two_camera_merge_update、update函数更改传入参数、
     返回车辆位置字典_location，统一绘图
     """
     # param
-
     _pred_time = 5  # 预测几次  一开始是10
     _pred_ratio = 0  # 预测速度比例
 
     con_thre = 0.6  # 置信度阈值
     con_decre1 = 0.075  # 置信度没超过阈值时的衰减速度
     con_incre = 0.10  # 置信度增加速度
-    con_decre2 = 0.05 # 置信度超过阈值时的衰减速度
+    con_decre2 = 0.05  # 置信度超过阈值时的衰减速度
 
     _lp = True  # 是否位置预测
-    _z_a = False  # 是否进行z轴突变调整
+    _z_a = True  # 是否进行z轴突变调整
     _z_thre = 0.2  # z轴突变调整
     _ground_thre = 100  # 地面阈值，我们最后调到了100就是没用这个阈值，看情况调
-    _using_l1 = True  # 不用均值，若两个都有预测只用右相机预测值
-    using_d = False # 是否使用德劳内算法（三角定位算法）
 
-    def __init__(self, api, touch_api, enemy, using_Delaunay=False, two_Camera=False, debug=False):
+    state_name = ['雷达点云定位', '德劳内三角定位', 'kd_tree定位', '禁用定位']
+    state = [3, 3]
+
+    def __init__(self, api, touch_api, enemy, state_: list, debug=False):
         """
-        :param region:预警区域
         :param api:主程序显示api，传入画图程序进行调用（不跨线程使用,特别是Qt）
         :param touch_api:log api
         :param enemy:敌方编号
-        :param two_Camera:是否使用两个相机
         :param debug:debug模式
         """
         self._debug = debug
+        # 敌人颜色
+        self._enemy = enemy
+        # 显示api
+        self._touch_api = touch_api
+        self.state = state_
         if debug:
             super(Alarm, self).__init__(test_region, real_size, enemy, api)
             self._region = test_region
@@ -54,41 +56,34 @@ class Alarm(draw_map.CompeteMap):
             super(Alarm, self).__init__(region, real_size, enemy, api)
             self._region = region
 
-
         self.reset_thre = 300
         self.reset_count = 0
 
         # location 车辆位置字典，键为字符'1'-'5'，值为车辆的位置数组
         self._location = {}
+        # location 车辆最后一次位置字典，键为字符'1'-'5'，值为车辆的位置数组
+        self._last_location = {}
         # confidence 车辆置信度字典，键为字符'1'-'5'，值为车辆的位置数组
         self._confidence = {}
-        # 相机模式选择和是否选择德劳内算法定位
-        self._two_camera = two_Camera
-        self.using_d = using_Delaunay
-        if two_Camera:
-            # 分别为z坐标缓存，相机世界坐标系位置，以及（相机到世界）转移矩阵
-            self._z_cache = [None, None]
-            self._camera_position = [None, None]
-            self._T = [None, None]
-            if using_Delaunay:
-                self._loc_D = [location_Delaunay(
-                    "cam_left", debug), location_Delaunay("cam_right", debug)]
+
+        # 分别为z坐标缓存，相机世界坐标系位置，以及（相机到世界）转移矩阵
+        self._locations = [None, None]
+        self._z_cache = [None, None]
+        self._camera_position = [None, None]
+        self._T = [None, None]
+        if(int(enemy_color) == 0):
+            choose_left = "cam_left_red"
+            choose_right = "cam_right_red"
         else:
-            self._z_cache = [None]
-            self._camera_position = [None]
-            self._T = [None]
-            if using_Delaunay:
-                self._loc_D = [location_Delaunay("cam_left", debug)]
+            choose_left = "cam_left_blue"
+            choose_right = "cam_right_blue"
+
+        self._loc_D = [location_Delaunay(
+            "cam_left", debug, choose[choose_left]), location_Delaunay("cam_right", debug, choose[choose_right])]
 
         # 相机内参
         self._K_O = cam_config['cam_left']['K_0']
-
         self._location_pred_time = np.zeros(5, dtype=int)  # 预测次数记录
-
-        # 敌人颜色
-        self._enemy = enemy
-        # 显示api
-        self._touch_api = touch_api
 
         # 对错误值进行预测
         self.thre_predict = [4, 25]
@@ -100,8 +95,10 @@ class Alarm(draw_map.CompeteMap):
         for i in range(1, 6):  # 初始化位置为全零
             self._location[str(i)] = [0, 0]
             self._confidence[i] = 0
-        # 前两帧位置为全零
+        # 前一帧位置为全零
+        self._locations = [np.zeros((5, 2)), np.zeros((5, 2))]
         self._location_cache = self._location.copy()
+        self._last_location = self._location.copy()
 
     def push_T(self, rvec, tvec, camera_type):
         """
@@ -110,9 +107,7 @@ class Alarm(draw_map.CompeteMap):
         :param tvec:平移矩阵
         :param camera_type:相机编号，若为单相机填0
         """
-        if camera_type > 0 and not self._two_camera:
-            return
-
+        self._loc_D[camera_type].push_T(rvec, tvec)
         T = np.eye(4)
         T[:3, :3] = cv.Rodrigues(rvec)[0]  # 旋转向量转化为旋转矩阵
         T[:3, 3] = tvec.reshape(-1)  # 加上平移向量
@@ -121,10 +116,8 @@ class Alarm(draw_map.CompeteMap):
         self._camera_position[camera_type] = camera_position.copy()
         self._T[camera_type] = T.copy()
 
-    def push_RT(self, rvec, tvec, camera_type):
-        if not self._two_camera and not self.using_d:
-            return
-        self._loc_D[camera_type].push_T(rvec, tvec)
+    def change_mode(self, camera_type):
+        self.state[camera_type] = (self.state[camera_type] + 1) % 4
 
     def _check_alarm(self):
         """
@@ -132,23 +125,20 @@ class Alarm(draw_map.CompeteMap):
         alarming:各区域是否有预警;
         base_alarming:基地是否有预警
         """
-        alarming = False
-        base_alarming = False
+
         str_text = ""
         for loc in self._region.keys():
             alarm_type, shape_type, team, target, l_type = loc.split('_')
             targets = []
             # 检测敌方
             for armor in list(self._location.keys())[0:5]:
-                l = np.float32(self._location[armor])
+                l_ = np.float32(self._location[armor])
                 if alarm_type == 'm' or alarm_type == 'a':  # 若为位置预警
                     if shape_type == 'r' and (
                             target in enemy_case or color2enemy[team] == self._enemy):  # 对于特殊地点，只考虑对敌方进行预警
                         # 矩形区域采用范围判断
-                        # if l[0] >= self._region[loc][0] and l[1] >= self._region[loc][3] and \
-                        #         l[0] <= self._region[loc][2] and l[1] <= self._region[loc][1]:
-                        if l[0] <= self._region[loc][0] and l[1] >= self._region[loc][3] and \
-                               l[0] >= self._region[loc][2] and l[1] <= self._region[loc][1]:
+                        if self._region[loc][0] >= l_[0] >= self._region[loc][2] \
+                                and self._region[loc][3] <= l_[1] <= self._region[loc][1]:
                             targets.append(armor)
                     # base alarm
                     if shape_type == 'l' and color2enemy[team] != self._enemy:
@@ -158,88 +148,74 @@ class Alarm(draw_map.CompeteMap):
                         dis_thres = self._region[loc][4]
                         up_l = up_p - dw_p  # 直线向上的向量
                         dw_l = dw_p - up_p  # 直线向下的向量
-                        m_r = np.float32([up_l[1], -up_l[0]])  # 方向向量，向右
-                        m_l = np.float32([-up_l[1], up_l[0]])  # 方向向量，向左
+                        m_r = np.array([up_l[1], -up_l[0]], dtype=np.float32)  # 方向向量，向右
+                        m_l = np.array([-up_l[1], up_l[0]], dtype=np.float32)  # 方向向量，向左
 
                         def f_dis(m):
-                            return m @ (l - dw_p) / \
+                            return m @ (l_ - dw_p) / \
                                    np.linalg.norm(m)  # 计算从下端点到物体点在各方向向量上的投影
 
                         if l_type == 'l':
                             dis = f_dis(m_l)
-                        if l_type == 'r':
+                        elif l_type == 'r':
                             dis = f_dis(m_r)
-                        if l_type == 'a':
+                        else:  # l_type == 'a'
                             dis = abs(f_dis(m_r))  # 绝对距离
                         # 当物体位置在线段内侧，且距离小于阈值时，预警
-                        if up_l @ (l - dw_p) > 0 and dw_l @ (l - up_p) > 0 and \
+                        if up_l @ (l_ - dw_p) > 0 and dw_l @ (l_ - up_p) > 0 and \
                                 dis_thres >= dis >= 0:
                             targets.append(armor)
                     if shape_type == 'fp' and (target not in enemy_case or color2enemy[team] == self._enemy):
                         # 判断是否在凸四边形内
-                        if is_inside(np.float32(self._region[loc][:8]).reshape(4, 2), point=l):
+                        if is_inside(np.float32(self._region[loc][:8]).reshape(4, 2), point=l_):
                             targets.append(armor)
 
             if len(targets):
                 # 发送预警
                 if alarm_type == 'l':
                     # 基地预警发送，编码规则详见主程序类send_judge
-                    base_alarming = True
                     # 车辆编号输出
                     self._touch_api("INFO", "位置预警-信息输出", f"targets:{targets}")
                 else:
-                    super(Alarm, self)._add_twinkle(loc)
-                    alarming = True
+                    self._add_twinkle(loc)
                     targets_text = ' '.join(targets)
                     str_text += f"{target}出现{team} {targets_text}\n"
 
         self._touch_api(
             "WARNING", "位置预警-信息输出", str_text)
 
-        return alarming, base_alarming
-
-    def _adjust_z_one_armor(self, l, camera_type):
+    def _adjust_z_one_armor(self, l_, camera_type):
         """
         z轴突变调整，仅针对一个装甲板
-        :param l:(cls+x+y+z) 一个id的位置
+        :param l_:(cls+x+y+z) 一个id的位置
         :param camera_type:相机编号
         """
         if isinstance(self._z_cache[camera_type], np.ndarray):
             # 检查上一帧缓存z坐标中有没有对应id
-            mask = np.array(self._z_cache[camera_type][:, 0] == l[0])
+            mask = np.array(self._z_cache[camera_type][:, 0] == l_[0])
             if mask.any():
                 z_0 = self._z_cache[camera_type][mask][:, 1]
                 if z_0 < self._ground_thre:  # only former is on ground do adjust
-                    z = l[3]
+                    z = l_[3]
                     if z - z_0 > self._z_thre:  # only adjust the step from down to up
                         # 以下计算过程详见技术报告公式
-                        ori = l[1:].copy()
-                        line = l[1:] - self._camera_position[camera_type]
+                        ori = l_[1:].copy()
+                        line = l_[1:] - self._camera_position[camera_type]
                         ratio = (
                                         z_0 - self._camera_position[camera_type][2]) / line[2]
                         new_line = ratio * line
-                        l[1:] = new_line + self._camera_position[camera_type]
+                        l_[1:] = new_line + self._camera_position[camera_type]
                         if self._debug:
                             # z轴变换debug输出
-                            # print('{0} from'.format(armor_list[(self._ids[int(l[0])]) - 1]), ori, 'to', l[1:])
                             print('{0} from'.format(
-                                armor_list[int(l[0]) - 1]), ori, 'to', l[1:])
-
-    def show(self):
-        """
-        执行预警闪烁并画点显示地图
-        """
-        self._update(self._location)
-        self._refresh()
-        self._twinkle(self._region)
-        self._show()
+                                armor_list[int(l_[0]) - 1]), ori, 'to', l_[1:])
 
     def _location_prediction(self):
         """
         位置预测
         """
-
         # 上两帧位置 (2,N)
+        a = list(self._location_cache.values())
         pre = np.float32(list(self._location_cache.values()))
         # 该帧预测位置
         now = np.float32(list(self._location.values()))
@@ -262,13 +238,12 @@ class Alarm(draw_map.CompeteMap):
         for i in range(1, 6):
             if self._confidence[i] >= self.con_thre:
                 self._location[str(i)] = now[i - 1].tolist()
+                self._last_location[str(i)] = now[i - 1].tolist()
             else:
                 self._location[str(i)] = [0, 0]
 
         # push new data
         self._location_cache = self._location.copy()
-
-
 
     def check(self):
         """
@@ -276,280 +251,150 @@ class Alarm(draw_map.CompeteMap):
         """
         self._check_alarm()
 
-    def two_camera_merge_update(self, locations, extra_locations):
+    def two_camera_merge_update(self, t_locations_left, t_locations_right):
         """
-        两个相机合并更新，顾名思义，two_camera为True才能用的专属api
-        :param locations: the list of the predicted locations [N,cls+x+y+z] of the both two cameras
-        :param extra_locations: the list of iou prediction [:,cls+x0+y0+z] of the both two cameras
+        :param t_locations_left: the list of the predicted locations [N,cls+x+y+z] of the both two cameras
+        :param t_locations_right: the list of the predicted locations [N,cls+x+y+z] of the both two cameras
         """
-        if self._two_camera:
-            # init location
-            for i in range(1, 6):
+        # init location
+        for i in range(1, 6):
+            self._location[str(i)] = [0, 0]
+
+        self._update_position(t_locations_left, 0, self.state[0])
+        self._update_position(t_locations_right, 1, self.state[1])
+
+        # 左相机 定位点
+        left_location = self._locations[0]
+        # 右相机 定位点
+        right_location = self._locations[1]
+
+        left_zero = self._f_equal_zero(left_location)
+        right_zero = self._f_equal_zero(right_location)
+
+        choose = np.logical_and(left_zero, np.logical_not(right_zero))
+        try:
+            left_location[choose] = right_location[choose]
+        except Exception as e:
+            print(choose)
+        # 预测填入
+        for i in range(1, 6):
+            self._location[str(i)] = left_location[i - 1].tolist()
+
+        if self._lp:
+            self._location_prediction()
+
+        if self.reset_count == self.reset_thre:
+            self.reset_count = 0
+            for i in range(1, 6):  # 初始化位置为全零
                 self._location[str(i)] = [0, 0]
-            rls = []
-            ex_rls = []
-            for location in locations:  # 车辆预测框列表，列表元素格式为[N,cls+x+y+z]
-                # 对左右两相机获取结果进行处理
-                if isinstance(location, np.ndarray):
-                    # 滤除nan
-                    # 当location中有一数组对应z值为nan，对应false
-                    mask = np.logical_not(np.any(np.isnan(location), axis=1))
-                    # rls对应格式为(N,cls+x0+y0+z)，只添加location中z值存在的对应数据
-                    rls.append(location[mask])
-                else:
-                    rls.append(None)
-
-            for e_location in extra_locations:  # 对iou预测装甲板进行解析
-                if isinstance(e_location, np.ndarray):
-                    # 滤除nan
-                    mask = np.logical_not(np.any(np.isnan(e_location), axis=1))
-                    ex_rls.append(e_location[mask])
-                else:
-                    ex_rls.append(None)
-
-            pred_loc = []  # 存储预测的位置 cls+x+y+z
-            if self._z_a:
-                pred_1 = []
-                pred_2 = []
-
-            # for armor in self._ids.keys():
-            for armor in range(1, 11):
-                l1 = None  # 对于特定id，第一个相机基于直接神经网络预测装甲板计算出的位置
-                l2 = None  # 对于特定id，第二个相机基于直接神经网络预测装甲板计算出的位置
-                el1 = None  # 对于特定id，第一个相机基于IoU预测装甲板计算出的位置
-                el2 = None  # 对于特定id，第二个相机基于IoU预测装甲板计算出的位置
-                al1 = None  # 对于特定id，第一个相机预测出的位置
-                al2 = None  # 对于特定id，第二个相机预测出的位置
-
-                # 若有直接神经网络预测的装甲板则直接使用，否则使用IoU预测出的装甲板
-                # 第一个相机数据处理
-                if isinstance(rls[0], np.ndarray):
-                    mask = rls[0][:, 0] == armor
-                    if mask.any():  # 神经网络预测装甲板编号有对应
-                        l1 = rls[0][mask].reshape(-1)
-                        # 坐标换算为世界坐标
-                        l1[1:] = (self._T[0] @ np.concatenate([np.concatenate([l1[1:3], np.ones(1)], axis=0) *
-                                                               l1[3], np.ones(1)], axis=0))[:3]
-                        # z坐标解算
-                        if self._z_a:
-                            self._adjust_z_one_armor(l1, 0)
-                        al1 = l1
-                    else:
-                        if isinstance(ex_rls[0], np.ndarray):
-                            mask = ex_rls[0][:, 0] == armor
-                            if mask.any():
-                                el1 = ex_rls[0][mask].reshape(-1)
-                                el1[1:] = (self._T[0] @ np.concatenate(
-                                    [np.concatenate([el1[1:3], np.ones(1)], axis=0) * el1[3], np.ones(1)], axis=0))[:3]
-                                if self._z_a:
-                                    self._adjust_z_one_armor(el1, 1)
-                                al1 = el1
-
-                # 第二个相机处理
-                if isinstance(rls[1], np.ndarray):
-                    mask = rls[1][:, 0] == armor
-                    if mask.any():
-                        l2 = rls[1][mask].reshape(-1)
-                        l2[1:] = (self._T[1] @ np.concatenate([np.concatenate([l2[1:3], np.ones(1)], axis=0) *
-                                                               l2[3], np.ones(1)], axis=0))[:3]
-                        if self._z_a:
-                            self._adjust_z_one_armor(l2, 1)
-                            al2 = l2
-                    else:
-                        if isinstance(ex_rls[1], np.ndarray):
-                            mask = ex_rls[1][:, 0] == armor
-                            if mask.any():
-                                el2 = ex_rls[1][mask].reshape(-1)
-                                el2[1:] = (self._T[1] @ np.concatenate(
-                                    [np.concatenate([el2[1:3], np.ones(1)], axis=0) * el2[3], np.ones(1)], axis=0))[:3]
-                                if self._z_a:
-                                    self._adjust_z_one_armor(el2, 1)
-                                al2 = el2
-
-                if self._z_a:
-                    if isinstance(al1, np.ndarray):
-                        pred_1.append(al1[[0, 3]])  # cache cls+z
-                    if isinstance(al2, np.ndarray):
-                        pred_2.append(al2[[0, 3]])
-
-                # 数据融合
-                armor_pred_loc = None
-                if isinstance(l1, np.ndarray):
-                    armor_pred_loc = l1.reshape(-1)
-                if isinstance(l2, np.ndarray):
-                    if isinstance(armor_pred_loc, np.ndarray):  # 只有左相机有数据，以左相机为准
-                        if not self._using_l1:
-                            # 若_using_l1为真，则不取均值，以右相机为准
-                            armor_pred_loc = (
-                                                     armor_pred_loc + l2.reshape(-1)) / 2
-                    else:
-                        armor_pred_loc = l2.reshape(-1)
-
-                if isinstance(armor_pred_loc, np.ndarray):
-                    pred_loc.append(armor_pred_loc)
-
-            # z cache
-            if self._z_a:
-                if len(pred_1):
-                    self._z_cache[0] = np.stack(pred_1, axis=0)
-                else:
-                    self._z_cache[0] = None
-                if len(pred_2):
-                    self._z_cache[1] = np.stack(pred_2, axis=0)
-                else:
-                    self._z_cache[1] = None
-
-            # 发送裁判系统小地图
-            judge_loc = {}
-            if len(pred_loc):
-                pred_loc = np.stack(pred_loc, axis=0)
-                pred_loc[:, 2] = self._real_size[1] + pred_loc[:, 2]  # 坐标变换，平移
-                for i, armor in enumerate(pred_loc[:, 0]):
-                    self._location[str(armor)] = pred_loc[i, 1:3].tolist()  # 类成员只存(x,y)信息
-                    judge_loc[str(armor)] = pred_loc[i, 1:].tolist()  # 发送包存三维信息
-            location = {}
-            # 位置预测
-            if self._lp:
-                self._location_prediction()
-            if self._debug:
-                # 位置debug输出
-                str_debut_output = ""
-                for armor, loc in judge_loc.items():
-                    str_debut_output += "{0} in ({1:.3f},{1:.3f},{1:.3f})\n".format(armor_list[int(armor) - 1], *loc)
-
-                self._touch_api("INFO", "位置预警-debug输出", str_debut_output)
-            for i in range(1, 6):
-                location[str(i)] = self._location[str(i)].copy()
-
-            # 执行裁判系统发送
-            # judge_loc为未预测的位置，作为logging保存，location为预测过的位置，作为小地图发送
-            self._touch_api("INFO", "位置预警-位置输出", f"judge_loc:{judge_loc} location:{location}")
-
-            # 返回车辆位置字典
-            return self._location
-
+            # 前一帧位置为全零
+            self._location_cache = self._location.copy()
         else:
-            self._touch_api(
-                "ERROR", "相机数目不符合", "This update function only supports two_camera case, using update instead.")
+            self.reset_count += 1
 
-    def update(self, t_location, e_location):
+    def _update_position(self, t_location, camera_type, detection_type):
         """
         #单相机使用
         :param t_location: the predicted locations [N,cls+x+y+z]
-        :param e_location: iou prediction [:,cls+x0+y0+z]
+        :param camera_type: 0: left 1: right
+        :param detection_type: 0: radar 1: Delaunary 2: kd_tree
         """
+        # 位置信息初始化，上次信息已保存至cache
+        self._locations[camera_type].fill(0)
 
-        if not self._two_camera:
+        locations = None
 
-            # 位置信息初始化，上次信息已保存至cache
-            for i in range(1, 6):
-                self._location[str(i)] = [0, 0]
+        if isinstance(t_location, np.ndarray):
+            # 当t_location中有一数组对应z值为nan，对应false
+            mask = np.logical_not(np.any(np.isnan(t_location), axis=1))
+            locations = t_location[mask]
 
-            locations = None
-            if isinstance(t_location, np.ndarray):
-                # 当t_location中有一数组对应z值为nan，对应false
-                mask = np.logical_not(np.any(np.isnan(t_location), axis=1))
-                locations = t_location[mask]
-
-            if isinstance(e_location, np.ndarray):
-                # nan滤除
-                mask = np.logical_not(np.any(np.isnan(e_location), axis=1))
-                ex_rls = e_location[mask]
-                if isinstance(locations, np.ndarray):
-                    locations = np.concatenate([locations, ex_rls], axis=0)
-                else:
-                    locations = ex_rls
-            judge_loc = {}
-            if isinstance(locations, np.ndarray):
-                pred_loc = []
-                if self._z_a:
-                    cache_pred = []
-                locations[1:3] = np.around(locations[1:3])
-                for armor in range(1, 6):
-                    if (locations[:, 0] == armor).any():
-                        if not self.using_d:
-                            l1 = locations[locations[:, 0]
-                                           == armor].reshape(-1)
-
-                            K_C = np.linalg.inv(self._K_O)
-                            C = (K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[
-                                3] * 1000
-                            B = np.concatenate(
-                                [np.array(C).flatten(), np.ones(1)], axis=0)
-                            l1[1:] = (self._T[0] @ B)[:3] / 1000
-                        else:
-                            l1 = locations[locations[:, 0]
-                                           == armor].reshape(-1)
-                            l1[1:] = self._loc_D[0].get_point_pos(l1).reshape(-1)
-                        if np.isnan(l1).any():
-                            continue
-                        # 异常值处理
-                        if l1[1] > self.thre_predict[1] or l1[1] < self.thre_predict[0]:
-                            continue
-                        self._confidence[armor] = min(1.1, self._confidence[armor] + self.con_incre)
-                        if self._confidence[armor] < self.con_thre:
-                            continue
-                        if self._z_a:
-                            self._adjust_z_one_armor(l1, 0)
-                            cache_pred.append(l1[[0, 3]])
-                        pred_loc.append(l1.reshape(-1))
+        if isinstance(locations, np.ndarray):
+            pred_loc = []
+            if self._z_a:
+                cache_pred = []
+            locations[1:3] = np.around(locations[1:3])
+            for armor in range(1, 6):
+                if (locations[:, 0] == armor).any():
+                    if not detection_type and not camera_type:
+                        l1 = locations[locations[:, 0]
+                                       == armor].reshape(-1)
+                        K_C = np.linalg.inv(self._K_O)
+                        C = (K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[
+                            3] * 1000
+                        B = np.concatenate(
+                            [np.array(C).flatten(), np.ones(1)], axis=0)
+                        l1[1:] = (self._T[0] @ B)[:3] / 1000
                     else:
-                        if self._confidence[armor] > self.con_thre:
-                            self._confidence[armor] -= self.con_decre2
-                        else:
-                            self._confidence[armor] -= self.con_decre1
-                            self._confidence[armor] = max(0, self._confidence[armor])
-
-                if len(pred_loc):
-                    l = np.stack(pred_loc, axis=0)
-                    cls = l[:, 0].reshape(-1, 1)
-                    # z cache
+                        l1 = locations[locations[:, 0]
+                                       == armor].reshape(-1)
+                        l1[1:] = self._loc_D[camera_type].get_point_pos(l1, detection_type).reshape(-1)
+                    if np.isnan(l1).any():
+                        continue
+                    # 异常值处理
+                    if l1[1] > self.thre_predict[1] or l1[1] < self.thre_predict[0]:
+                        continue
+                    self._confidence[armor] = min(1.1, self._confidence[armor] + self.con_incre)
+                    if self._confidence[armor] < self.con_thre:
+                        continue
                     if self._z_a:
-                        self._z_cache[0] = np.stack(cache_pred, axis=0)
+                        self._adjust_z_one_armor(l1, 0)
+                        cache_pred.append(l1[[0, 3]])
+                    pred_loc.append(l1.reshape(-1))
+                else:
+                    if self._confidence[armor] > self.con_thre:
+                        self._confidence[armor] -= self.con_decre2
+                    else:
+                        self._confidence[armor] -= self.con_decre1
+                        self._confidence[armor] = max(0., self._confidence[armor])
 
-                    for i, armor in enumerate(cls):
-                        self._location[str(int(armor))] = l[i, 1:3].tolist()
-                        judge_loc[str(armor)] = l[i, 1:].tolist()
+            if len(pred_loc):
+                l_ = np.stack(pred_loc, axis=0)
+                choose = l_[:, 0].reshape(-1).astype(np.int32)
+                choose = choose - np.ones_like(choose)
+                # z cache
+                if self._z_a:
+                    self._z_cache[0] = np.stack(cache_pred, axis=0)
 
-            if self._lp:
-                self._location_prediction()
-
-            if self.reset_count == self.reset_thre:
-                self.reset_count = 0
-                for i in range(1, 6):  # 初始化位置为全零
-                    self._location[str(i)] = [0, 0]
-                # 前一帧位置为全零
-                self._location_cache = self._location.copy()
-            else:
-                self.reset_count += 1
-        else:
-            self._touch_api(
-                "ERROR", "相机数目不符合", "This update function only supports single_camera case, using "
-                                    "two_camera_merge_update instead.")
+                self._locations[camera_type][choose] = l_[:, 1:3].copy()
 
     def get_location(self):
         return np.array(list(self._location.values()))[:5, :]
 
-    def pc_location(self, armor: np.ndarray):
+    def get_mode(self):
+        return f"左相机定位：{self.state_name[self.state[0]]}\n" \
+               f"右相机定位：{self.state_name[self.state[1]]}"
+
+    def pc_location(self, camera_type, armor: np.ndarray):
         """
         显示点云定位
         """
         self._refresh()
-        if not self.using_d:
+        if not camera_type and not self.state[camera_type]:
             l1 = armor.reshape(-1)
             K_C = np.linalg.inv(self._K_O)
-            C = (K_C @ np.concatenate([l1[0:2], np.ones(1)], axis=0).reshape(3, 1)) * l1[2] * 1000
+            C = (K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[3] * 1000
             B = np.concatenate(
                 [np.array(C).flatten(), np.ones(1)], axis=0)
-            l1 = (self._T[0] @ B)[:3] / 1000
+            l1[1:] = (self._T[0] @ B)[:3] / 1000
         else:
             l1 = armor.reshape(-1)
-            l1 = self._loc_D[0].get_point_pos(l1).reshape(-1)
+            l1[1:] = self._loc_D[camera_type].get_point_pos(l1, self.state[camera_type]).reshape(-1)
         try:
-            self._update({'6': l1})
+            self._update({'2': l1[1:3]}, {'2': l1[1:3]})
+            self._twinkle(self._region)
             self._show()
-        except:
-            pass
+        except Exception as e:
+            print(e)
 
-    def pc_draw(self, frame):
-        self._loc_D[0].draw_points(frame=frame)
+    def pc_draw(self, frame, camera_type):
+        self._loc_D[camera_type].draw_points(frame=frame)
+
+    def show(self):
+        """
+        执行预警闪烁并画点显示地图
+        """
+        self._update(self._location, self._last_location)
+        self._refresh()
+        self._twinkle(self._region)
+        self._show()

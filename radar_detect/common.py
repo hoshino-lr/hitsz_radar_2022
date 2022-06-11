@@ -57,6 +57,8 @@ def armor_filter(armors: np.ndarray):
             armors = np.stack(results, axis=0)
             for i in range(0, len(results)):
                 armors[i][13] = i
+        else:
+            armors = np.array(results)
     return armors
 
 

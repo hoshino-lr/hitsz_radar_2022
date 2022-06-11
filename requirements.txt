@@ -1,8 +1,5 @@
-numpy==1.17.4
 pycuda==2020.1
-PyQt5==5.14
-pyserial==3.5
-rosbag==1.15.14
-rospy==1.15.14
-sensor_msgs==1.13.1
-tensorrt==8.4.0.6
+PyQt5==5.15.6
+rosbag>=1.15.14
+rospy>=1.15.14
+sensor_msgs>=1.13.1

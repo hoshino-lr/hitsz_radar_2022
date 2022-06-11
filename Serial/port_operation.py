@@ -10,13 +10,15 @@ from resources.config import enemy_color, BO
 class Port_operate(object):
     _bytes2int = lambda x: (0x0000 | x[0]) | (x[1] << 8)
 
+    hero_alarm_type = 1
+
     _Robot_positions = np.zeros((5, 2), dtype=np.float32)  # 敌方所有机器人坐标
     _Now_stage = 0
     _Game_Start_Flag = False
     _Game_End_Flag = False
     Remain_time = 0  # 剩余时间
 
-    change_view = False
+    change_view = -1
     missile_stage = False  # into stage 2
 
     _init_hp = np.ones(10, dtype=int) * 500  # 初始血量
@@ -148,9 +150,42 @@ class Port_operate(object):
             return False
 
     @staticmethod
+    def get_alarm_type():
+        return Port_operate.hero_alarm_type
+
+    @staticmethod
     def Receive_Robot_Data(buffer):
         # 车间通信
-        if buffer[13] == 0:
-            pass
-        if buffer[14] == 0:
-            pass
+        if Port_operate._Game_Start_Flag:
+            Port_operate.change_view = buffer[13]
+        else:
+            Port_operate.change_view = -1
+
+    @staticmethod
+    def Hero_alarm(target_id, my_id, alarm_type, ser):
+        # 车间通信
+        buffer = [0]
+        buffer *= 19
+        buffer[0] = 0xA5
+        buffer[1] = 10
+        buffer[2] = 0
+        buffer[3] = 1
+        buffer[4] = official_Judge_Handler.myGet_CRC8_Check_Sum(id(buffer), 5 - 1, 0xff)  # 帧头 CRC8 校验
+        buffer[5] = 0x01
+        buffer[6] = 0x03
+        buffer[7] = 0x10
+        buffer[8] = 0x02
+        buffer[9] = my_id
+        buffer[10] = 0
+        buffer[11] = target_id
+        buffer[12] = 0
+        buffer[13] = alarm_type
+        buffer[14] = 0
+        buffer[15] = 0
+        buffer[16] = 0
+        official_Judge_Handler.Append_CRC16_Check_Sum(id(buffer), 19)
+        buffer_tmp_array = [0]
+        buffer_tmp_array *= 19
+        for i in range(19):
+            buffer_tmp_array[i] = buffer[i]
+        ser.write(bytearray(buffer_tmp_array))

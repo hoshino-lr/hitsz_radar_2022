@@ -11,7 +11,6 @@
 import cv2 as cv
 import numpy as np
 from resources.config import Delaunary_points, cam_config
-import math
 
 
 class location_Delaunay(object):
@@ -21,12 +20,13 @@ class location_Delaunay(object):
     rect_points = None
     debug_mode = False
 
-    def __init__(self, cam_side: str, debug: bool = False, rvec=None, tvec=None):
+    def __init__(self, cam_side: str, debug: bool = False, choose=list(range(0, 80, 1)), rvec=None, tvec=None):
         self.debug_mode = debug
         if cam_side in ["cam_left", "cam_right"]:
             t = Delaunary_points[int(debug)][cam_side]
             self.cam_rect = t[0]
             self.c_points = np.array(t[1]).reshape((-1, 3)) * 1000
+            self.c_points = self.c_points[list(np.array(choose)-1)]
             self._rvec = cam_config[cam_side]["rvec"]
             self._tvec = cam_config[cam_side]["tvec"]
             self._K_O = cam_config[cam_side]['K_0']
@@ -52,6 +52,7 @@ class location_Delaunay(object):
                 self.Dly.insert(tuple(i.tolist()))
         except Exception as e:
             print(f"[ERROR] {e}")
+        self.init_ok = True
 
     def _get_region(self):
         points = cv.projectPoints(self.c_points, self._rvec,
@@ -74,50 +75,56 @@ class location_Delaunay(object):
                 self.Dly.insert(tuple(i.tolist()))
         except Exception as e:
             print(f"[ERROR] {e}")
-        triangle = self.Dly.getTriangleList()
-        for i in triangle:
-            print(i)
+        # triangle = self.Dly.getTriangleList()
+        self.init_ok = True
 
-    def get_point_pos(self, l: np.ndarray):
-        if self.init_ok or l.shape[0] != 4:
-            return np.ndarray((3, 1), dtype=np.float64) * np.nan
+    def get_point_pos(self, l: np.ndarray, detect_type: int):
+        w_point = np.ndarray((3, 1), dtype=np.float64) * np.nan
+        if not self.init_ok or l.shape[0] != 4:
+            pass
         else:
-            # try:
-            #     res = self.Dly.findNearest(tuple(l[1:3]))[1]
-            #     w_point = self._cal_pos_vertex(res)
-            # except Exception as e:
-            #     w_point = np.ndarray((3, 1), dtype=np.float64) * np.nan
-            #     print(f"[ERROR] {e}")
-            #     print(f"[ERROR] {l[1:3]}")
-            try:
-                res = self.Dly.locate(tuple(l[1:3]))
-                value = res[0]
-                if value == cv.SUBDIV2D_PTLOC_ERROR:
-                    return np.ndarray((3, 1), dtype=np.float64) * np.nan
-                if value == cv.SUBDIV2D_PTLOC_INSIDE:
-                    first_edge = res[1]
-                    second_edge = self.Dly.getEdge(first_edge, cv.SUBDIV2D_NEXT_AROUND_LEFT)
-                    third_edge = self.Dly.getEdge(second_edge, cv.SUBDIV2D_NEXT_AROUND_LEFT)
-                    w_point = self._cal_pos_triangle(
-                        np.array([self.Dly.edgeDst(first_edge)[1],
-                                  self.Dly.edgeDst(second_edge)[1],
-                                  self.Dly.edgeDst(third_edge)[1],
-                                  ]),
-                        l[1:3]
-                    )
-                if value == cv.SUBDIV2D_PTLOC_ON_EDGE:
-                    first_edge = res[1]
-                    w_point = self._cal_pos_edge(
-                        np.array([self.Dly.edgeOrg(first_edge)[1],
-                                  self.Dly.edgeDst(first_edge)[1]
-                                  ]),
-                        l[1:3]
-                    )
-                if value == cv.SUBDIV2D_PTLOC_VERTEX:
-                    w_point = self._cal_pos_vertex(np.ndarray(self.cam_points[res[2]]))
-            except Exception as e:
+            if detect_type == 2:
+                try:
+                    res = self.Dly.findNearest(tuple(l[1:3]))[1]
+                    w_point = self._cal_pos_vertex(res)
+                except Exception as e:
+                    w_point = np.ndarray((3, 1), dtype=np.float64) * np.nan
+                    print(f"[ERROR] {e}")
+            elif detect_type == 1:
+                try:
+                    res = self.Dly.locate(tuple(l[1:3]))
+                    value = res[0]
+                    if value == cv.SUBDIV2D_PTLOC_ERROR:
+                        return np.ndarray((3, 1), dtype=np.float64) * np.nan
+                    if value == cv.SUBDIV2D_PTLOC_INSIDE:
+                        first_edge = res[1]
+                        second_edge = self.Dly.getEdge(first_edge, cv.SUBDIV2D_NEXT_AROUND_LEFT)
+                        third_edge = self.Dly.getEdge(second_edge, cv.SUBDIV2D_NEXT_AROUND_LEFT)
+                        w_point = self._cal_pos_triangle(
+                            np.array([self.Dly.edgeDst(first_edge)[1],
+                                      self.Dly.edgeDst(second_edge)[1],
+                                      self.Dly.edgeDst(third_edge)[1],
+                                      ]),
+                            l[1:3]
+                        )
+                    if value == cv.SUBDIV2D_PTLOC_ON_EDGE:
+                        first_edge = res[1]
+                        w_point = self._cal_pos_edge(
+                            np.array([self.Dly.edgeOrg(first_edge)[1],
+                                      self.Dly.edgeDst(first_edge)[1]
+                                      ]),
+                            l[1:3]
+                        )
+                    if value == cv.SUBDIV2D_PTLOC_VERTEX:
+                        w_point = self._cal_pos_vertex(np.ndarray(self.cam_points[res[2]]))
+                except Exception as e:
+                    w_point = np.ndarray((3, 1), dtype=np.float64) * np.nan
+                    print(f"[ERROR] {e}")
+            else:
                 w_point = np.ndarray((3, 1), dtype=np.float64) * np.nan
-            return w_point
+            if w_point.reshape(-1).shape[0] == 0:
+                w_point = np.ndarray((3, 1), dtype=np.float64) * np.nan
+        return w_point
 
     def _cal_pos_edge(self, pts: np.ndarray, pt) -> np.ndarray:
         if not self._check(pts):
