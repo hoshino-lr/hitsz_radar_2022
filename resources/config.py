@@ -93,6 +93,7 @@ real_size = (28., 15.)
 
 INIT_FRAME_PATH = os.path.dirname(os.path.abspath(__file__)) + "/beijing.png"
 
+# 
 region = \
     {
         'a_fp_red_环形高地1_a': [17.56, 7.81, 19.01, 8.25, 19.06, 5.40, 17.50, 5.86, 0.60],
