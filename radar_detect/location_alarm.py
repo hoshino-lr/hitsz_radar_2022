@@ -191,6 +191,10 @@ class Alarm(draw_map.CompeteMap):
         :param l_:(cls+x+y+z) 一个id的位置
         :param camera_type:相机编号
         """
+        # 定义函数内变量 z_reset_count 当z轴突变调整执行一定次数后，清空z轴缓存
+        if not hasattr(self._adjust_z_one_armor, 'z_reset_count'):
+            self._adjust_z_one_armor.z_reset_count = 0
+
         if isinstance(self._z_cache[camera_type], np.ndarray):
             # 检查上一帧缓存z坐标中有没有对应id
             mask = np.array(self._z_cache[camera_type][:, 0] == l_[0])
@@ -203,7 +207,7 @@ class Alarm(draw_map.CompeteMap):
                         ori = l_[1:].copy()
                         line = l_[1:] - self._camera_position[camera_type]
                         ratio = (
-                                        z_0 - self._camera_position[camera_type][2]) / line[2]
+                            z_0 - self._camera_position[camera_type][2]) / line[2]
                         new_line = ratio * line
                         l_[1:] = new_line + self._camera_position[camera_type]
                         if self._debug:
@@ -231,7 +235,8 @@ class Alarm(draw_map.CompeteMap):
             # 被预测id,debug输出
             for i in range(5):
                 if do_prediction[i]:
-                    self._touch_api("INFO", "位置预警-debug输出", "{0} lp yes".format(armor_list[i]))
+                    self._touch_api("INFO", "位置预警-debug输出",
+                                    "{0} lp yes".format(armor_list[i]))
 
         now[do_prediction] = pre[do_prediction]
 
