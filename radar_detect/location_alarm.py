@@ -343,14 +343,14 @@ class Alarm(draw_map.CompeteMap):
                                 # 矩形区域采用范围判断
                                 if shape_type == 'r':
                                     # 车辆在对应区域内，则不做处理
-                                    if self._region[i][0] >= l1[0] >= self._region[i][2] \
-                                            and self._region[i][3] <= l1[1] <= self._region[i][1]:
+                                    if self._region[i][0] >= l1[1] >= self._region[i][2] \
+                                            and self._region[i][3] <= l1[2] <= self._region[i][1]:
                                         break
                                     
                                 # 判断是否在凸四边形内
                                 if shape_type == 'fp':
                                     # 车辆在对应区域内，则不做处理
-                                    if is_inside(np.float32(self._region[i][:8]).reshape(4, 2), point=l1):
+                                    if is_inside(np.float32(self._region[i][:8]).reshape(4, 2), point=l1[1:3]):
                                         break
                                 # 反投影模块与雷达点云信息不匹配，采用德劳内定位
                                 else:
