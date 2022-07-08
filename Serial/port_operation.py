@@ -2,7 +2,7 @@
 串口相关操作类
 """
 import numpy as np
-
+import time
 from .official import Game_data_define, official_Judge_Handler
 from resources.config import enemy_color, BO
 
@@ -13,13 +13,15 @@ class Port_operate(object):
     hero_alarm_type = 1
 
     _Robot_positions = np.zeros((5, 2), dtype=np.float32)  # 敌方所有机器人坐标
+    _Robot_decisions = np.zeros((5, 2), dtype=np.float32)  # 我方所有机器人状态
     _Now_stage = 0
+    _Now_state = 0
+    _last_state = 0
     _Game_Start_Flag = False
     _Game_End_Flag = False
     Remain_time = 0  # 剩余时间
 
     change_view = -1
-    missile_stage = False  # into stage 2
 
     _init_hp = np.ones(10, dtype=int) * 500  # 初始血量
     _HP = np.ones(16, dtype=int) * 500  # 血量
@@ -31,6 +33,10 @@ class Port_operate(object):
     _BO = 0
     _stage = ["NOT START", "PREPARING", "CHECKING", "5S", "PLAYING", "END"]
 
+    _state = ["normal", "small_energy", "big_energy"]
+
+    _energy_time = 0
+
     def __init__(self):
         pass
 
@@ -40,15 +46,30 @@ class Port_operate(object):
         Port_operate._Robot_positions = np.float32(positions)
 
     @staticmethod
+    def gain_decisions(decisions):
+        # 传入位置
+        Port_operate._Robot_decisions = np.float32(decisions)
+
+    @staticmethod
     def positions():
         # 传出位置
         return Port_operate._Robot_positions
 
     @staticmethod
+    def decisions():
+        # 传出位置
+        return Port_operate._Robot_decisions
+
+    @staticmethod
+    def get_state():
+        # 传出位置
+        return [Port_operate._Now_state, Port_operate._energy_time]
+
+    @staticmethod
     def Map(targetId, x, y, ser):
-        '''
+        """
         小地图数据处理
-        '''
+        """
         buffer = [0]
         buffer *= 19
 
@@ -150,21 +171,39 @@ class Port_operate(object):
             return False
 
     @staticmethod
-    def get_alarm_type():
-        return Port_operate.hero_alarm_type
-
-    @staticmethod
     def Receive_Robot_Data(buffer):
         # 车间通信
         if Port_operate._Game_Start_Flag:
             Port_operate.change_view = buffer[13]
         else:
             Port_operate.change_view = -1
-        # Port_operate.change_view = buffer[13]
-        # print(Port_operate.change_view)
 
     @staticmethod
-    def Hero_alarm(target_id, my_id, alarm_type, ser):
+    def Receive_State_Data(buffer):
+        # 能量机关状态
+        s_energy = (buffer[7] >> 4) & 0x1
+        b_energy = (buffer[7] >> 5) & 0x1
+        if s_energy == 1:
+            Port_operate._Now_state = 1
+        elif b_energy == 1:
+            Port_operate._Now_state = 2
+        else:
+            Port_operate._Now_state = 0
+        if Port_operate._last_state != Port_operate._Now_state:
+            if Port_operate._Now_state == 1:
+                Port_operate._energy_time = time.time()
+            elif Port_operate._Now_state == 1:
+                Port_operate._energy_time = time.time()
+            else:
+                Port_operate._energy_time = 0
+            Port_operate._last_state = Port_operate._Now_state
+        else:
+            if time.time() - Port_operate._energy_time >= 45:
+                Port_operate._Now_state = Port_operate._last_state = 0
+                Port_operate._energy_time = 0
+
+    @staticmethod
+    def robo_alarm(target_id, my_id, alarm_type, attack_target, ser):
         # 车间通信
         buffer = [0]
         buffer *= 19
@@ -182,7 +221,7 @@ class Port_operate(object):
         buffer[11] = target_id
         buffer[12] = 0
         buffer[13] = alarm_type
-        buffer[14] = 0
+        buffer[14] = attack_target
         buffer[15] = 0
         buffer[16] = 0
         official_Judge_Handler.Append_CRC16_Check_Sum(id(buffer), 19)
@@ -191,3 +230,75 @@ class Port_operate(object):
         for i in range(19):
             buffer_tmp_array[i] = buffer[i]
         ser.write(bytearray(buffer_tmp_array))
+
+    @staticmethod
+    def Map_Transmit(ser):
+        class Count(object):
+            r_id = 1
+            b_id = 101
+            nID = 0
+
+        # 画小地图
+        position = Port_operate.positions()[Count.nID]
+        x, y = position
+        # 坐标为零则不发送
+        if np.isclose(position, 0).all():
+            flag = False
+        else:
+            flag = True
+        # 敌方判断
+        if enemy_color == 0:
+            # 敌方为红方
+            if flag:
+                Port_operate.Map(Count.r_id, np.float32(x), np.float32(y), ser)
+                time.sleep(0.1)
+            if Count.r_id == 5:
+                Count.r_id = 1
+            else:
+                Count.r_id += 1
+        if enemy_color == 1:
+            # 敌方为蓝方
+            if flag:
+                Port_operate.Map(Count.b_id, np.float32(x), np.float32(y), ser)
+                time.sleep(0.1)
+            if Count.b_id == 105:
+                Count.b_id = 101
+            else:
+                Count.b_id += 1
+        Count.nID = (Count.nID + 1) % 5
+
+    @staticmethod
+    def port_send(ser):
+        Port_operate.Map_Transmit(ser)
+        Port_operate.port_manager(ser)
+
+    @staticmethod
+    def port_manager(ser):
+        class Count(object):
+            r_id = 1
+            b_id = 101
+            nID = 0
+
+        # 英雄飞坡预警
+        alarm_type = Port_operate.decisions()[Count.nID][0]
+        attack_target = Port_operate.decisions()[Count.nID][1]
+        # 敌方判断
+        if enemy_color == 0:
+            # 敌方为红方
+            my_id = 109
+            Port_operate.robo_alarm(Count.b_id, my_id, alarm_type, attack_target, ser)
+            time.sleep(0.1)
+            if Count.b_id == 105:
+                Count.b_id = 101
+            else:
+                Count.b_id += 1
+        if enemy_color == 1:
+            # 敌方为蓝方
+            my_id = 9
+            Port_operate.robo_alarm(Count.b_id, my_id, alarm_type, attack_target, ser)
+            time.sleep(0.1)
+            if Count.r_id == 5:
+                Count.r_id = 1
+            else:
+                Count.r_id += 1
+        Count.nID = (Count.nID + 1) % 5

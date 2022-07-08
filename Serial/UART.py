@@ -1,20 +1,13 @@
 """
 串口通信
 """
-import time
-
-import numpy as np
 from .official import official_Judge_Handler, Game_data_define
 from .port_operation import Port_operate
-from resources.config import enemy_color
-from .HP_show import HP_scene
 
 buffer = [0] * 50
 bufferbyte = 0
 cmd_id = 0
-r_id = 1
-b_id = 101
-nID = 0
+
 
 Game_state = Game_data_define.game_state()
 Game_result = Game_data_define.game_result()
@@ -92,7 +85,7 @@ def read(ser):
         # 场地事件数据
         if bufferbyte == 12 and cmd_id == 0x0101:
             if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 13):
-                Game_event_data.event_type = [buffer[7], buffer[8], buffer[9], buffer[10]]  # 储存但未使用
+                Port_operate.Receive_State_Data(buffer)
                 read_init(buffer)
                 continue
 
@@ -120,61 +113,5 @@ def read(ser):
         bufferbyte += 1
 
 
-def Map_Transmit(ser):
-    # 画小地图
-    global r_id, b_id, nID
-    loop_send = 0
-    position = Port_operate.positions()[nID]
-    x, y = position
-    # 坐标为零则不发送
-    if np.isclose(position, 0).all():
-        flag = False
-    else:
-        flag = True
-    # 敌方判断
-    if enemy_color == 0:
-        # 敌方为红方
-        if flag:
-            Port_operate.Map(r_id, np.float32(x), np.float32(y), ser)
-            time.sleep(0.1)
-            loop_send += 1
-        if r_id == 5:
-            r_id = 1
-        else:
-            r_id += 1
-    if enemy_color == 1:
-        # 敌方为蓝方
-        if flag:
-            Port_operate.Map(b_id, np.float32(x), np.float32(y), ser)
-            time.sleep(0.1)
-            loop_send += 1
-        if b_id == 105:
-            b_id = 101
-        else:
-            b_id += 1
-    if nID == 4:
-        if loop_send == 0:
-            time.sleep(0.1)
-        loop_send = 0
-    nID = (nID + 1) % 5
-
-
-def Hero_Transmit(ser):
-    # 英雄飞坡预警
-    alarm_type = Port_operate.get_alarm_type()
-    # 敌方判断
-    if enemy_color == 0:
-        # 敌方为红方
-        my_id = 109
-        Port_operate.Hero_alarm(101, my_id, alarm_type, ser)
-    if enemy_color == 1:
-        # 敌方为蓝方
-        my_id = 9
-        Port_operate.Hero_alarm(1, my_id, alarm_type, ser)
-    time.sleep(0.1)
-
-
 def write(ser):
-    while True:
-        Map_Transmit(ser)
-        Hero_Transmit(ser)
+    Port_operate.port_send(ser)

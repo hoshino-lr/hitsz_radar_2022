@@ -1,5 +1,7 @@
 """
 飞镖预警
+基于上海交通大学的程序进行了修改，可以计算飞镖发射个数
+已弃用
 """
 import cv2
 import numpy as np
@@ -254,26 +256,3 @@ class Missile(object):
         self._text_api("INFO", "missile", "")
 
 
-if __name__ == '__main__':
-    region = {'1': 0}
-    t = Missile(0)
-    cap = cv2.VideoCapture()
-    cap.open("1.mp4")
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if ret:
-
-            t.detect(frame, region, 0)
-
-        else:
-            print("视频播放完成！")
-            break
-
-        # 退出播放
-        key = cv2.waitKey(30)
-        if key == 27:  # 按键esc
-            break
-
-        # 3.释放资源
-    cap.release()
-    cv2.destroyAllWindows()

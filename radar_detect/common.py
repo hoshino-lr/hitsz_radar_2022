@@ -1,22 +1,20 @@
-'''
+"""
 common.py
 对于所有类都有用的函数
 对上海交通大学源代码进行了一些删减
 最终修改 by 李龙 2021/1/14
-'''
+"""
 import numpy as np
 import cv2
 
-from resources.config import color2enemy
-
 
 def is_inside(box: np.ndarray, point: np.ndarray):
-    '''
+    """
     判断点是否在凸四边形中
 
     :param box:为凸四边形的四点 shape is (4,2)
     :param point:为需判断的是否在内的点 shape is (2,)
-    '''
+    """
     assert box.shape == (4, 2)
     assert point.shape == (2,)
     AM = point - box[0]
@@ -63,15 +61,15 @@ def armor_filter(armors: np.ndarray):
 
 
 def car_classify(frame_m, red=True):
-    '''
+    """
     亮度阈值加HSV判断车辆颜色
 
     :param frame_m:输入图像（可以是ROI)
     :param red:判断为红还是蓝
 
     :return: 判断结果
-    '''
-    ########param#############
+    """
+
     if red:
         l = 10
         h = 30
@@ -80,7 +78,7 @@ def car_classify(frame_m, red=True):
         h = 128
     intensity_thre = 200
     channel_thre = 150
-    #########################
+
     frame_ii = np.zeros((frame_m.shape[0], frame_m.shape[1]), dtype=np.uint8)
     # intensity threshold
     gray = cv2.cvtColor(frame_m, cv2.COLOR_BGR2GRAY)
@@ -104,4 +102,3 @@ def car_classify(frame_m, red=True):
         if cv2.contourArea(c) > 5:
             flag = True
     return flag
-

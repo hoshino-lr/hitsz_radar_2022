@@ -2,7 +2,7 @@
 相机类
 用于打开相机并且输出图像
 created by 李龙 2021/11
-最终修改 by 李龙 2021/1/19
+最终修改 by 李龙 2021/7/1
 """
 import re
 import time
@@ -32,6 +32,7 @@ class Camera_HK(Camera):
         self.__camera_config = cam_config[self.__type]
         self.__id = self.__camera_config['id']
         self.__size = self.__camera_config['size']
+        self.__roi = self.__camera_config['roi']
         self.__img = np.ndarray((self.__size[0], self.__size[1], 3), dtype="uint8")
         self.__exposure = self.__camera_config['exposure']
         self.__gain = self.__camera_config['gain']
@@ -124,20 +125,20 @@ class Camera_HK(Camera):
                     print("set AcquisitionFrameRateEnable failed! ret [0x%x]" % ret)
                     self.init_ok = False
 
-                ret = self.cam.MV_CC_SetIntValue("Height", int(self.__size[1]))
+                ret = self.cam.MV_CC_SetIntValue("Height", int(self.__roi[3]))
                 if ret != 0:
                     print("set height failed! ret [0x%x]" % ret)
                     self.init_ok = False
 
-                ret = self.cam.MV_CC_SetIntValue("Width", int(self.__size[0]))
+                ret = self.cam.MV_CC_SetIntValue("Width", int(self.__roi[2]))
                 if ret != 0:
                     print("set width failed! ret [0x%x]" % ret)
                     self.init_ok = False
-                ret = self.cam.MV_CC_SetIntValue("OffsetX", int(0))
+                ret = self.cam.MV_CC_SetIntValue("OffsetX", int(self.__roi[0]))
                 if ret != 0:
                     print("set width failed! ret [0x%x]" % ret)
                     self.init_ok = False
-                ret = self.cam.MV_CC_SetIntValue("OffsetY", int(0))
+                ret = self.cam.MV_CC_SetIntValue("OffsetY", int(self.__roi[1]))
                 if ret != 0:
                     print("set OffsetY failed! ret [0x%x]" % ret)
                     self.init_ok = False
@@ -199,8 +200,8 @@ class Camera_HK(Camera):
             else:
                 img_buff = (c_ubyte * stConvertParam.nDstLen)()
                 memmove(byref(img_buff), stConvertParam.pDstBuffer, stConvertParam.nDstLen)
-                self.__img = np.asarray(img_buff)
-                self.__img = self.__img.reshape((self.__size[1], self.__size[0], -1))
+                self.__img[self.__roi[1]:self.__roi[3], self.__roi[0]:self.__roi[2]] = \
+                    np.asarray(img_buff).reshape((self.__size[1], self.__size[0], -1)).copy()
                 return True
         else:
             print("get one frame fail, ret[0x%x]" % ret)
@@ -246,6 +247,7 @@ class Camera_HK(Camera):
 if __name__ == "__main__":
     import time
     import sys
+
     sys.path.append("..")
     cv.namedWindow("test", cv.WINDOW_NORMAL)
 
@@ -278,5 +280,3 @@ if __name__ == "__main__":
         else:
             break
     cv.destroyAllWindows()
-
-
