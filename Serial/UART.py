@@ -162,7 +162,6 @@ def Map_Transmit(ser):
 def Hero_Transmit(ser):
     # 英雄飞坡预警
     alarm_type = Port_operate.get_alarm_type()
-    alarm_type = 1
     # 敌方判断
     if enemy_color == 0:
         # 敌方为红方

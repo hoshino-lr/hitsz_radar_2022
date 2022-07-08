@@ -96,7 +96,7 @@ class Camera_HK(Camera):
                     print("set height failed! ret [0x%x]" % ret)
                     self.init_ok = False
 
-                ret = self.cam.MV_CC_SetEnumValue("GainAuto", MV_GAIN_MODE_OFF)
+                ret = self.cam.MV_CC_SetEnumValue("GainAuto", MV_GAIN_MODE_CONTINUOUS)
                 if ret != 0:
                     print("set GainAuto failed! ret [0x%x]" % ret)
                     self.init_ok = False
@@ -146,10 +146,10 @@ class Camera_HK(Camera):
                     print("start grabbing fail! ret[0x%x]" % ret)
                     self.init_ok = False
 
-                ret = self.cam.MV_CC_SetFloatValue("Gain", float(self.__gain))
-                if ret != 0:
-                    print("start grabbing fail! ret[0x%x]" % ret)
-                    self.init_ok = False
+                # ret = self.cam.MV_CC_SetFloatValue("Gain", float(self.__gain))
+                # if ret != 0:
+                #     print("start grabbing fail! ret[0x%x]" % ret)
+                #     self.init_ok = False
 
                 # ch:获取数据包大小 | en:Get payload size
                 stParam = MVCC_INTVALUE()
@@ -175,7 +175,7 @@ class Camera_HK(Camera):
             self.init_ok = True
 
     def work_thread(self) -> bool:
-        ret = self.cam.MV_CC_GetOneFrameTimeout(self.__data_buf, self.__nPayloadSize, self.__stDeviceList, 100)
+        ret = self.cam.MV_CC_GetOneFrameTimeout(self.__data_buf, self.__nPayloadSize, self.__stDeviceList, 10000)
         if ret == 0:
             # print("get one frame: Width[%d], Height[%d], nFrameNum[%d]" % (
             #     self.__stDeviceList.nWidth, self.__stDeviceList.nHeight, self.__stDeviceList.nFrameNum))

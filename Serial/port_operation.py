@@ -160,6 +160,8 @@ class Port_operate(object):
             Port_operate.change_view = buffer[13]
         else:
             Port_operate.change_view = -1
+        # Port_operate.change_view = buffer[13]
+        # print(Port_operate.change_view)
 
     @staticmethod
     def Hero_alarm(target_id, my_id, alarm_type, ser):

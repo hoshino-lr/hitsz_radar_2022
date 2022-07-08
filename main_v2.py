@@ -62,7 +62,7 @@ def process_detect(event, que, Event_Close, record, name):
             else:
                 count_error += 1
                 pub(event, que, [result, frame])
-                if count_error == 10:
+                if count_error == 30:
                     cam.destroy()
                     del cam
                     cam = Camera_HK(name, using_video)
@@ -116,7 +116,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 self._event_left, self._que_left, self._event_close, self._left_record,
                 'cam_left'))
             self.PRE_left.daemon = True
-
+        # time.sleep(5)
         if self.__cam_right:
             self.PRE_right = multiprocessing.Process(target=process_detect, args=(
                 self._event_right, self._que_right, self._event_close, self._right_record,
@@ -164,6 +164,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
 
         self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
         self.start()
+        self.record_on_clicked()
+
 
     def __ui_init(self):
         self.view_change = 0  # 视角切换控制符
@@ -489,13 +491,18 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
 
     def update_image(self) -> None:
         if not self.view_change:
-            self.set_image(self.__pic_left, "main_demo")
+            if self.__pic_left is not None:
+                self.set_image(self.__pic_left, "main_demo")
+                self.set_image(self.__pic_left[600:800, 750:1250].copy(), "far_demo")
             if self.__pic_right is not None:
                 self.set_image(self.__pic_right[:, 2000:3000].copy(), "side_demo")
         else:
-            self.set_image(self.__pic_right, "main_demo")
+            if self.__pic_right is not None:
+                self.set_image(self.__pic_right, "main_demo")
             if self.__pic_left is not None:
                 self.set_image(self.__pic_left[:, 500:1700].copy(), "side_demo")
+                self.set_image(self.__pic_left[600:800, 750:1250].copy(), "far_demo")
+
 
     def update_epnp(self, tvec: np.ndarray, rvec: np.ndarray, side: int) -> None:
         if not side:
@@ -590,7 +597,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.hp_scene.show()
             location = self.loc_alarm.get_location()
             Port_operate.gain_positions(location)
-            # Port_operate.hero_alarm_type = int(self.repo_left.fly)
+            Port_operate.hero_alarm_type = int(self.repo_left.fly)
             if Port_operate.change_view != -1:
                 self.view_change = Port_operate.change_view
 

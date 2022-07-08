@@ -112,9 +112,9 @@ class Reproject(object):
                 continue
             else:
                 if i in self.rp_alarming.keys():
-                    cv2.polylines(frame, [recor], isClosed=1, color=(0, 255, 0), lineType=0)
+                    cv2.polylines(frame, [recor], isClosed=True, color=(0, 255, 0), thickness=1)
                 else:
-                    cv2.polylines(frame, [recor], isClosed=1, color=(0, 0, 255), lineType=0)
+                    cv2.polylines(frame, [recor], isClosed=True, color=(0, 0, 255), thickness=1)
 
     def check(self, net_input) -> None:
         """
@@ -168,7 +168,7 @@ class Reproject(object):
                 mask = np.sum(mask, axis=1) > 0  # True or False,只要有一个点在区域内，则为True
                 alarm_target = cls[mask]  # 需要预警的装甲板种类
                 if len(alarm_target):
-                    self.rp_alarming = {r: alarm_target.reshape(1, -1)}
+                    self.rp_alarming = {r: alarm_target.reshape(-1, 1)}
 
     def push_text(self) -> None:
         """
@@ -180,8 +180,12 @@ class Reproject(object):
                 _, _, _, location, _ = r.split('_')
                 if location == "3号高地":
                     for i in self.rp_alarming[r]:
-                        if i == 1:
-                            self._textapi("WARNING", f"反投影{location}", f"在{location}处有英雄！！！\n")
+                        try:
+                            if i == 1:
+                                self._textapi("ERROR", f"反投影{location}", f"在{location}处有英雄！！！\n")
+                                print(f"[ERROR] 反投影{location}", f"在{location}处有英雄！！！")
+                        except Exception as e:
+                            print(e)
                 else:
                     if self._time[f'{location}'] == 0:
                         self._start[f'{location}'] = time.time()
@@ -197,7 +201,8 @@ class Reproject(object):
                             if self._region_count[f'{location}'] >= self._frame:
                                 if location == "飞坡":
                                     self.fly = True
-                                self._textapi("WARNING", f"反投影{location}", f"在{location}处有敌人！！！\n")
+                                self._textapi("ERROR", f"反投影{location}", f"在{location}处有敌人！！！\n")
+                                print(f"[ERROR] 反投影{location}", f"在{location}处有英雄！！！")
                                 self._region_count[f'{location}'] = 0
                             self._time[f'{location}'] = 0
         else:
