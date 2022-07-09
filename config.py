@@ -6,35 +6,34 @@ created by 李龙 2021/12
 最终修改 by 李龙 2021/1/15
 """
 import os
-from re import T
 import numpy as np
 
-enemy_color = 0 # 0：敌方为红色；1：敌方为蓝色
+enemy_color = 0  # 0：敌方为红色；1：敌方为蓝色
 USEABLE = {
     "cam_left": True,
     "cam_right": True,
-    "serial": True,
-    "Lidar": True,
-    "locate_state": [1, 1],
+    "serial": False,
+    "Lidar": False,
+    "locate_state": [0, 1],
 }
-BO = 3
+BO = 0
 DEBUG = False
-
 using_video = False
 cam_config = {
     "cam_right": {
         "id": "J37877236",
         "size": (3072, 2048),
-        "roi": (0, 0, 3072, 2048),
-        "video_path": "/home/mark/视频/11_19_27_right.avi",
+        "roi": (0, 400, 3072, 1648),
+        "using_net": False,
+        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_video/20_16_34_right.avi",
         "K_0": np.mat([[2505.2629026927225, 0.0, 1529.4286325395244],
                        [0.0, 2505.5722700649067, 1026.1378217662113],
                        [0.0, 0.0, 1.0]]),
         "C_0": np.mat([-0.06856710471358254, 0.1269396451339073,
                        -0.0003599605406165552, -0.0004173270419984247,
                        -0.141056084229664]),
-        "exposure": 15000,
-        "gain": 22,
+        "exposure": 7000,
+        "gain": 18,
         "rvec": np.mat([[1.69750257], [0.69091169], [-0.54474128]]),
         "tvec": np.mat([[-11381.85466339], [-584.01247871], [9359.30328641]]),
         "E_0": np.mat([
@@ -47,21 +46,22 @@ cam_config = {
     "cam_left": {
         "id": "J87631625",
         "size": (3072, 2048),
-        "roi": (0, 0, 3072, 2048),
-        "video_path": "/home/mark/视频/11_19_27_left.avi",
+        "roi": (0, 400, 3072, 1648),
+        "using_net": True,
+        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_video/20_16_34_left.avi",
         "K_0": np.mat([[2580.7380664637653, 0.0, 1535.9830165125002],
                        [0.0, 2582.8839945792183, 1008.784910706948],
                        [0.0, 0.0, 1.0]]),
         "C_0": np.mat([[-0.0640364274094021], [0.04211319930460198], [0.0010490064499735965],
                        [-0.0003352752162304746], [0.27835581516135494]]),
-        "exposure": 15000,
-        "gain": 22,
+        "exposure": 7000,
+        "gain": 21,
         "rvec": np.mat([[1.69750257], [0.69091169], [-0.54474128]]),
         "tvec": np.mat([[-11381.85466339], [-479.01247871], [9449.30328641]]),
         "E_0": np.mat([
-            [0.001792, -0.999867, 0.0161871, 0.100099],
-            [0.00252176, -0.0161825, -0.999866, -0.00737759],
-            [0.999995, 0.00183258, 0.00249243, 0.031457],
+            [0.0135786, -0.999829, -0.0125439, 0.0995423],
+            [0.078977, 0.0135782, -0.996784, 0.0471041],
+            [0.996784, 0.0125442, 0.0791478, 0.0300738],
             [0, 0, 0, 1]
         ])},
 }
@@ -78,7 +78,7 @@ color2enemy = {"red": 0, "blue": 1}
 enemy2color = ['red', 'blue']
 num2cam = ['左', '右']
 
-enemy_case = ["环形高地1", "环形高地2", "打符", "前哨站", "飞坡", "3号高地"]  # 这些区域在预警时只考虑敌方的该区域
+enemy_case = ["环形高地", "打符", "前哨站", "飞坡"]  # 这些区域在预警时只考虑敌方的该区域
 
 our_case = ["missle_launch1", "missle_lauch2", "danger"]
 
@@ -88,7 +88,7 @@ unit_list = ['R1', 'R2', 'R3', 'R4', 'R5', 'RG', 'RO', 'RB', 'B1', 'B2', 'B3', '
 
 # 小地图图片路径
 MAP_PATH = os.path.dirname(os.path.abspath(__file__)) + "/map.jpg"
-BAG_FIRE = "/home/mark/hitsz_radar_2022/2022-06-15-10-11-01.bag"
+BAG_FIRE = "/home/hoshino/CLionProjects/hitsz_radar/2022-05-20-16-22-06.bag"
 
 # 小地图设定大小
 map_size = (716, 384)
@@ -97,7 +97,6 @@ real_size = (28., 15.)
 
 INIT_FRAME_PATH = os.path.dirname(os.path.abspath(__file__)) + "/beijing.png"
 
-# 
 region = \
     {
         'a_fp_red_环形高地1_a': [17.56, 7.81, 19.01, 8.25, 19.06, 5.40, 17.50, 5.86, 0.60],
@@ -129,12 +128,12 @@ objNames = [
     {
         "cam_left_red": ['飞坡点(右)', '风车狙击点角(左)', '烧饼左', 'R2右', '环形高地银矿左角（敌方）',
                          '敌方环形高地围栏点', '我方银矿左上', '我方银矿左下', 'B3B1', '我方长挡板高点'],
-        "cam_right_red": ['我方风车狙击点角(左)', '烧饼左', 'R2右', '环形高地银矿左角(敌方)', '敌方环形高地围栏点',
-                          '我方银矿左上', '我方银矿左下', 'R4右口', '我方长挡板高点'],
+        "cam_right_red": ['风车狙击点角(左)', '烧饼左', 'R2右', '环形高地银矿左角(敌方)', '敌方环形高地围栏点',
+                          '我方银矿左上', '我方银矿左下', 'B4右口', '我方长挡板高点'],
         "cam_left_blue": ['飞坡点(右)', '风车狙击点角(左)', '烧饼左', 'B2右', '环形高地银矿左角(敌方)',
                           '敌方环形高地围栏点', '我方银矿左上', '我方银矿左下', 'R3R1', '我方长挡板高点'],
-        "cam_right_blue": ['我方风车狙击点角(左)', '烧饼左', 'B2右', '环形高地银矿左角(敌方)', '敌方环形高地围栏点',
-                           '我方银矿左上', '我方银矿左下', 'B4右口', '我方长挡板高点'],
+        "cam_right_blue": ['风车狙击点角(左)', '烧饼左', 'B2右', '环形高地银矿左角(敌方)', '敌方环形高地围栏点',
+                           '我方银矿左上', '我方银矿左下', 'R4右口', '我方长挡板高点'],
     },
     {
         "cam_left_red": ['风车狙击点角', '烧饼轨道左', '烧饼轨道右', '环形高低银矿处角',
@@ -265,7 +264,7 @@ objPoints = [
                                   real_points[26],
                                   real_points[51],
                                   real_points[29]], dtype=np.float32),
-        "cam_right_red": np.array([real_points[19],
+        "cam_right_red": np.array([real_points[1],
                                    real_points[5],
                                    real_points[13],
                                    real_points[7],
@@ -284,7 +283,7 @@ objPoints = [
                                    real_points[11],
                                    real_points[12],
                                    real_points[8]], dtype=np.float32),
-        "cam_right_blue": np.array([real_points[2],
+        "cam_right_blue": np.array([real_points[18],
                                     real_points[22],
                                     real_points[32],
                                     real_points[25],

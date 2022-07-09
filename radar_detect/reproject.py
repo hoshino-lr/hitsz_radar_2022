@@ -1,18 +1,15 @@
 """
 反投影预警
 created by 牟俊宇 2020/12
-最新修改 by 牟俊宇 2021/1/15
+最新修改 by 李龙 2022/7/08
 """
-from typing import Union, Any, Tuple
-from numpy import ndarray
-
 import cv2
 import numpy as np
 import time
-
 from radar_detect.common import is_inside
-from resources.config import color2enemy, enemy_case, enemy_color, cam_config, \
+from config import color2enemy, enemy_case, enemy_color, cam_config, \
     DEBUG, test_region, region, real_size
+from mapping.drawing import draw_message
 
 
 class Reproject(object):
@@ -23,7 +20,7 @@ class Reproject(object):
     _clock = 1  # 间隔一秒发送text
     _frame = 3  # 一秒钟需要检测到3帧
 
-    def __init__(self, name, textapi):
+    def __init__(self, name, text_api):
         # 读取相机配置文件
         self._tvec = cam_config[name]['tvec']
         self._rvec = cam_config[name]['rvec']
@@ -39,7 +36,7 @@ class Reproject(object):
         self._real_size = real_size  # 真实尺寸
         self._scene_init = False  # 初始化flag
         self.fly = False
-        self._textapi = textapi  # 发送text的api
+        self._text_api = text_api  # 发送text的api
         self.rp_alarming = {}
 
         self._region_count = {}  # 检测区域计数
@@ -47,9 +44,9 @@ class Reproject(object):
         self._start = {}  # 开始时间
         self._end = {}  # 结束时间
 
-        self._plot_regin()  # 预警区域坐标初始化
+        self._plot_region()  # 预警区域坐标初始化
 
-    def _plot_regin(self) -> None:
+    def _plot_region(self) -> None:
         """
         计算预警区域反投影坐标，用第一帧初始化了就可以了。
         """
@@ -93,28 +90,13 @@ class Reproject(object):
                         self._scene_region[r] = recor  # 储存反投影坐标
                         self._scene_init = True
 
-    def push_T(self, rvec: ndarray, tvec: ndarray) -> None:
+    def push_T(self, rvec: np.ndarray, tvec: np.ndarray) -> None:
         """
         输入相机位姿（世界到相机）
         """
         self._rvec = rvec
         self._tvec = tvec
-        self._plot_regin()  # 初始化预警区域字典
-
-    def update(self, frame) -> None:
-        """
-        更新一帧绘图
-        """
-        for i in self._scene_region.keys():
-            recor = self._scene_region[i]
-            _, shape_type, team, location, height_type = i.split('_')
-            if color2enemy[team] != enemy_color:
-                continue
-            else:
-                if i in self.rp_alarming.keys():
-                    cv2.polylines(frame, [recor], isClosed=1, color=(0, 255, 0), lineType=0)
-                else:
-                    cv2.polylines(frame, [recor], isClosed=1, color=(0, 0, 255), lineType=0)
+        self._plot_region()  # 初始化预警区域字典
 
     def check(self, net_input) -> None:
         """
@@ -168,7 +150,7 @@ class Reproject(object):
                 mask = np.sum(mask, axis=1) > 0  # True or False,只要有一个点在区域内，则为True
                 alarm_target = cls[mask]  # 需要预警的装甲板种类
                 if len(alarm_target):
-                    self.rp_alarming = {r: alarm_target.reshape(1, -1)}
+                    self.rp_alarming = {r: alarm_target.reshape(-1, 1)}
 
     def push_text(self) -> None:
         """
@@ -180,8 +162,12 @@ class Reproject(object):
                 _, _, _, location, _ = r.split('_')
                 if location == "3号高地":
                     for i in self.rp_alarming[r]:
-                        if i == 1:
-                            self._textapi("WARNING", f"反投影{location}", f"在{location}处有英雄！！！\n")
+                        try:
+                            if i == 1:
+                                self._text_api("ERROR", f"反投影{location}", f"在{location}处有英雄！！！\n")
+                                print(f"[ERROR] 反投影{location}", f"在{location}处有英雄！！！")
+                        except Exception as e:
+                            print(e)
                 else:
                     if self._time[f'{location}'] == 0:
                         self._start[f'{location}'] = time.time()
@@ -197,50 +183,15 @@ class Reproject(object):
                             if self._region_count[f'{location}'] >= self._frame:
                                 if location == "飞坡":
                                     self.fly = True
-                                self._textapi("WARNING", f"反投影{location}", f"在{location}处有敌人！！！\n")
+                                self._text_api("ERROR", f"反投影{location}", f"在{location}处有敌人！！！\n")
+                                print(f"[ERROR] 反投影{location}", f"在{location}处有英雄！！！")
                                 self._region_count[f'{location}'] = 0
                             self._time[f'{location}'] = 0
         else:
-            self._textapi("WARNING", "反投影", "未初始化！！！")
+            self._text_api("WARNING", "反投影", "未初始化！！！")
 
+    def get_rp_alarming(self):
+        return self.rp_alarming
 
-if __name__ == "__main__":
-    ori = cv2.imread("/home/hoshino/CLionProjects/hitsz_radar/resources/beijing.png")
-    frame = ori.copy()
-    repo = Reproject(frame=frame, name='cam_left')
-    _, _, region11 = repo.push_T(cam_config['cam_left']['rvec'], cam_config['cam_left']['tvec'])
-
-    frame = ori.copy()
-    rect_armor = cv2.selectROI("img", frame, False)
-    rect_car = cv2.selectROI("img", frame, False)
-    key = cv2.waitKey(1)
-    while key != ord('q'):
-        key = cv2.waitKey(1)
-        # 在初始输入上绘制
-        for i in region11.keys():
-            recor = region11[i]
-            for p in recor:
-                cv2.circle(frame, tuple(p), 10, (0, 255, 0), -1)
-            cv2.fillConvexPoly(frame, recor, (0, 255, 0))
-        # 为了统一采用is_inside来判断是否在图像内
-        # 分别在实际相机图和深度图上画ROI框来对照
-        cv2.rectangle(frame, (rect_car[0], rect_car[1]), (rect_car[0] + rect_car[2]
-                                                          , rect_car[1] + rect_car[3]), (0, 255, 0), 3)
-        cv2.rectangle(frame, (rect_armor[0], rect_armor[1]), (rect_armor[0] + rect_armor[2]
-                                                              , rect_armor[1] + rect_armor[3]), (0, 255, 0), 3)
-        cv2.imshow("img", frame)
-        if key == ord('r') & 0xFF:
-            # 重选区域
-            rect_armor = cv2.selectROI("img", frame, False)
-        if key == ord('c') & 0xFF:
-            # 重选区域
-            rect_car = cv2.selectROI("img", frame, False)
-        if key == ord('p') & 0xFF:
-            # 重选区域
-            frame = ori.copy()
-        if key == ord('s') & 0xFF:
-            # 显示世界坐标系和相机坐标系坐标和深度，以对测距效果进行粗略测试
-            armor = np.array([1, 0, rect_armor[0], rect_armor[1], rect_armor[2], rect_armor[3]]).reshape((-1, 6))
-            car = np.array([1, rect_car[0], rect_car[1], rect_car[2], rect_car[3]]).reshape((-1, 5))
-            result = repo.check(armors=armor, cars=car)
-            print(result)
+    def get_scene_region(self):
+        return self._scene_region

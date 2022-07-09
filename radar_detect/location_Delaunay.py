@@ -10,7 +10,8 @@
 """
 import cv2 as cv
 import numpy as np
-from resources.config import Delaunary_points, cam_config
+from config import Delaunary_points, cam_config
+from mapping.drawing import draw_message
 
 
 class location_Delaunay(object):
@@ -183,6 +184,6 @@ class location_Delaunay(object):
     def _mag_pow(magnitude):
         return pow(magnitude[0], 2) + pow(magnitude[1], 2)
 
-    def draw_points(self, frame):
-        for i in self.cam_points:
-            cv.circle(frame, tuple(i), 10, (0, 255, 0), -1)
+    def get_points(self):
+        return self.cam_points
+

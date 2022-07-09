@@ -7,7 +7,7 @@ import numpy as np
 import threading
 import time
 import cv2 as cv
-from resources.config import net1_engine, net2_engine, \
+from config import net1_engine, net2_engine, \
     net1_cls, net2_cls_names, enemy_color, cam_config
 from net.tensorrtx import YoLov5TRT
 from radar_detect.common import armor_filter
@@ -54,11 +54,12 @@ class Predictor(object):
         初始化函数
         :param _name 
         """
-        self.pic_update = False
-        # net1初始化
-        self._net1 = YoLov5TRT(self.net1_trt_file)
-        # net2初始化
-        self._net2 = YoLov5TRT(self.net2_trt_file)
+        self.using_net = cam_config[_name]["using_net"]
+        if self.using_net:
+            # net1初始化
+            self._net1 = YoLov5TRT(self.net1_trt_file)
+            # net2初始化
+            self._net2 = YoLov5TRT(self.net2_trt_file)
         self.img_src = np.zeros(cam_config[_name]["size"])
         self.name = _name  # 选择的相机是左还是右
         self.choose_type = 0  # 只选择检测cars类，不检测哨兵和基地
@@ -84,37 +85,40 @@ class Predictor(object):
         :param 
         """
         # 检测函数
+        if not self.using_net:
+            return np.array([]), src
+        else:
+            self.img_src = src.copy()
+            self.pic_update = True
+            # 图像预处理
+            img = cv.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv.INTER_LINEAR)
+            img = img[:, :, ::-1].transpose(2, 0, 1)
+            img = np.ascontiguousarray(img)
+            img = img.astype(np.float32)
+            img /= 255.0
 
-        self.img_src = src.copy()
-        self.pic_update = True
-        # 图像预处理
-        img = cv.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv.INTER_LINEAR)
-        img = img[:, :, ::-1].transpose(2, 0, 1)
-        img = np.ascontiguousarray(img)
-        img = img.astype(np.float32)
-        img /= 255.0
+            net1_output = self._net1.infer(img, 1)[0]
+            res = self.net1_process_sjtu(net1_output)
 
-        net1_output = self._net1.infer(img, 1)[0]
-        res = self.net1_process_sjtu(net1_output)
+            if res.shape[0] != 0:
+                # get Jigsaw
+                res[:, :4] = self.scale_coords((640, 640), res[:, :4], self.img_src.shape).round()
+                net2_img = self.jigsaw(res[:, :4], self.img_src)
+                # Rescale boxes from img_size to im0 size
+                net2_output = self.detect_armor(net2_img)
+                net2_output = self.net2_output_process(net2_output, det_points=res[:, :4], shape=self.img_src.shape)
+                res = np.concatenate([res, net2_output], axis=1)
 
-        if res.shape[0] != 0:
-            # get Jigsaw
-            res[:, :4] = self.scale_coords((640, 640), res[:, :4], self.img_src.shape).round()
-            net2_img = self.jigsaw(res[:, :4], self.img_src)
-            # Rescale boxes from img_size to im0 size
-            net2_output = self.detect_armor(net2_img)
-            net2_output = self.net2_output_process(net2_output, det_points=res[:, :4], shape=self.img_src.shape)
-            res = np.concatenate([res, net2_output], axis=1)
-
-        if self.img_show and res.shape != 0:  # 画图
-            self.net_show(res)
-        res = armor_filter(res)
-        return res, self.img_src
+            if self.img_show and res.shape != 0:  # 画图
+                self.net_show(res)
+            res = armor_filter(res)
+            return res, self.img_src
 
     def detect_armor(self, src):
         """
         :param src 输入一张640x640的图片
-        :param res 输出一个(N,7)的array 或是None
+        Returns:
+            res 输出一个(N,7)的array 或是None
         """
         img = cv.resize(src, (self.net2_inpHeight, self.net2_inpWidth), interpolation=cv.INTER_LINEAR)
         # Convert
@@ -412,8 +416,9 @@ class Predictor(object):
         """
         停止ternsorrt线程，在关闭之前必须做这个操作，不然tensorrt的stramer可能无法释放
         """
-        self._net1.destroy()
-        self._net2.destroy()
+        if self.using_net:
+            self._net1.destroy()
+            self._net2.destroy()
 
     def net_show(self, res):
         # 绘制函数
@@ -461,9 +466,8 @@ class Predictor(object):
     def mul_record(self):
         while True:
             if self.record_state:
-                if self.pic_update:
-                    self.record_object.write(self.img_src)
-                    self.pic_update = False
+                self.record_object.write(self.img_src)
+                time.sleep(0.02)
             else:
                 break
 

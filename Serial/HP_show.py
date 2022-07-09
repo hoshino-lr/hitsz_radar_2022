@@ -74,9 +74,9 @@ class HP_scene(object):
         cv2.rectangle(self._out_scene, (x, y), (x + 5 * width, y + 15), (0, 0, 0), 1)
 
     def update(self, HP, max_hp):
-        '''
+        """
         根据读取到的血量和计算的血量上限，绘制血量信息
-        '''
+        """
         for i in range(8):
             if i < 5:  # 我方
                 hp = HP[i + 8 * (not self._enemy)]

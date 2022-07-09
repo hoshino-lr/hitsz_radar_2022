@@ -8,8 +8,9 @@ import cv2 as cv
 import numpy as np
 from radar_detect.common import is_inside
 import mapping.draw_map as draw_map  # 引入draw_map模块，使用其中的CompeteMap类
-from resources.config import armor_list, color2enemy, enemy_color, enemy_case, cam_config, real_size, region, test_region, choose
+from config import armor_list, color2enemy, enemy_color, enemy_case, cam_config, real_size, region, test_region, choose
 from radar_detect.location_Delaunay import location_Delaunay
+from mapping.drawing import draw_message
 
 
 class Alarm(draw_map.CompeteMap):
@@ -257,11 +258,13 @@ class Alarm(draw_map.CompeteMap):
         """
         self._check_alarm()
 
-    def two_camera_merge_update(self, t_locations_left, t_locations_right, rp_alarming):
+    def two_camera_merge_update(self, t_locations_left, t_locations_right, rp_alarming: dict):
         """
         :param t_locations_left: the list of the predicted locations [N,cls+x+y+z] of the both two cameras
         :param t_locations_right: the list of the predicted locations [N,cls+x+y+z] of the both two cameras
-        :param rp_alarming : the dictionary of the reproject module, {region: [cls,..]}
+
+        Args:
+            rp_alarming:
         """
         # init location
         for i in range(1, 6):
@@ -300,7 +303,7 @@ class Alarm(draw_map.CompeteMap):
         else:
             self.reset_count += 1
 
-    def _update_position(self, t_location, camera_type, detection_type, rp_alarming):
+    def _update_position(self, t_location, camera_type, detection_type, rp_alarming: dict):
         """
         #单相机使用
         :param t_location: the predicted locations [N,cls+x+y+z]
@@ -346,10 +349,10 @@ class Alarm(draw_map.CompeteMap):
                                     if self._region[i][0] >= l1[1] >= self._region[i][2] \
                                             and self._region[i][3] <= l1[2] <= self._region[i][1]:
                                         break
-                                    
+
+
                                 # 判断是否在凸四边形内
                                 if shape_type == 'fp':
-                                    # 车辆在对应区域内，则不做处理
                                     if is_inside(np.float32(self._region[i][:8]).reshape(4, 2), point=l1[1:3]):
                                         break
                                 # 反投影模块与雷达点云信息不匹配，采用德劳内定位
@@ -365,7 +368,7 @@ class Alarm(draw_map.CompeteMap):
                         # 使用德劳内定位
                         l1 = locations[locations[:, 0] == armor].reshape(-1)
                         l1[1:] = self._loc_D[camera_type].get_point_pos(l1, detection_type).reshape(-1)
-                    
+                        
                     # 对应装甲板位置信息无效，跳过
                     if np.isnan(l1).any():
                         continue
@@ -427,8 +430,8 @@ class Alarm(draw_map.CompeteMap):
         except Exception as e:
             print(e)
 
-    def pc_draw(self, frame, camera_type):
-        self._loc_D[camera_type].draw_points(frame=frame)
+    def get_draw(self, camera_type):
+        return self._loc_D[camera_type].get_points()
 
     def show(self):
         """
