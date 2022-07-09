@@ -25,7 +25,7 @@ class draw_message(object):
         Args:
             title_: 标题
             type_: 类型
-            message_: 内容
+            message_: 内容 【message】【bbox】 【message+(point)】
             level_: 等级
         """
         self.title = title_
@@ -155,7 +155,7 @@ class drawing(object):
         tl = 5  # line/font thickness
         tf = max(tl - 1, 1)  # font thickness
         text_size = cv.getTextSize(input_text, 0, tl, tf)
-        middle_point = ((pic.size[1] - text_size[0][0])/2, pic.size[0] - text_size[0][1])
+        middle_point = ((pic.size[1] - text_size[0][0]) / 2, pic.size[0] - text_size[0][1])
         cv.putText(pic, input_text, middle_point, 0, tl, (20, 20, 255), thickness=tf,
                    lineType=cv.LINE_AA)
 
@@ -348,4 +348,3 @@ class drawing(object):
         else:
             msg = f"<font color='#FF8033'><b>{message}</b></font>"
         return msg.replace('\n', "<br />")
-

@@ -32,33 +32,6 @@ def is_inside(box: np.ndarray, point: np.ndarray):
     return (a >= 0 and b >= 0 and c >= 0 and d >= 0) or \
            (a <= 0 and b <= 0 and c <= 0 and d <= 0)
 
-def is_inside_polygon(polygon: np.ndarray, point: np.ndarray) -> bool:
-    """
-    判断点是否在多边形内，点的次序需要连续（顺、逆时针）
-
-    :param polygon: [[], [], [], [], ...] 多边形的点 shape:(N,2)
-    :param p: [x, y] 判断是否在内的点 shape:(2,)
-    :return: is_in 点是否在多边形内
-    """
-    px, py = point
-    is_in = False
-
-    for i, corner in enumerate(polygon):
-        next_i = i + 1 if i + 1 < len(polygon) else 0
-        x1, y1 = corner
-        x2, y2 = polygon[next_i]
-        if (x1 == px and y1 == py) or (x2 == px and y2 == py):  # 点在多边形顶点时
-            is_in = True
-            break
-        if min(y1, y2) < py <= max(y1, y2):  # 过当前点的水平线将多边形该边两点分割
-            x = x1 + (py - y1) * (x2 - x1) / (y2 - y1)
-            if x == px:  # 点在多边形边上时
-                is_in = True
-                break
-            elif x > px:  # 点在多边形当前线段的左侧
-                is_in = not is_in
-
-    return is_in
 
 def armor_filter(armors: np.ndarray):
     """

@@ -254,5 +254,3 @@ class Missile(object):
     def reset(self):
         self._launch = 0
         self._text_api("INFO", "missile", "")
-
-

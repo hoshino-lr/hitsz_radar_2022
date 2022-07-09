@@ -17,7 +17,7 @@ from PyQt5.QtCore import QTimer, Qt, QRect
 
 from config import INIT_FRAME_PATH, \
     MAP_PATH, map_size, USEABLE, \
-    enemy_color, cam_config, num2cam, using_video, enemy2color
+    enemy_color, cam_config, using_video, enemy2color
 
 from mapping.ui_v3 import Ui_MainWindow
 from camera.cam_hk_v3 import Camera_HK
@@ -278,6 +278,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.sp.clc()
             self.pnp_textBrowser.clear()
             self.update_epnp(self.sp.translation, self.sp.rotation, self.view_change)
+            self.draw_module.info_update_dly(self.loc_alarm.get_draw(0))
+            self.draw_module.info_update_reproject(self.repo_left.get_scene_region())
 
     def epnp_mouseEvent(self, event) -> None:
         if self.epnp_mode:
@@ -332,7 +334,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if frame is None:
             return False
         if position not in ["main_demo", "map", "far_demo", "blood"]:
-            print("[ERROR] The position isn't a member of this UIwindow")
+            print("[ERROR] The position isn't a member of this UI_window")
             return False
         if position == "main_demo":
             width = self.main_demo.width()
@@ -379,7 +381,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         to set text in the QtLabel
         :param message: message that will be put on the screen;
         :param _type: message level [ERROR,INFO,WARNING];
-        :param position: message that will put on position [LOCATION,ALARM_POSITION,TIMEING]
+        :param position: message that will put on position [LOCATION,ALARM_POSITION]
         :return:
         a flag to indicate whether the showing process have succeeded or not
         """
@@ -428,7 +430,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.PRE_right.start()
 
     def update_state(self) -> None:
-        self.set_board_text("INFO", "当前相机", f"当前相机为:{num2cam[self.view_change]}")
         if isinstance(self.__res_left, bool):
             self.set_board_text("ERROR", "左相机", "左相机寄了")
         else:
@@ -457,13 +458,12 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.repo_left.push_T(rvec, tvec)
             self.loc_alarm.push_T(rvec, tvec, 0)
         else:
-            self.repo_right.push_T(rvec, tvec)
+            # self.repo_right.push_T(rvec, tvec)
             self.loc_alarm.push_T(rvec, tvec, 1)
 
     def update_reproject(self) -> None:
         if self.__cam_left:
             self.repo_left.check(self.__res_left)
-            self.repo_left.update(self.__pic_left)
             self.repo_left.push_text()
 
     # 位置预警函数，更新各个预警区域的预警次数
@@ -506,6 +506,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                     if self._use_lidar:
                         depth = self.lidar.read()
                         self.draw_module.draw_pc(self.__pic_left, depth)
+                    self.draw_module.draw_CamPoints(self.__pic_left)
             else:
                 self.update_reproject()
                 self.update_location_alarm()
@@ -517,7 +518,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.hp_scene.show()
             location = self.loc_alarm.get_location()
             Port_operate.gain_positions(location)
-            Port_operate.hero_alarm_type = int(self.repo_left.fly)
+
             if Port_operate.change_view != -1:
                 self.view_change = Port_operate.change_view
 
@@ -547,8 +548,8 @@ class LOGGER(object):
         log_path = os.path.abspath(os.getcwd()) + "/logs/"  # 指定文件输出路径
         if not os.path.exists(log_path):
             os.makedirs(log_path)
-        logname = log_path + logger_name + '.log'  # 指定输出的日志文件名
-        fh = logging.FileHandler(logname, encoding='utf-8')  # 指定utf-8格式编码，避免输出的日志文本乱码
+        LogName = log_path + logger_name + '.log'  # 指定输出的日志文件名
+        fh = logging.FileHandler(LogName, encoding='utf-8')  # 指定utf-8格式编码，避免输出的日志文本乱码
         fh.setLevel(logging.DEBUG)
 
         # 定义handler的输出格式
@@ -581,11 +582,11 @@ if __name__ == "__main__":
     # ui
     app = QtWidgets.QApplication(sys.argv)
     sys.stdout = LOGGER()
-    myshow = Mywindow()
-    myshow.show()
+    MyShow = Mywindow()
+    MyShow.show()
 
     timer_main = QTimer()  # 主循环使用的线程
-    timer_main.timeout.connect(myshow.spin)
+    timer_main.timeout.connect(MyShow.spin)
     timer_main.start(0)
 
     sys.exit(app.exec_())

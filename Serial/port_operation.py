@@ -4,15 +4,14 @@
 import numpy as np
 import time
 from .official import Game_data_define, official_Judge_Handler
-from resources.config import enemy_color, BO
+from config import enemy_color, BO
 
 
 class Port_operate(object):
     _bytes2int = lambda x: (0x0000 | x[0]) | (x[1] << 8)
 
-    hero_alarm_type = 1
-
     _Robot_positions = np.zeros((5, 2), dtype=np.float32)  # 敌方所有机器人坐标
+    _Robot_positions_us = np.zeros((5, 2), dtype=np.float32)  # 敌方所有机器人坐标
     _Robot_decisions = np.zeros((5, 2), dtype=np.float32)  # 我方所有机器人状态
     _Now_stage = 0
     _Now_state = 0
@@ -22,6 +21,8 @@ class Port_operate(object):
     Remain_time = 0  # 剩余时间
 
     change_view = -1
+    using_position = False
+    missile_bit = False
 
     _init_hp = np.ones(10, dtype=int) * 500  # 初始血量
     _HP = np.ones(16, dtype=int) * 500  # 血量
@@ -56,6 +57,11 @@ class Port_operate(object):
         return Port_operate._Robot_positions
 
     @staticmethod
+    def positions_us():
+        # 传出位置
+        return Port_operate._Robot_positions_us
+
+    @staticmethod
     def decisions():
         # 传出位置
         return Port_operate._Robot_decisions
@@ -72,12 +78,7 @@ class Port_operate(object):
         """
         buffer = [0]
         buffer *= 19
-
-        buffer[0] = 0xA5
-        buffer[1] = 10
-        buffer[2] = 0
-        buffer[3] = 1
-        buffer[4] = official_Judge_Handler.myGet_CRC8_Check_Sum(id(buffer), 5 - 1, 0xff)  # 帧头 CRC8 校验
+        Port_operate.generate_head(buffer, length=10)
         buffer[5] = 0x05
         buffer[6] = 0x03
         buffer[7] = targetId
@@ -93,7 +94,6 @@ class Port_operate(object):
         official_Judge_Handler.Append_CRC16_Check_Sum(id(buffer), 19)
         buffer_tmp_array = [0]
         buffer_tmp_array *= 19
-
         for i in range(19):
             buffer_tmp_array[i] = buffer[i]
         ser.write(bytearray(buffer_tmp_array))
@@ -171,12 +171,34 @@ class Port_operate(object):
             return False
 
     @staticmethod
+    def Update_robo_position(buffer):
+        if Port_operate._Now_stage < 2 and ((buffer[7] >> 4) == 2 or (buffer[7] >> 4) == 3 or (buffer[7] >> 4) == 4):
+            # 从自检阶段开始表示比赛开始
+            Port_operate._Game_Start_Flag = True
+            Port_operate._set_max_flag = True
+        if Port_operate._Now_stage < 5 and (buffer[7] >> 4) == 5:
+            # 比赛结束
+            Port_operate._Game_End_Flag = True
+            Port_operate._max_hp = Port_operate._init_hp.copy()
+        Port_operate._Now_stage = buffer[7] >> 4
+        Port_operate.Remain_time = (0x0000 | buffer[8]) | (buffer[9] << 8)
+
+    @staticmethod
     def Receive_Robot_Data(buffer):
         # 车间通信
         if Port_operate._Game_Start_Flag:
-            Port_operate.change_view = buffer[13]
+            sender_id = (buffer[8] << 8) | buffer[7]
+            if sender_id == 0x106 or sender_id == 0x6:
+                Port_operate.change_view = buffer[13]
+                Port_operate.using_position = buffer[14]
+                Port_operate.missile_bit = buffer[15]
+            elif sender_id >= 0x100:
+                Port_operate._Robot_positions_us[sender_id - 0x100] = np.array([buffer[13], buffer[14]])
+            else:
+                Port_operate._Robot_positions_us[sender_id] = np.array([buffer[13], buffer[14]])
         else:
             Port_operate.change_view = -1
+            Port_operate.Robot_positions_us = np.zeros((5, 2), dtype=np.float32)  # 敌方所有机器人坐标
 
     @staticmethod
     def Receive_State_Data(buffer):
@@ -203,15 +225,19 @@ class Port_operate(object):
                 Port_operate._energy_time = 0
 
     @staticmethod
+    def generate_head(buffer, length):
+        buffer[0] = 0xA5
+        buffer[1] = length
+        buffer[2] = 0
+        buffer[3] = 1
+        buffer[4] = official_Judge_Handler.myGet_CRC8_Check_Sum(id(buffer), 5 - 1, 0xff)  # 帧头 CRC8 校验
+
+    @staticmethod
     def robo_alarm(target_id, my_id, alarm_type, attack_target, ser):
         # 车间通信
         buffer = [0]
         buffer *= 19
-        buffer[0] = 0xA5
-        buffer[1] = 10
-        buffer[2] = 0
-        buffer[3] = 1
-        buffer[4] = official_Judge_Handler.myGet_CRC8_Check_Sum(id(buffer), 5 - 1, 0xff)  # 帧头 CRC8 校验
+        Port_operate.generate_head(buffer, length=10)
         buffer[5] = 0x01
         buffer[6] = 0x03
         buffer[7] = 0x10
@@ -220,10 +246,10 @@ class Port_operate(object):
         buffer[10] = 0
         buffer[11] = target_id
         buffer[12] = 0
-        buffer[13] = alarm_type
+        buffer[13] = alarm_type  # 预警信息 0：normal 1：attack 2：run 3：fly
         buffer[14] = attack_target
-        buffer[15] = 0
-        buffer[16] = 0
+        buffer[15] = 0  # 上下云台
+        buffer[16] = 0  # 方位
         official_Judge_Handler.Append_CRC16_Check_Sum(id(buffer), 19)
         buffer_tmp_array = [0]
         buffer_tmp_array *= 19
