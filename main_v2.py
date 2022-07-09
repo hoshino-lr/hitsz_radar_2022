@@ -5,6 +5,7 @@ created by 李龙 2022/4
 import sys
 import time
 import os
+from turtle import left
 import cv2 as cv
 import numpy as np
 import multiprocessing
@@ -549,7 +550,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 x0 = (armors[:, 1] + (armors[:, 3] - armors[:, 1]) / 2).reshape(-1, 1)
                 y0 = (armors[:, 2] + (armors[:, 4] - armors[:, 2]) / 2).reshape(-1, 1)
                 t_loc_right = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, np.zeros(x0.shape)], axis=1)
-        self.loc_alarm.two_camera_merge_update(t_loc_left, t_loc_right)
+        self.loc_alarm.two_camera_merge_update(t_loc_left, t_loc_right, self.repo_left.rp_alarming)
         self.loc_alarm.check()
         self.loc_alarm.show()
 
