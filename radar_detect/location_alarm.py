@@ -184,14 +184,15 @@ class Alarm(draw_map.CompeteMap):
                 if alarm_type == 'l':
                     # 基地预警发送，编码规则详见主程序类send_judge
                     # 车辆编号输出
-                    self._touch_api("INFO", "位置预警-信息输出", f"targets:{targets}")
+                    message_ = draw_message("位置预警-信息输出", 0, f"targets:{targets}", "INFO")
+                    self._touch_api(message_)
                 else:
                     self._add_twinkle(loc)
                     targets_text = ' '.join(targets)
                     str_text += f"{target}出现{team} {targets_text}\n"
 
-        self._touch_api(
-            "WARNING", "位置预警-信息输出", str_text)
+        message_ = draw_message("位置预警-信息输出", 0, str_text, "WARNING")
+        self._touch_api(message_)
 
     def _adjust_z_one_armor(self, l_, camera_type):
         """
@@ -239,7 +240,8 @@ class Alarm(draw_map.CompeteMap):
             # 被预测id,debug输出
             for i in range(5):
                 if do_prediction[i]:
-                    self._touch_api("INFO", "位置预警-debug输出", "{0} lp yes".format(armor_list[i]))
+                    message_ = draw_message("位置预警-debug输出", 0, "{0} lp yes".format(armor_list[i]), "INFO")
+                    self._touch_api(message_)
 
         now[do_prediction] = pre[do_prediction]
 
