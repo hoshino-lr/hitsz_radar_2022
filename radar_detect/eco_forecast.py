@@ -50,9 +50,10 @@ class eco_forecast(object):
             return
         guess_num = -1
         score = np.zeros(3)
+        now_time = time.time()
         if not self._init_flag:
             for i in range(score.size):
-                score[i] = self._get_score(detect_message[i])
+                score[i] = self._get_score(detect_message[i], now_time)
             if score[np.argmax(score)] > self._fore_threshold:
                 guess_num = np.argmax(score) + 3
             else:
@@ -66,7 +67,7 @@ class eco_forecast(object):
             message = draw_message("eco_forecast", 0, f"检测到敌方加弹", "critical")
             self.text_api(message)
 
-    def _get_score(self, sub_message: np.ndarray) -> float:
+    def _get_score(self, sub_message: np.ndarray, now_time) -> float:
         # 距离判断，仅根据x
         distance = abs(self._start_dis - sub_message[0])
         if distance > 14:
@@ -77,7 +78,7 @@ class eco_forecast(object):
             d_score = 10
 
         # 时间判断
-        period = time.time() - sub_message[2]
+        period = now_time - sub_message[2]
         if period > 15:
             t_score = 10
         elif period > 10:

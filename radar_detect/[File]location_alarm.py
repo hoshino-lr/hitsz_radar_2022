@@ -1,7 +1,7 @@
 """
 位置预警类，还需要修改和完善
 created by 黄继凡 2021/12
-最新修改 by 黄继凡 2022/7/10
+最新修改 by 黄继凡 2022/7/12
 """
 
 import cv2 as cv
@@ -65,19 +65,21 @@ class Alarm(draw_map.CompeteMap):
         # current_time 车辆出现时间字典，键为字符'1'-'5'，值为车辆出现的时间点
         self._current_time = {}
 
-        # location 车辆位置字典，键为字符'1'-'5'，值为车辆的位置数组，包含车辆坐标及出现时间间隔:[x, y, time]
+        # location 车辆位置字典，键为字符'1'-'5'，值为车辆的位置数组
+        # 包含车辆坐标及出现时间间隔:[x, y, z, time]
         self._location = {}
-        # location 车辆最后一次位置字典，键为字符'1'-'5'，值为车辆的位置数组，包含车辆坐标及出现时间间隔:[x, y, time]
+        # location 车辆最后一次位置字典，键为字符'1'-'5'，值为车辆的位置数组
+        # 包含车辆坐标及出现时间间隔:[x, y, z, time]
         self._last_location = {}
         # confidence 车辆置信度字典，键为字符'1'-'5'，值为车辆的置信度
         self._confidence = {}
 
         # 分别为左右相机存储位置信息，z坐标缓存，相机世界坐标系位置，以及（相机到世界）转移矩阵
-        self._locations = [None, None]
+        self._locations = [None, None] # [[x,y,z],[x,y,z]]
         self._z_cache = [None, None]
         self._camera_position = [None, None]
         self._T = [None, None]
-        if int(enemy_color) == 0:
+        if(int(enemy_color) == 0):
             choose_left = "cam_left_red"
             choose_right = "cam_right_red"
         else:
@@ -99,13 +101,13 @@ class Alarm(draw_map.CompeteMap):
             np.sum(x, axis=1), np.zeros(x.shape[0]))
 
         start_time = time.time()
-        for i in range(1, 6):  # 初始化位置为全零
-            self._location[str(i)] = [0, 0, 0.]
-            self._current_time[str(i)] = start_time
+        for i in range(1, 6):  # 初始化信息为全零
+            self._location[str(i)] = [0, 0, 0, 0.]
+            self._current_time[str(i)] = start_time # 初始时间
             self._confidence[i] = 0
 
         # 前一帧位置为全零
-        self._locations = [np.zeros((5, 2)), np.zeros((5, 2))]
+        self._locations = [np.zeros((5, 3)), np.zeros((5, 3))]
         self._location_cache = self._location.copy()
         self._last_location = self._location.copy()
 
@@ -211,8 +213,7 @@ class Alarm(draw_map.CompeteMap):
                         # 以下计算过程详见技术报告公式
                         ori = l_[1:].copy()
                         line = l_[1:] - self._camera_position[camera_type]
-                        ratio = (
-                                        z_0 - self._camera_position[camera_type][2]) / line[2]
+                        ratio = (z_0 - self._camera_position[camera_type][2]) / line[2]
                         new_line = ratio * line
                         l_[1:] = new_line + self._camera_position[camera_type]
                         if self._debug:
@@ -249,10 +250,10 @@ class Alarm(draw_map.CompeteMap):
         for i in range(1, 6):
             if self._confidence[i] >= self.con_thre:
                 self._location[str(i)][0:2] = now[i - 1].tolist()
-                self._last_location[str(i)][0:2] = now[i - 1].tolist()
-                self._last_location[str(i)][2] = self._current_time[str(i)]
+                self._last_location[str(i)[0:2]] = now[i - 1].tolist()
             else:
                 self._location[str(i)][0:2] = [0, 0]
+
         # push new data
         self._location_cache = self._location.copy()
 
@@ -272,7 +273,7 @@ class Alarm(draw_map.CompeteMap):
         """
         # init location
         for i in range(1, 6):
-            self._location[str(i)][0:2] = [0, 0]
+            self._location[str(i)][0:3] = [0, 0, 0]
 
         self._update_position(t_locations_left, 0, self.state[0], rp_alarming)
         self._update_position(t_locations_right, 1, self.state[1], rp_alarming)
@@ -293,10 +294,12 @@ class Alarm(draw_map.CompeteMap):
             print(choose)
         # 预测填入
         for i in range(1, 6):
-            self._location[str(i)][0:2] = left_location[i - 1].tolist()
-            # 当前未检测到的对应装甲板
-            if self._location[str(i)][0:2] != [0, 0]:
+            self._location[str(i)][0:3] = left_location[i - 1].tolist()
+            #当前未检测到的对应装甲板，时间间隔不进行处理
+            if self._location[str(i)][0:2] != [0,0]:
+                self._location[str(i)][2] = time.time() - self._current_time[str(i)]
                 self._current_time[str(i)] = time.time()
+
 
         if self._lp:
             self._location_prediction()
@@ -304,7 +307,7 @@ class Alarm(draw_map.CompeteMap):
         if self.reset_count == self.reset_thre:
             self.reset_count = 0
             for i in range(1, 6):  # 初始化位置为全零
-                self._location[str(i)][0:2] = [0, 0]
+                self._location[str(i)][0:3] = [0, 0, 0]
             # 前一帧位置为全零
             self._location_cache = self._location.copy()
         else:
@@ -334,6 +337,7 @@ class Alarm(draw_map.CompeteMap):
             locations[1:3] = np.around(locations[1:3])
             for armor in range(1, 6):
                 if (locations[:, 0] == armor).any():
+                    # 雷达点云定位
                     if not detection_type and not camera_type:
                         l1 = locations[locations[:, 0]
                                        == armor].reshape(-1)
@@ -347,7 +351,7 @@ class Alarm(draw_map.CompeteMap):
                         # 结合反投影模块信息判断车辆位置是否在指定区域内
                         for i in rp_alarming.keys():
                             # 反投影模块信息表明当前区域有对应编号车辆
-                            if ((rp_alarming[i] == armor).any()):
+                            if((rp_alarming[i] == armor).any()):
                                 alarm_type, shape_type, team, target, l_type = i.split('_')
                                 # 矩形区域采用范围判断
                                 if shape_type == 'r':
@@ -369,6 +373,7 @@ class Alarm(draw_map.CompeteMap):
                                 continue
 
                     else:
+                        # 德劳内定位
                         l1 = locations[locations[:, 0]
                                        == armor].reshape(-1)
                         l1[1:] = self._loc_D[camera_type].get_point_pos(l1, detection_type).reshape(-1)
@@ -383,10 +388,19 @@ class Alarm(draw_map.CompeteMap):
                     self._confidence[armor] = min(1.1, self._confidence[armor] + self.con_incre)
                     if self._confidence[armor] < self.con_thre:
                         continue
+
+                    # z轴坐标处理，反投影模块字典显示车辆在对应区域时，使用对应区域的高度
+                    l1[3] = np.around(l1[3], decimals=2) # 保留两位小数
+                    for i in rp_alarming.keys():
+                        if((rp_alarming[i] == armor).any()):
+                            l1[3] = self._region[i][-1]
+
+                    # z轴突变调整
                     if self._z_a:
                         self._adjust_z_one_armor(l1, 0)
                         cache_pred.append(l1[[0, 3]])
                     pred_loc.append(l1.reshape(-1))
+
                 else:
                     # 装甲板未出现，置信度衰减处理
                     if self._confidence[armor] > self.con_thre:
@@ -402,8 +416,8 @@ class Alarm(draw_map.CompeteMap):
                 # z cache
                 if self._z_a:
                     self._z_cache[0] = np.stack(cache_pred, axis=0)
-
-                self._locations[camera_type][choose] = l_[:, 1:3].copy()
+                # 保存车辆的位置信息[x,y,z]
+                self._locations[camera_type][choose] = l_[:, 1:4].copy()
 
     def get_location(self):
         return np.array(list(i[0:2] for i in list(self._location.values())))[:5, :]
@@ -437,14 +451,11 @@ class Alarm(draw_map.CompeteMap):
     def get_draw(self, camera_type):
         return self._loc_D[camera_type].get_points()
 
-    def get_last_loc(self) -> np.ndarray:
-        return np.array(list(self._last_location.values()))
-
     def show(self):
         """
         执行预警闪烁并画点显示地图
         """
-        # _update函数内使用索引对位置的x，y值进行处理
+        #_update函数内使用索引对位置的x，y值进行处理
         self._update(self._location, self._last_location)
         self._refresh()
         self._twinkle(self._region)

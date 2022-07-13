@@ -81,6 +81,12 @@ class message_box(object):
     def clear_message(self):
         for key in self.__message_base.keys():
             self.__message_base[key].clear()
+        while not self.__critical_queue.empty():
+            self.__critical_queue.get()
+        while not self.__info_queue.empty():
+            self.__info_queue.get()
+        while not self.__warning_queue.empty():
+            self.__warning_queue.get()
 
     def get_top_message(self) -> str:
         if not self.__critical_queue.empty():
@@ -96,10 +102,8 @@ class message_box(object):
     def _get_prefix(l_: draw_message) -> str:
         period = time.time() - l_.time
         prefix = ""
-        if period > 90:
+        if period > 60:
             prefix = "[无效] "
-        elif period > 60:
-            prefix = "[一分钟前] "
         elif period > 30:
             prefix = "[半分钟前] "
         elif period > 10:
