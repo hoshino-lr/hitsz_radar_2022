@@ -26,6 +26,7 @@ class decision_tree(object):
         self._our_blood = np.zeros((8, 1))  # 我方血量
         self._last_blood = np.zeros((8, 1))  # 我方血量
         self._our_blood_max = np.ones((8, 1))  # 我方血量上限
+        self._position_2d = None
         self._rp_alarming = {}
         self._state = 0  # 增益
         self.text_api = text_api
@@ -35,7 +36,7 @@ class decision_tree(object):
             self.start_x = 28.
         else:
             self.start_x = 0
-        self._start_time = 0.
+        self._start_time = time.time()
         self._engineer_flag = False
         self._fly_flag = False
         self._tou_flag = False
@@ -48,7 +49,6 @@ class decision_tree(object):
             self._target_attack()
             self._run_alarm()
             self._tou_alarm()
-
         else:
             self.clear_state()
 
@@ -82,7 +82,7 @@ class decision_tree(object):
                     self._car_decision[i][0] = 2
 
     def _tou_alarm(self):
-        self.tou_flag = False
+        self._tou_flag = False
         car_flag = False
         for i in range(5):
             if self._our_position[i][0] != 0 and i != 1:
@@ -95,7 +95,7 @@ class decision_tree(object):
                 if self._enemy_position[i][0] != 0 and i != 1:
                     distance = abs(self._enemy_position[i][0] - self.start_x)
                     if distance <= 8:
-                        self.tou_flag = True
+                        self._tou_flag = True
                         break
 
     def _target_attack(self):
@@ -131,6 +131,7 @@ class decision_tree(object):
         self._our_blood = np.zeros((8, 1))  # 我方血量
         self._last_blood = np.zeros((8, 1))  # 我方血量
         self._our_blood_max = np.ones((8, 1))  # 我方血量上限
+        self._position_2d = None
         self._rp_alarming = {}
         self._state = 0  # 增益
         self._car_decision = np.zeros((5, 2))
@@ -138,17 +139,41 @@ class decision_tree(object):
         self._engineer_flag = False
         self._fly_flag = False
 
-    def update_start_time(self, t_: float):
-        self._start_time = t_
+    def update_serial(self, our_position: np.ndarray, our_blood: np.ndarray,
+                      enemy_blood: np.ndarray, state: int, remain_time: float):
 
-    def update_position(self, our_position: np.ndarray, enemy_position: np.ndarray):
         self._our_position = our_position
-        self._enemy_position = enemy_position
-
-    def update_blood(self, our_blood: np.ndarray, enemy_blood: np.ndarray):
         self._our_blood = our_blood
         self._enemy_blood = enemy_blood
-
-    def update_state(self, state: int, fly_flag: bool):
         self._state = state
+        self._remain_time = remain_time
+        self._high_light = False
+
+    def generate_information(self):
+
+        if self._fly_flag:
+            self.text_api(draw_message("fly", 2, ("飞坡预警", (100, 2000)), "critical"))
+        if self._engineer_flag:
+            self.text_api(draw_message("engineer", 2, ("工程预警", (2500, 2000)), "critical"))
+        if self._tou_qsz:
+            self.text_api(draw_message("tou_qsz", 0, "偷前哨站预警", "warning"))
+        if self._tou_flag:
+            self.text_api(draw_message("tou", 0, "偷家预警", "critical"))
+
+        if isinstance(self._position_2d, np.ndarray):
+            for i in self._position_2d:
+                if i[11] == 1:
+                    if self._remain_time < 60 or self._high_light:
+                        self.text_api(draw_message(f"{i[11]}", 2, i[6:10].tolist(), "critical"))
+                else:
+                    if self._high_light:
+                        self.text_api(draw_message(f"{i[11]}", 2, i[6:10].tolist(), "warning"))
+
+    def update_information(self, enemy_position: np.ndarray, fly_flag: bool, hero_r3: bool, position_2d):
+        self._enemy_position = enemy_position
+        self._hero_r3 = hero_r3
         self._fly_flag = fly_flag
+        self._position_2d = position_2d
+
+    def get_decision(self) -> np.ndarray:
+        return self._car_decision

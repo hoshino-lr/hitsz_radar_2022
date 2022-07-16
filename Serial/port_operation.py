@@ -21,7 +21,7 @@ class Port_operate(object):
     Remain_time = 0  # 剩余时间
 
     change_view = -1
-    using_position = False
+    highlight = False
     missile_bit = False
 
     _init_hp = np.ones(10, dtype=int) * 500  # 初始血量
@@ -70,6 +70,10 @@ class Port_operate(object):
     def get_state():
         # 传出位置
         return [Port_operate._Now_state, Port_operate._energy_time]
+    
+    @staticmethod
+    def HP():
+        return Port_operate._HP
 
     @staticmethod
     def Map(targetId, x, y, ser):
@@ -190,8 +194,15 @@ class Port_operate(object):
             sender_id = (buffer[8] << 8) | buffer[7]
             if sender_id == 0x106 or sender_id == 0x6:
                 Port_operate.change_view = buffer[13]
-                Port_operate.using_position = buffer[14]
+                Port_operate.highlight = buffer[14]
                 Port_operate.missile_bit = buffer[15]
+                if Port_operate.missile_bit:
+                    Port_operate._energy_time = time.time()
+                    if Port_operate.Remain_time < 240:
+                        Port_operate._Now_state = 4
+                    else:
+                        Port_operate._Now_state = 3
+
             elif sender_id >= 0x100:
                 Port_operate._Robot_positions_us[sender_id - 0x100] = np.array([buffer[13], buffer[14]])
             else:
@@ -217,12 +228,15 @@ class Port_operate(object):
             elif Port_operate._Now_state == 1:
                 Port_operate._energy_time = time.time()
             else:
-                Port_operate._energy_time = 0
+                Port_operate._energy_time = time.time()
             Port_operate._last_state = Port_operate._Now_state
         else:
             if time.time() - Port_operate._energy_time >= 45:
-                Port_operate._Now_state = Port_operate._last_state = 0
-                Port_operate._energy_time = 0
+                Port_operate._Now_state = -1
+                Port_operate._energy_time = time.time()
+            if Port_operate._Now_state == -1 and time.time() - Port_operate._energy_time >= 30:
+                Port_operate._Now_state = 0
+            Port_operate._last_state = Port_operate._Now_state
 
     @staticmethod
     def generate_head(buffer, length):

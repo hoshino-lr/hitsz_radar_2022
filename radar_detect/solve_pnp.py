@@ -6,7 +6,7 @@ created by 黄继凡 2021/1
 import cv2
 import numpy as np
 from radar_detect.location import CameraLocation
-from resources.config import objPoints, objNames, DEBUG, cam_config, enemy2color, enemy_color
+from config import objPoints, objNames, DEBUG, cam_config, enemy2color, enemy_color
 
 
 class SolvePnp(CameraLocation):
@@ -91,8 +91,8 @@ class SolvePnp(CameraLocation):
         self._api("INFO", "count", f"当前点：{self.count + 1}")
         for i in range(1, self.count_max + 1):
             text = f"{self.names[i - 1]}\n" \
-                    f"x : {self.imgPoints[i - 1][0]} y: {self.imgPoints[i - 1][1]}"
-            if i-1 != self.count:
+                   f"x : {self.imgPoints[i - 1][0]} y: {self.imgPoints[i - 1][1]}"
+            if i - 1 != self.count:
                 self._api("INFO", f"count{i}", text)
             else:
                 self._api("ERROR", f"count{i}", text)  # 只是显示一种颜色
@@ -125,4 +125,3 @@ class SolvePnp(CameraLocation):
             self.sp_state = False
             self._update_info()
             return False
-

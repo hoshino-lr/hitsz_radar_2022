@@ -64,6 +64,7 @@ class Predictor(object):
         self.name = _name  # 选择的相机是左还是右
         self.choose_type = 0  # 只选择检测cars类，不检测哨兵和基地
         self.enemy_color = not enemy_color
+        self.lock = threading.Condition()
         for i in self.net1_strides:
             self.net1_grid.append([self.net1_num_anchors[0], int(self.net1_inpHeight / i), int(self.net1_inpWidth / i)])
 
@@ -88,8 +89,10 @@ class Predictor(object):
         if not self.using_net:
             return np.array([]), src
         else:
+            self.lock.acquire()
             self.img_src = src.copy()
-            self.pic_update = True
+            self.lock.notify()
+            self.lock.release()
             # 图像预处理
             img = cv.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv.INTER_LINEAR)
             img = img[:, :, ::-1].transpose(2, 0, 1)
@@ -466,8 +469,10 @@ class Predictor(object):
     def mul_record(self):
         while True:
             if self.record_state:
+                self.lock.acquire()
+                self.lock.wait()
                 self.record_object.write(self.img_src)
-                time.sleep(0.02)
+                self.lock.release()
             else:
                 break
 

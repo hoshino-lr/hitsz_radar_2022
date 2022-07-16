@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1860</width>
-    <height>1020</height>
+    <width>1857</width>
+    <height>1037</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -41,7 +41,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>1841</width>
+        <width>1854</width>
         <height>991</height>
        </rect>
       </property>
@@ -78,25 +78,6 @@
          <property name="spacing">
           <number>2</number>
          </property>
-         <item row="0" column="0">
-          <widget class="QLabel" name="main_demo">
-           <property name="minimumSize">
-            <size>
-             <width>1400</width>
-             <height>645</height>
-            </size>
-           </property>
-           <property name="frameShape">
-            <enum>QFrame::StyledPanel</enum>
-           </property>
-           <property name="text">
-            <string>主视角</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
          <item row="1" column="0">
           <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="1,1,1">
            <property name="leftMargin">
@@ -116,7 +97,7 @@
              <property name="minimumSize">
               <size>
                <width>476</width>
-               <height>250</height>
+               <height>270</height>
               </size>
              </property>
              <property name="frameShape">
@@ -141,7 +122,7 @@
              <property name="minimumSize">
               <size>
                <width>320</width>
-               <height>250</height>
+               <height>270</height>
               </size>
              </property>
              <property name="frameShape">
@@ -160,7 +141,7 @@
              <property name="minimumSize">
               <size>
                <width>320</width>
-               <height>250</height>
+               <height>270</height>
               </size>
              </property>
              <property name="frameShape">
@@ -168,6 +149,73 @@
              </property>
              <property name="text">
               <string>三倍镜显示界面</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item row="0" column="0">
+          <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="1,8,1">
+           <property name="spacing">
+            <number>0</number>
+           </property>
+           <property name="sizeConstraint">
+            <enum>QLayout::SetDefaultConstraint</enum>
+           </property>
+           <item>
+            <widget class="QLabel" name="left_demo">
+             <property name="minimumSize">
+              <size>
+               <width>146</width>
+               <height>693</height>
+              </size>
+             </property>
+             <property name="frameShape">
+              <enum>QFrame::StyledPanel</enum>
+             </property>
+             <property name="text">
+              <string>left_demo</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="main_demo">
+             <property name="minimumSize">
+              <size>
+               <width>1170</width>
+               <height>693</height>
+              </size>
+             </property>
+             <property name="frameShape">
+              <enum>QFrame::StyledPanel</enum>
+             </property>
+             <property name="text">
+              <string>main_demo</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="right_demo">
+             <property name="minimumSize">
+              <size>
+               <width>146</width>
+               <height>693</height>
+              </size>
+             </property>
+             <property name="frameShape">
+              <enum>QFrame::StyledPanel</enum>
+             </property>
+             <property name="text">
+              <string>right_demo</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignCenter</set>

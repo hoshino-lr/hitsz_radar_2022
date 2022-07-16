@@ -6,7 +6,7 @@ draw_map.py
 import cv2
 import numpy as np
 
-from resources.config import MAP_PATH, map_size, enemy2color
+from config import MAP_PATH, map_size, enemy2color
 
 
 class CompeteMap(object):
@@ -94,33 +94,16 @@ class CompeteMap(object):
         在canvas绘制预警区域（canvas 原始地图 _map）
         """
         for r in region.keys():
-            alarm_type, shape_type, team, _, _ = r.split('_')
+            alarm_type, team, _, _ = r.split('_')
             if (alarm_type == 'm' or alarm_type == 'a') and team == enemy2color[self._enemy]:  # 预警类型判断，若为map或all类型
-                if shape_type == 'l':
-                    # 直线预警
-                    rect = region[r]  # 获得直线两端点，为命名统一命名为rect
-                    # 将实际世界坐标系坐标转换为地图上的像素位置
-                    cv2.line(self._map, (int(rect[0] * map_size[0] // self._real_size[0]),
-                                         int((self._real_size[1] - rect[1]) * map_size[1] // self._real_size[1])),
-                             (int(rect[2] * map_size[0] // self._real_size[0]),
-                              int((self._real_size[1] - rect[3]) * map_size[1] // self._real_size[1])),
-                             (0, 255, 0), 2)
-                if shape_type == 'r':
-                    # 矩形预警
-                    rect = region[r]  # rect(x0,y0,x1,y1)
-                    cv2.rectangle(self._map,
-                                  (int(rect[0] * map_size[0] // self._real_size[0]),
-                                   int((self._real_size[1] - rect[1]) * map_size[1] // self._real_size[1])),
-                                  (int(rect[2] * map_size[0] // self._real_size[0]),
-                                   int((self._real_size[1] - rect[3]) * map_size[1] // self._real_size[1])),
-                                  (0, 255, 0), 2)
-                if shape_type == 'fp':
-                    # 四点预警
-                    f = lambda x: (int(x[0] * map_size[0] // self._real_size[0]),
-                                   int((self._real_size[1] - x[1]) * map_size[1] // self._real_size[1]))
-                    rect = np.array(region[r][:8]).reshape(4, 2)  # rect(x0,y0,x1,y1)
-                    for i in range(4):
-                        cv2.line(self._map, f(rect[i]), f(rect[(i + 1) % 4]), (0, 255, 0), 2)
+                # n点预警
+                f = lambda x: (int(x[0] * map_size[0] // self._real_size[0]),
+                               int((self._real_size[1] - x[1]) * map_size[1] // self._real_size[1]))
+                rect = np.array(region[r]).reshape(-1, 3)[:, :2]
+                count = len(region[r])
+                if count > 2:
+                    for i in range(count):
+                        cv2.line(self._map, f(rect[i]), f(rect[(i + 1) % count]), (0, 255, 0), 2)
 
     def _draw_circle(self, location, armor: int, dtype: int):
         """
@@ -164,23 +147,11 @@ class CompeteMap(object):
                 # 不能再预警
                 continue
             if self._twinkle_event[r] % 10 >= 5:
-                # 当前灭，且还有预警次数，使其亮
-                _, shape_type, _, _, _ = r.split('_')  # region格式见tmp_config.py文件
-                # 闪
-                if shape_type == 'r':
-                    rect = region[r]  # rect(x0,y0,x1,y1)
-                    cv2.rectangle(self._out_map_twinkle,
-                                  (int(rect[0] * map_size[0] // self._real_size[0]),
-                                   int((self._real_size[1] - rect[1]) * map_size[1] // self._real_size[1])),
-                                  (int(rect[2] * map_size[0] // self._real_size[0]),
-                                   int((self._real_size[1] - rect[3]) * map_size[1] // self._real_size[1])),
-                                  (0, 0, 255), -1)
-                if shape_type == 'fp':
-                    x = np.float32(region[r][:8]).reshape(4, 2)
-                    x[:, 0] = (x[:, 0] * map_size[0] // self._real_size[0])
-                    x[:, 1] = ((self._real_size[1] - x[:, 1]) * map_size[1] // self._real_size[1])
-                    rect = x.astype(int)
-                    cv2.fillConvexPoly(self._out_map_twinkle, rect, (0, 0, 255))
+                x = np.float32(region[r]).reshape(-1, 3)[:, :2]
+                x[:, 0] = (x[:, 0] * map_size[0] // self._real_size[0])
+                x[:, 1] = ((self._real_size[1] - x[:, 1]) * map_size[1] // self._real_size[1])
+                rect = x.astype(int)
+                cv2.fillConvexPoly(self._out_map_twinkle, rect, (0, 0, 255))
 
             # 减少预警次数
             self._twinkle_event[r] -= 1

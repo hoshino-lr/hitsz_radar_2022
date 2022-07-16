@@ -6,10 +6,9 @@ created by 牟俊宇 2020/12
 import cv2
 import numpy as np
 import time
-from radar_detect.common import is_inside
+from radar_detect.common import is_inside_polygon
 from config import color2enemy, enemy_case, enemy_color, cam_config, \
     DEBUG, test_region, region, real_size
-from mapping.drawing import draw_message
 
 
 class Reproject(object):
@@ -36,6 +35,7 @@ class Reproject(object):
         self._real_size = real_size  # 真实尺寸
         self._scene_init = False  # 初始化flag
         self.fly = False
+        self.hero_r3 = False
         self._text_api = text_api  # 发送text的api
         self.rp_alarming = {}
 
@@ -54,37 +54,41 @@ class Reproject(object):
             # 格式解析
             cor = None
             height = None
-            rtype, shape_type, team, location, height_type = r.split('_')
+            rtype, team, location, height_type = r.split('_')
             if location not in enemy_case or color2enemy[team] == self._enemy:  # 筛选出敌方的区域
                 if rtype == 's' or rtype == 'a':  # 筛选需要进行反投影的区域
                     self._region_count[f'{location}'] = 0  # 初始化区域检测计数
                     self._time[f'{location}'] = 0  # 初始化时间间隔
-                    if shape_type == 'r':  # 计算矩形坐标
-                        # 引入左上右下两点
-                        lt = self._region[r][:2].copy()
-                        rd = self._region[r][2:4].copy()
-                        # 另外两点坐标
-                        ld = [lt[0], rd[1]]
-                        rt = [rd[0], lt[1]]
-                        cor = np.float32([lt, rt, rd, ld]).reshape(-1, 2)  # 坐标数组
-                        if height_type == 'a':  # 四点在同一高度
-                            height = np.ones((cor.shape[0], 1)) * self._region[r][4]
-                        if height_type == 'd':  # 四点在不同高度
-                            height = np.ones((cor.shape[0], 1))
-                            height[1:3] *= self._region[r][5]  # 右上和右下
-                            height[[0, 3]] *= self._region[r][4]  # 左上和左下
-                    if shape_type == 'fp':
-                        # 四点凸四边形类型，原理同上
-                        cor = np.float32(self._region[r][:8]).reshape(-1, 2)
-                        # cor[:, 1] -= self._real_size[1]  # 同上，原点变换
-                        if height_type == 'a':
-                            height = np.ones((cor.shape[0], 1)) * self._region[r][8]
-                        if height_type == 'd':
-                            height = np.ones((cor.shape[0], 1))
-                            height[1:3] *= self._region[r][9]
-                            height[[0, 3]] *= self._region[r][8]
+                    if len(self._region[r]) < 2:
+                        pass
+                    else:
+                        cor = np.array(self._region[r]) * 1000
+                    # if shape_type == 'r':  # 计算矩形坐标
+                    #     # 引入左上右下两点
+                    #     lt = self._region[r][:2].copy()
+                    #     rd = self._region[r][2:4].copy()
+                    #     # 另外两点坐标
+                    #     ld = [lt[0], rd[1]]
+                    #     rt = [rd[0], lt[1]]
+                    #     cor = np.float32([lt, rt, rd, ld]).reshape(-1, 2)  # 坐标数组
+                    #     if height_type == 'a':  # 四点在同一高度
+                    #         height = np.ones((cor.shape[0], 1)) * self._region[r][4]
+                    #     if height_type == 'd':  # 四点在不同高度
+                    #         height = np.ones((cor.shape[0], 1))
+                    #         height[1:3] *= self._region[r][5]  # 右上和右下
+                    #         height[[0, 3]] *= self._region[r][4]  # 左上和左下
+                    # if shape_type == 'fp':
+                    #     # 四点凸四边形类型，原理同上
+                    #     cor = np.float32(self._region[r][:8]).reshape(-1, 2)
+                    #     # cor[:, 1] -= self._real_size[1]  # 同上，原点变换
+                    #     if height_type == 'a':
+                    #         height = np.ones((cor.shape[0], 1)) * self._region[r][8]
+                    #     if height_type == 'd':
+                    #         height = np.ones((cor.shape[0], 1))
+                    #         height[1:3] *= self._region[r][9]
+                    #         height[[0, 3]] *= self._region[r][8]
                     if isinstance(cor, np.ndarray) and isinstance(height, np.ndarray):
-                        cor = np.concatenate([cor, height], axis=1) * 1000  # 合并高度坐标 顺便把米转换为毫米
+                        # cor = np.concatenate([cor, height], axis=1) * 1000  # 合并高度坐标 顺便把米转换为毫米
                         recor = cv2.projectPoints(cor, self._rvec, self._tvec, self._K_O, self._C_O)[0] \
                             .astype(int).reshape(-1, 2)  # 得到反投影坐标
                         self._scene_region[r] = recor  # 储存反投影坐标
@@ -107,6 +111,7 @@ class Reproject(object):
         armors = None  # armors:N,cls+对应的车辆预测框序号+装甲板bbox
         cars = None  # cars:N,cls+车辆bbox
         self.fly = False
+        self.hero_r3 = False
         self.rp_alarming = {}
         if isinstance(net_input, np.ndarray):  # 解析网络输入
             if len(net_input):
@@ -146,7 +151,7 @@ class Reproject(object):
             points = points.reshape((-1, 4, 2))
             for r in self._scene_region.keys():
                 # 判断对于各个预测框，是否有点在该区域内
-                mask = np.array([[is_inside(self._scene_region[r], p) for p in cor] for cor in points])
+                mask = np.array([[is_inside_polygon(self._scene_region[r], p) for p in cor] for cor in points])
                 mask = np.sum(mask, axis=1) > 0  # True or False,只要有一个点在区域内，则为True
                 alarm_target = cls[mask]  # 需要预警的装甲板种类
                 if len(alarm_target):
@@ -156,18 +161,16 @@ class Reproject(object):
         """
         发送信息
         """
+
         if self._scene_init:
             for r in self.rp_alarming.keys():
                 # 格式解析
                 _, _, _, location, _ = r.split('_')
                 if location == "3号高地":
-                    for i in self.rp_alarming[r]:
-                        try:
-                            if i == 1:
-                                self._text_api("ERROR", f"反投影{location}", f"在{location}处有英雄！！！\n")
-                                print(f"[ERROR] 反投影{location}", f"在{location}处有英雄！！！")
-                        except Exception as e:
-                            print(e)
+                    result = self.rp_alarming[r] == 1
+                    if result.any():
+                        self.hero_r3 = True
+                        print(f"[ERROR] 反投影{location}", f"在{location}处有英雄！！！")
                 else:
                     if self._time[f'{location}'] == 0:
                         self._start[f'{location}'] = time.time()
@@ -183,12 +186,9 @@ class Reproject(object):
                             if self._region_count[f'{location}'] >= self._frame:
                                 if location == "飞坡":
                                     self.fly = True
-                                self._text_api("ERROR", f"反投影{location}", f"在{location}处有敌人！！！\n")
-                                print(f"[ERROR] 反投影{location}", f"在{location}处有英雄！！！")
+                                print(f"[ERROR] 反投影{location}", f"在{location}处有敌人！！！")
                                 self._region_count[f'{location}'] = 0
                             self._time[f'{location}'] = 0
-        else:
-            self._text_api("WARNING", "反投影", "未初始化！！！")
 
     def get_rp_alarming(self):
         return self.rp_alarming

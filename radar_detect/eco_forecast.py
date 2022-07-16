@@ -20,7 +20,7 @@ import cv2 as cv
 class eco_forecast(object):
     def __init__(self, text_api):
         self.ori_pic = np.array([])
-        self.cut = self.cut
+        self.cut = None
         self.text_api = text_api
         self._init_flag = False
         self._intensity_bound = 50

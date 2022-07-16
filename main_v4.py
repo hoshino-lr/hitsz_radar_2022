@@ -120,14 +120,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 'cam_right'))
             self.PRE_right.daemon = True
 
-        self.lidar = Radar('cam_left', text_api=self.text_api, imgsz=cam_config['cam_left']["size"], queue_size=100)
-
-        if USEABLE['Lidar']:
-            self.lidar.start()
-        else:
-            # 读取预定的点云文件
-            self.lidar.preload()
-
         if self.__serial:
             ser = serial.Serial("/dev/ttyACM0", 115200, timeout=1)
             self.read_thr = threading.Thread(target=read, args=(ser,))
@@ -138,9 +130,18 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.read_thr.start()
 
         self.draw_module = drawing()  # 绘图及信息管理类
+        self.text_api = lambda x: self.draw_module.update(x)
+        self.lidar = Radar('cam_left', text_api=self.text_api, imgsz=cam_config['cam_left']["size"], queue_size=100)
+
+        if USEABLE['Lidar']:
+            self.lidar.start()
+        else:
+            # 读取预定的点云文件
+            self.lidar.preload()
+
         self.sp = SolvePnp(self.pnp_api)  # pnp解算
 
-        self.text_api = lambda x: self.draw_module.update(x)
+        self.decision_tree = decision_tree(self.text_api)
         self.repo_left = Reproject('cam_left', self.text_api)  # 左相机反投影
         self.loc_alarm = Alarm(enemy=enemy_color, api=self.show_map, touch_api=self.text_api,
                                state_=USEABLE['locate_state'], debug=False)  # 绘图及信息管理类
@@ -157,11 +158,9 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.loc_alarm.push_T(cam_config["cam_left"]["rvec"], cam_config["cam_left"]["tvec"], 0)
         try:
             self.sp.read(f'cam_right_{enemy2color[enemy_color]}')
-            self.repo_right.push_T(self.sp.rvec, self.sp.tvec)
             self.loc_alarm.push_T(self.sp.rvec, self.sp.tvec, 1)
         except Exception as e:
             print(f"[ERROR] {e}")
-            self.repo_right.push_T(cam_config["cam_right"]["rvec"], cam_config["cam_right"]["tvec"])
             self.loc_alarm.push_T(cam_config["cam_right"]["rvec"], cam_config["cam_right"]["tvec"], 1)
 
         self.draw_module.info_update_reproject(self.repo_left.get_scene_region())
@@ -183,7 +182,9 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.set_image(frame, "main_demo")
         self.set_image(frame_m, "map")
         del frame, frame_m
-
+        frame = np.zeros((162, 716, 3)).astype(np.uint8)
+        self.set_image(frame, "left_demo")
+        self.set_image(frame, "right_demo")
         self.board_textBrowser = {}
         self.pnp_textBrowser = {}
 
@@ -194,6 +195,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.epnp_mode = False  # 0:停止 1:开始
         self.terminate = False
         self.show_pc_state = False
+        self.highlight = False
         self.record.setText("录制")
         self.ChangeView.setText("切换视角")
         self.ShutDown.setText("终止程序")
@@ -329,7 +331,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         """
         if frame is None:
             return False
-        if position not in ["main_demo", "map", "far_demo", "blood", "hero_demo"]:
+        if position not in ["main_demo", "map", "far_demo", "blood", "hero_demo", "left_demo", "right_demo"]:
             print("[ERROR] The position isn't a member of this UI_window")
             return False
         if position == "main_demo":
@@ -341,10 +343,18 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         elif position == "map":
             width = self.map.width()
             height = self.map.height()
-        else:
+        elif position == "blood":
             width = self.blood.width()
             height = self.blood.height()
-
+        elif position == "hero_demo":
+            width = self.hero_demo.width()
+            height = self.hero_demo.height()
+        elif position == "left_demo":
+            width = self.left_demo.width()
+            height = self.left_demo.height()
+        elif position == "right_demo":
+            width = self.left_demo.width()
+            height = self.left_demo.height()
         if frame.shape[2] == 3:
             rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
         elif frame.shape[2] == 2:
@@ -373,6 +383,12 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         elif position == "hero_demo":
             self.hero_demo.setPixmap(temp_pixmap)
             self.hero_demo.setScaledContents(True)
+        elif position == "left_demo":
+            self.left_demo.setPixmap(temp_pixmap)
+            self.left_demo.setScaledContents(True)
+        elif position == "right_demo":
+            self.right_demo.setPixmap(temp_pixmap)
+            self.right_demo.setScaledContents(True)
         return True
 
     def set_board_text(self, _type: str, position: str, message: str) -> None:
@@ -438,8 +454,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         else:
             self.set_board_text("INFO", "右相机", "右相机正常工作")
 
-        text = "<br \>".join(self.draw_module.browser_message())  # css format to replace \n
-        self.textBrowser.setText(text)
+        # text = "<br \>".join(self.draw_module.browser_message())  # css format to replace \n
+        # self.textBrowser.setText(text)
         text = "<br \>".join(list(self.board_textBrowser.values()))  # css format to replace \n
         self.condition.setText(text)
 
@@ -447,10 +463,9 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if self.__pic_left is not None:
             self.draw_module.draw_message(self.__pic_left)
             self.set_image(self.__pic_left, "main_demo")
-            if self.view_change == 0:
-                self.set_image(self.__pic_left[800:1300, 800:1300], "far_demo")
-        if self.__pic_right is not None and self.view_change != 0:
-            self.set_image(self.__pic_right[800:1300, 800:1300], "far_demo")
+            self.set_image(self.__pic_left[600:800, 700:1200], "far_demo")
+        if self.__pic_right is not None:
+            self.set_image(self.__pic_right, "hero_demo")
 
     def update_epnp(self, tvec: np.ndarray, rvec: np.ndarray, side: int) -> None:
         if not side:
@@ -508,17 +523,25 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             else:
                 self.update_reproject()
                 self.update_location_alarm()
-        self.update_image()
-        self.update_state()
+
         # update serial
         if self.__serial:
             Port_operate.get_message(self.hp_scene)
             self.hp_scene.show()
             location = self.loc_alarm.get_location()
             Port_operate.gain_positions(location)
-
+            Port_operate.gain_decisions(self.decision_tree.get_decision())
             if Port_operate.change_view != -1:
                 self.view_change = Port_operate.change_view
+            self.decision_tree.update_serial(Port_operate.positions_us(), Port_operate.HP()[0:8],
+                                             Port_operate.HP()[8:16],
+                                             Port_operate.get_state(), Port_operate.Remain_time)
+
+        self.decision_tree.update_information(self.loc_alarm.get_location(), self.repo_left.fly, self.repo_left.hero_r3,
+                                              self.__res_left)
+        self.decision_tree.decision_alarm()
+        self.update_image()
+        self.update_state()
 
         # if close the program
         if self.terminate:
@@ -527,11 +550,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 self.PRE_left.join(timeout=0.5)
             if self.__cam_right:
                 self.PRE_right.join(timeout=0.5)
-            del self._right_record
-            del self._left_record
-            del self._que_left
-            del self._que_right
-            del self._cam
             sys.exit()
 
 

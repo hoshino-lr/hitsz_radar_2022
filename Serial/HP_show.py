@@ -4,7 +4,7 @@
 import numpy as np
 import cv2
 
-from resources.config import enemy2color, unit_list
+from config import enemy2color, unit_list
 
 
 class HP_scene(object):

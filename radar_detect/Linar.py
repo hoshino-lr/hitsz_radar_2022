@@ -20,7 +20,7 @@ from datetime import datetime
 import pickle as pkl
 from sensor_msgs import point_cloud2
 from sensor_msgs.msg import PointCloud2
-from resources.config import PC_STORE_DIR, LIDAR_TOPIC_NAME,BAG_FIRE
+from config import PC_STORE_DIR, LIDAR_TOPIC_NAME, BAG_FIRE
 
 
 class DepthQueue(object):
@@ -35,8 +35,8 @@ class DepthQueue(object):
         self.size = size
         self.depth = np.ones((size[1], size[0]), np.float64) * np.nan
         self.queue = Queue(capacity)
-        self.rvec = cv2.Rodrigues(E_0[:3,:3])[0]
-        self.tvec = E_0[:3,3]
+        self.rvec = cv2.Rodrigues(E_0[:3, :3])[0]
+        self.tvec = E_0[:3, 3]
         self.K_0 = K_0
         self.C_0 = C_0
         self.E_0 = E_0
@@ -49,10 +49,10 @@ class DepthQueue(object):
             self.init_flag = True
 
         # 坐标转换 由雷达坐标转化相机坐标，得到点云各点在相机坐标系中的z坐标
-        dpt = (self.E_0@(np.concatenate([entry,np.ones((entry.shape[0],1))],axis = 1).transpose())).transpose()[:,2]
+        dpt = (self.E_0 @ (np.concatenate([entry, np.ones((entry.shape[0], 1))], axis=1).transpose())).transpose()[:, 2]
 
         # 得到雷达点云投影到像素平面的位置
-        ip = cv2.projectPoints(entry,self.rvec,self.tvec,self.K_0,self.C_0)[0].reshape(-1,2).astype(np.int32)
+        ip = cv2.projectPoints(entry, self.rvec, self.tvec, self.K_0, self.C_0)[0].reshape(-1, 2).astype(np.int32)
 
         # 判断投影点是否在图像内部
         inside = np.logical_and(np.logical_and(ip[:, 0] >= 0, ip[:, 0] < self.size[0]),
@@ -94,7 +94,7 @@ class DepthQueue(object):
         x0,y0是中心点在归一化相机平面的坐标前两位，z为其对应在相机坐标系中的z坐标值
         '''
         if len(rects) == 0:
-            return np.stack([], axis=0)*np.nan
+            return np.stack([], axis=0) * np.nan
 
         ops = []
 
@@ -138,7 +138,7 @@ class Radar(object):
 
     __record_max_times = 100  # 最大存点云数量
 
-    def __init__(self, name,text_api, queue_size=300, imgsz=(1024, 1024)):
+    def __init__(self, name, text_api, queue_size=300, imgsz=(1024, 1024)):
         '''
         雷达处理类，对每个相机都要创建一个对象
 
@@ -146,7 +146,7 @@ class Radar(object):
         :param queue_size:队列最大长度
         :param imgsz:相机图像大小
         '''
-        from resources.config import cam_config
+        from config import cam_config
         if not Radar.__init_flag:
             # 当雷达还未有一个对象时，初始化接收节点
             Radar.__laser_listener_begin(LIDAR_TOPIC_NAME)
@@ -290,7 +290,8 @@ if __name__ == '__main__':
     # 测试demo 同时也是非常好的测距测试脚本
     # 还没改
     from resources.config import cam_config
-    cv2.namedWindow("img",cv2.WINDOW_NORMAL) # 显示实际图片
+
+    cv2.namedWindow("img", cv2.WINDOW_NORMAL)  # 显示实际图片
     bag_file = '/home/hoshino/CLionProjects/camera_lidar_calibration/data/game/beijing.bag'
     bag = rosbag.Bag(bag_file, "r")
     topic = '/livox/lidar'
@@ -298,7 +299,7 @@ if __name__ == '__main__':
     K_0 = cam_config['cam_left']['K_0']
     C_0 = cam_config['cam_left']['C_0']
     E_0 = cam_config['cam_right']['E_0']
-    depth = DepthQueue(100, size=[1024, 1024], K_0=K_0, C_0=C_0,E_0=E_0)
+    depth = DepthQueue(100, size=[1024, 1024], K_0=K_0, C_0=C_0, E_0=E_0)
     for topic, msg, t in bag_data:
         pc = np.float32(point_cloud2.read_points_list(msg, field_names=("x", "y", "z"), skip_nans=True)).reshape(
             -1, 3)
@@ -322,4 +323,3 @@ if __name__ == '__main__':
             # 显示世界坐标系和相机坐标系坐标和深度，以对测距效果进行粗略测试
             dee = depth.detect_depth([rect])
             print(dee)
-

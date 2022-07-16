@@ -46,9 +46,9 @@ class message_box(object):
 
     def __init__(self):
         self.__message_base = {
-            "info": Dict[str, draw_message],
-            "warning:": Dict[str, draw_message],
-            "critical": Dict[str, draw_message]
+            "info": {},
+            "warning:": {},
+            "critical": {}
         }
         self.__info_queue = queue.Queue(self.queue_size)
         self.__warning_queue = queue.Queue(self.queue_size)
@@ -159,7 +159,7 @@ class drawing(object):
         tl = 5  # line/font thickness
         tf = max(tl - 1, 1)  # font thickness
         text_size = cv.getTextSize(input_text, 0, tl, tf)
-        middle_point = ((pic.size[1] - text_size[0][0]) / 2, pic.size[0] - text_size[0][1])
+        middle_point = (int((pic.shape[1] - text_size[0][0]) / 2), pic.shape[0] - text_size[0][1])
         cv.putText(pic, input_text, middle_point, 0, tl, (20, 20, 255), thickness=tf,
                    lineType=cv.LINE_AA)
 
