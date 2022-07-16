@@ -3,6 +3,7 @@
 '''
 import numpy as np
 import cv2
+import time
 
 from config import enemy2color, unit_list
 
@@ -27,6 +28,10 @@ class HP_scene(object):
         self._scene *= 240
         self._show_api = show_api
         self._enemy = enemy
+        self._twinkle_time = [0] * 16
+        self._start = [0] * 16
+        self._end = [0] * 16
+        self._light = [0] * 16
         self._puttext = lambda txt, x, y, color: cv2.putText(self._scene, txt, (x, y), self._font,
                                                              self._font_size, color, 1, cv2.LINE_AA)
         # init title
@@ -77,48 +82,81 @@ class HP_scene(object):
         """
         根据读取到的血量和计算的血量上限，绘制血量信息
         """
+        width = 100 // self._stage_max
         for i in range(8):
             if i < 5:  # 我方
                 hp = HP[i + 8 * (not self._enemy)]
+                self._twinkle(hp, i + 8 * (not self._enemy))
                 self._put_hp(hp, max_hp[i + 5 * (not self._enemy)], 60, 42 + 30 * i)
+                if self._light[i + 8 * (not self._enemy)]:
+                    cv2.rectangle(self._out_scene, (2, 40 + 30 * i), (196, (43 + 30 * i) + 20),
+                                  (0, 0, 255), 2)
                 cv2.putText(self._out_scene, "{0}".format(hp), (165, 56 + 30 * i), cv2.FONT_ITALIC,
                             0.5, self.our_color, 1, cv2.LINE_AA)
             if i == 5:  # guard
-                hp = HP[i + 8 * (self._enemy)]
+                hp = HP[i + 8 * (not self._enemy)]
+                self._twinkle(hp, i + 8 * (not self._enemy))
                 self._put_hp(hp, self._guard, 60, 42 + 30 * i)
+                if self._light[i + 8 * (not self._enemy)]:
+                    cv2.rectangle(self._out_scene, (2, 40 + 30 * i), (196, (43 + 30 * i) + 20),
+                                  (0, 0, 255), 2)
                 cv2.putText(self._out_scene, "{0}".format(hp), (165, 56 + 30 * i), cv2.FONT_ITALIC,
                             0.5, self.our_color, 1, cv2.LINE_AA)
             if i == 6:
                 hp = HP[i + 8 * (not self._enemy)]
+                self._twinkle(hp, i + 8 * (not self._enemy))
                 self._put_hp(hp, self._outpost, 60, 42 + 30 * i)
+                if self._light[i + 8 * (not self._enemy)]:
+                    cv2.rectangle(self._out_scene, (2, 40 + 30 * i), (196, (43 + 30 * i) + 20),
+                                  (0, 0, 255), 2)
                 cv2.putText(self._out_scene, "{0}".format(hp), (165, 56 + 30 * i), cv2.FONT_ITALIC,
                             0.5, self.our_color, 1, cv2.LINE_AA)
             if i == 7:
                 hp = HP[i + 8 * (not self._enemy)]
+                self._twinkle(hp, i + 8 * (not self._enemy))
                 self._put_hp(hp, self._base, 60, 42 + 30 * i)
+                if self._light[i + 8 * (not self._enemy)]:
+                    cv2.rectangle(self._out_scene, (2, 40 + 30 * i), (196, (43 + 30 * i) + 20),
+                                  (0, 0, 255), 2)
                 cv2.putText(self._out_scene, "{0}".format(hp), (165, 56 + 30 * i), cv2.FONT_ITALIC,
                             0.5, self.our_color, 1, cv2.LINE_AA)
 
         # enemy
         for i in range(8):
             if i < 5:  # 1-5
-                hp = HP[i + 8 * (self._enemy)]
+                hp = HP[i + 8 * self._enemy]
+                self._twinkle(hp, i + 8 * self._enemy)
                 self._put_hp(hp, max_hp[i + 5 * self._enemy], 60 + 200, 42 + 30 * i)
+                if self._light[i + 8 * self._enemy]:
+                    cv2.rectangle(self._out_scene, (207, 40 + 30 * i), (196 + 200, (43 + 30 * i) + 20),
+                                  (0, 0, 255), 2)
                 cv2.putText(self._out_scene, "{0}".format(hp), (165 + 200, 56 + 30 * i), cv2.FONT_ITALIC,
                             0.5, self.enemy_color, 1, cv2.LINE_AA)
             if i == 5:  # guard
-                hp = HP[i + 8 * (self._enemy)]
+                hp = HP[i + 8 * self._enemy]
+                self._twinkle(hp, i + 8 * self._enemy)
                 self._put_hp(hp, self._guard, 60 + 200, 42 + 30 * i)
+                if self._light[i + 8 * self._enemy]:
+                    cv2.rectangle(self._out_scene, (207, 40 + 30 * i), (196 + 200, (43 + 30 * i) + 20),
+                                  (0, 0, 255), 2)
                 cv2.putText(self._out_scene, "{0}".format(hp), (165 + 200, 56 + 30 * i), cv2.FONT_ITALIC,
                             0.5, self.enemy_color, 1, cv2.LINE_AA)
             if i == 6:
-                hp = HP[i + 8 * (self._enemy)]
+                hp = HP[i + 8 * self._enemy]
+                self._twinkle(hp, i + 8 * self._enemy)
                 self._put_hp(hp, self._outpost, 60 + 200, 42 + 30 * i)
+                if self._light[i + 8 * self._enemy]:
+                    cv2.rectangle(self._out_scene, (207, 40 + 30 * i), (196 + 200, (43 + 30 * i) + 20),
+                                  (0, 0, 255), 2)
                 cv2.putText(self._out_scene, "{0}".format(hp), (165 + 200, 56 + 30 * i), cv2.FONT_ITALIC,
                             0.5, self.enemy_color, 1, cv2.LINE_AA)
             if i == 7:
-                hp = HP[i + 8 * (self._enemy)]
+                hp = HP[i + 8 * self._enemy]
+                self._twinkle(hp, i + 8 * self._enemy)
                 self._put_hp(hp, self._base, 60 + 200, 42 + 30 * i)
+                if self._light[i + 8 * self._enemy]:
+                    cv2.rectangle(self._out_scene, (207, 40 + 30 * i), (196 + 200, (43 + 30 * i) + 20),
+                                  (0, 0, 255), 2)
                 cv2.putText(self._out_scene, "{0}".format(hp), (165 + 200, 56 + 30 * i), cv2.FONT_ITALIC,
                             0.5, self.enemy_color, 1, cv2.LINE_AA)
 
@@ -142,14 +180,36 @@ class HP_scene(object):
         """
         self._out_scene = self._scene.copy()
 
+    def _twinkle(self, hp, i):
+        """
+        闪烁预警
+        """
+        if hp <= 100:
+            if self._twinkle_time[i] == 0.0:
+                self._start[i] = time.time()
+            self._end[i] = time.time()
+            self._twinkle_time[i] = self._end[i] - self._start[i]
+            if self._twinkle_time[i] >= 1:
+                self._twinkle_time[i] = 0
+                if self._light[i] == 0:
+                    self._light[i] = 1
+                else:
+                    self._light[i] = 0
+
+
 
 if __name__ == "__main__":
     hp_scene = HP_scene(0, [])
-    hp = np.array([300, 400, 100, 100, 100, 100, 100, 100, 100, 400, 100, 100, 100, 100, 100, 100])
-    max = np.array([500, 500, 500, 500, 500, 500, 500, 500, 500, 500])
-    hp_scene.update(hp, max)
-    hp_scene.update_stage('start', 10, 1, 5)
-    cv2.namedWindow("HP", cv2.WINDOW_NORMAL)
-    pic = hp_scene.show()
-    cv2.imshow("HP", pic)
-    cv2.waitKey()
+    while True:
+        hp = np.array([300, 400, 100, 100, 100, 100, 100, 100, 100, 400, 100, 100, 100, 100, 100, 100])
+        max = np.array([500, 500, 500, 500, 500, 500, 500, 500, 500, 500])
+        hp_scene.update(hp, max)
+        hp_scene.update_stage('start', 10, 1, 5)
+        cv2.namedWindow("HP", cv2.WINDOW_NORMAL)
+        cv2.imshow("HP", hp_scene._out_scene)
+        hp_scene.refresh()
+        cv2.waitKey(1)
+
+    # pic = hp_scene.show()
+    # cv2.imshow("HP", pic)
+
