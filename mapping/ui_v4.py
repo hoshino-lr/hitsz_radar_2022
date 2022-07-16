@@ -191,6 +191,7 @@ class Ui_MainWindow(object):
         self.ShutDown.clicked.connect(MainWindow.CloseProgram_on_clicked)
         self.pnp_demo.mousePressEvent = MainWindow.epnp_mouseEvent
         self.main_demo.mouseMoveEvent = MainWindow.pc_mouseEvent
+        self.main_demo.mousePressEvent = MainWindow.eco_mouseEvent
         self.condition.keyPressEvent = MainWindow.condition_key_on_clicked
         self.condition.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.tabWidget.currentChanged.connect(MainWindow.epnp_on_clicked)

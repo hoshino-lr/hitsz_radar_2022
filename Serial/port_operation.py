@@ -70,7 +70,7 @@ class Port_operate(object):
     def get_state():
         # 传出位置
         return [Port_operate._Now_state, Port_operate._energy_time]
-    
+
     @staticmethod
     def HP():
         return Port_operate._HP
@@ -247,7 +247,7 @@ class Port_operate(object):
         buffer[4] = official_Judge_Handler.myGet_CRC8_Check_Sum(id(buffer), 5 - 1, 0xff)  # 帧头 CRC8 校验
 
     @staticmethod
-    def robo_alarm(target_id, my_id, alarm_type, attack_target, ser):
+    def robo_alarm(target_id, my_id, alarm_type: int, attack_target: int, ser):
         # 车间通信
         buffer = [0]
         buffer *= 19
@@ -273,13 +273,8 @@ class Port_operate(object):
 
     @staticmethod
     def Map_Transmit(ser):
-        class Count(object):
-            r_id = 1
-            b_id = 101
-            nID = 0
-
         # 画小地图
-        position = Port_operate.positions()[Count.nID]
+        position = Port_operate.positions()[Port_operate.Map_Transmit.nID]
         x, y = position
         # 坐标为零则不发送
         if np.isclose(position, 0).all():
@@ -290,22 +285,22 @@ class Port_operate(object):
         if enemy_color == 0:
             # 敌方为红方
             if flag:
-                Port_operate.Map(Count.r_id, np.float32(x), np.float32(y), ser)
+                Port_operate.Map(Port_operate.Map_Transmit.r_id, np.float32(x), np.float32(y), ser)
                 time.sleep(0.1)
-            if Count.r_id == 5:
-                Count.r_id = 1
-            else:
-                Count.r_id += 1
+                if Port_operate.Map_Transmit.r_id == 5:
+                    Port_operate.Map_Transmit.r_id = 1
+                else:
+                    Port_operate.Map_Transmit.r_id += 1
         if enemy_color == 1:
             # 敌方为蓝方
             if flag:
-                Port_operate.Map(Count.b_id, np.float32(x), np.float32(y), ser)
+                Port_operate.Map(Port_operate.Map_Transmit.b_id, np.float32(x), np.float32(y), ser)
                 time.sleep(0.1)
-            if Count.b_id == 105:
-                Count.b_id = 101
-            else:
-                Count.b_id += 1
-        Count.nID = (Count.nID + 1) % 5
+                if Port_operate.Map_Transmit.b_id == 105:
+                    Port_operate.Map_Transmit.b_id = 101
+                else:
+                    Port_operate.Map_Transmit.b_id += 1
+        Port_operate.Map_Transmit.nID = (Port_operate.Map_Transmit.nID + 1) % 5
 
     @staticmethod
     def port_send(ser):
@@ -313,32 +308,43 @@ class Port_operate(object):
         Port_operate.port_manager(ser)
 
     @staticmethod
+    def port_send_init():
+        if not hasattr(Port_operate.port_manager, 'r_id'):
+            Port_operate.port_manager.r_id = 1
+        if not hasattr(Port_operate.port_manager, 'b_id'):
+            Port_operate.port_manager.b_id = 101
+        if not hasattr(Port_operate.port_manager, 'nID'):
+            Port_operate.port_manager.nID = 0
+        if not hasattr(Port_operate.Map_Transmit, 'r_id'):
+            Port_operate.Map_Transmit.r_id = 1
+        if not hasattr(Port_operate.Map_Transmit, 'b_id'):
+            Port_operate.Map_Transmit.b_id = 101
+        if not hasattr(Port_operate.Map_Transmit, 'nID'):
+            Port_operate.Map_Transmit.nID = 0
+
+    @staticmethod
     def port_manager(ser):
-        class Count(object):
-            r_id = 1
-            b_id = 101
-            nID = 0
 
         # 英雄飞坡预警
-        alarm_type = Port_operate.decisions()[Count.nID][0]
-        attack_target = Port_operate.decisions()[Count.nID][1]
+        alarm_type = int(Port_operate.decisions()[Port_operate.port_manager.nID][0])
+        attack_target = int(Port_operate.decisions()[Port_operate.port_manager.nID][1])
         # 敌方判断
         if enemy_color == 0:
             # 敌方为红方
             my_id = 109
-            Port_operate.robo_alarm(Count.b_id, my_id, alarm_type, attack_target, ser)
+            Port_operate.robo_alarm(Port_operate.port_manager.b_id, my_id, alarm_type, attack_target, ser)
             time.sleep(0.1)
-            if Count.b_id == 105:
-                Count.b_id = 101
+            if Port_operate.port_manager.b_id == 105:
+                Port_operate.port_manager.b_id = 101
             else:
-                Count.b_id += 1
+                Port_operate.port_manager.b_id += 1
         if enemy_color == 1:
             # 敌方为蓝方
             my_id = 9
-            Port_operate.robo_alarm(Count.b_id, my_id, alarm_type, attack_target, ser)
+            Port_operate.robo_alarm(Port_operate.port_manager.b_id, my_id, alarm_type, attack_target, ser)
             time.sleep(0.1)
-            if Count.r_id == 5:
-                Count.r_id = 1
+            if Port_operate.port_manager.r_id == 5:
+                Port_operate.port_manager.r_id = 1
             else:
-                Count.r_id += 1
-        Count.nID = (Count.nID + 1) % 5
+                Port_operate.port_manager.r_id += 1
+        Port_operate.port_manager.nID = (Port_operate.port_manager.nID + 1) % 5

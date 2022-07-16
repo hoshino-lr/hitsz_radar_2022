@@ -8,7 +8,6 @@ buffer = [0] * 50
 bufferbyte = 0
 cmd_id = 0
 
-
 Game_state = Game_data_define.game_state()
 Game_result = Game_data_define.game_result()
 Game_robot_HP = Game_data_define.game_robot_HP()
@@ -114,4 +113,6 @@ def read(ser):
 
 
 def write(ser):
-    Port_operate.port_send(ser)
+    Port_operate.port_send_init()
+    while True:
+        Port_operate.port_send(ser)

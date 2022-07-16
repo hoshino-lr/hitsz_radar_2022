@@ -13,7 +13,7 @@ enemy_color = 0  # 0：敌方为红色；1：敌方为蓝色
 USEABLE = {
     "cam_left": True,
     "cam_right": False,
-    "serial": False,
+    "serial": True,
     "Lidar": False,
     "locate_state": [0, 1],
 }
@@ -24,7 +24,7 @@ cam_config = {
     "cam_right": {
         "id": "J37877236",
         "size": (3072, 2048),
-        "roi": (0, 400, 3072, 1648),
+        "roi": (0, 0, 3072, 1648),
         "using_net": False,
         "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_video/20_16_34_right.avi",
         "K_0": np.mat([[2505.2629026927225, 0.0, 1529.4286325395244],
@@ -47,7 +47,7 @@ cam_config = {
     "cam_left": {
         "id": "J87631625",
         "size": (3072, 2048),
-        "roi": (0, 400, 3072, 1648),
+        "roi": (0, 200, 3072, 1848),
         "using_net": True,
         "video_path": "/home/hoshino/15_10_28_left.avi",
         "K_0": np.mat([[2580.7380664637653, 0.0, 1535.9830165125002],
@@ -101,23 +101,23 @@ region = \
     {
         'a_red_环形高地1_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
         'a_red_环形高地2_a': [real_points[31], real_points[27], real_points[26], real_points[32]],
-        # 'a_red_我方前哨站_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_red_敌方前哨站_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_red_飞坡_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_red_我方3号高地_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_red_敌方3号高地_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_red_前哨站我方盲道_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_red_3号高地下我方盲道及公路区_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        #
-        # 'a_blue_环形高地1_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_blue_环形高地2_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_blue_我方前哨站_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_blue_敌方前哨站_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_blue_飞坡_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_blue_我方3号高地_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_blue_敌方3号高地_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_blue_前哨站我方盲道_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
-        # 'a_blue_3号高地下我方盲道及公路区_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_red_我方前哨站_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_red_敌方前哨站_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_red_飞坡_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_red_我方3号高地_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_red_敌方3号高地_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_red_前哨站我方盲道_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_red_3号高地下我方盲道及公路区_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
+
+        'a_blue_环形高地1_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_blue_环形高地2_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_blue_我方前哨站_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_blue_敌方前哨站_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_blue_飞坡_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_blue_我方3号高地_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_blue_敌方3号高地_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_blue_前哨站我方盲道_d': [real_points[27], real_points[28], real_points[25], real_points[26]],
+        'a_blue_3号高地下我方盲道及公路区_a': [real_points[27], real_points[28], real_points[25], real_points[26]],
     }
 
 test_region = \

@@ -42,12 +42,12 @@ class draw_message(object):
 
 
 class message_box(object):
-    queue_size = 4
+    queue_size = 1
 
     def __init__(self):
         self.__message_base = {
             "info": {},
-            "warning:": {},
+            "warning": {},
             "critical": {}
         }
         self.__info_queue = queue.Queue(self.queue_size)
@@ -56,25 +56,25 @@ class message_box(object):
 
     def add_message(self, message: draw_message) -> None:
         if message.level in ["info", "warning", "critical"]:
-            self.__message_base[message][message.title] = message
+            self.__message_base[message.level][message.title] = message
         if message.type == 0:
             if message.level == "info":
                 if self.__info_queue.full():
                     self.__info_queue.get()
-                    self.__info_queue.put(message)
+                self.__info_queue.put(message)
             if message.level == "warning":
                 if self.__warning_queue.full():
                     self.__warning_queue.get()
-                    self.__warning_queue.put(message)
+                self.__warning_queue.put(message)
             if message.level == "critical":
                 if self.__critical_queue.full():
                     self.__critical_queue.get()
-                    self.__critical_queue.put(message)
+                self.__critical_queue.put(message)
 
     def refresh_message(self):
         for key1 in self.__message_base.keys():
             item = self.__message_base[key1]
-            for key2 in item.keys():
+            for key2 in list(item.keys()):
                 if not item[key2].check_valid():
                     item.pop(key2)
 
@@ -92,11 +92,16 @@ class message_box(object):
         if not self.__critical_queue.empty():
             item = self.__critical_queue.queue[self.__critical_queue.qsize() - 1]
             if item.check_valid():
-                return item
-            else:
-                return ""
-        else:
-            return ""
+                return item.message
+        elif not self.__warning_queue.empty():
+            item = self.__warning_queue.queue[self.__warning_queue.qsize() - 1]
+            if item.check_valid():
+                return item.message
+        elif not self.__info_queue.empty():
+            item = self.__info_queue.queue[self.__info_queue.qsize() - 1]
+            if item.check_valid():
+                return item.message
+        return ""
 
     @staticmethod
     def _get_prefix(l_: draw_message) -> str:
@@ -177,7 +182,6 @@ class drawing(object):
         tl = 6  # line/font thickness
         tf = max(tl - 1, 1)  # font thickness
         point = message[1]
-        point[1] = point[1] - 50
         cv.putText(pic, message[0], point, 0, tl / 3, (20, 20, 255), thickness=tf,
                    lineType=cv.LINE_AA)
 
@@ -252,12 +256,12 @@ class drawing(object):
             res = self._message_alarm.get_valid_messages()
             for item in res:
                 for it in item:
-                    self._draw_alarm(pic, item)
+                    self._draw_alarm(pic, it.message)
 
             res = self._message_board.get_valid_messages()
             for item in res:
                 for it in item:
-                    self._draw_board(pic, item)
+                    self._draw_board(pic, it.message)
 
     def browser_message(self) -> list:
         return self._message_text.get_all_messages()
@@ -321,21 +325,21 @@ class drawing(object):
         return b, g, r
 
     @staticmethod
-    def draw_pc(src: np.ndarray, depth: np.ndarray) -> None:
+    def draw_pc(src: np.ndarray, depth: np.ndarray, roi: tuple) -> None:
         if not src.shape[0]:
             return
         else:
-            for i in range(0, depth.shape[0] - 1, 15):
+            for i in range(roi[1], depth.shape[0] - 1, 15):
                 for j in range(0, depth.shape[1] - 1, 15):
                     v = depth[i][j]
                     if math.isnan(depth[i][j]):
                         continue
                     rgb = drawing.get_rgb(20, 4, depth[i][j])
-                    cv.circle(src, (j, i), radius=3, color=rgb, thickness=-1)
+                    cv.circle(src, (j, i - roi[1]), radius=3, color=rgb, thickness=-1)
 
-    def draw_CamPoints(self, pic):
+    def draw_CamPoints(self, pic, roi: tuple):
         for i in self.cam_points:
-            cv.circle(pic, tuple(i), 10, (0, 255, 0), -1)
+            cv.circle(pic, (i[0], i[1] - roi[1]), 10, (0, 255, 0), -1)
 
     @staticmethod
     def set_text(_type: str, message: str) -> str:

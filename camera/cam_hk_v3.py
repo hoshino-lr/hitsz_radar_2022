@@ -13,7 +13,7 @@ from ctypes import *
 import cv2 as cv
 import numpy as np
 from camera.MvImport.MvCameraControl_class import *
-from resources.config import cam_config
+from config import cam_config
 from camera.cam import Camera
 
 
@@ -33,7 +33,7 @@ class Camera_HK(Camera):
         self.__id = self.__camera_config['id']
         self.__size = self.__camera_config['size']
         self.__roi = self.__camera_config['roi']
-        self.__img = np.ndarray((self.__size[0], self.__size[1], 3), dtype="uint8")
+        self.__img = np.ndarray((self.__size[1], self.__size[0], 3), dtype="uint8")
         self.__exposure = self.__camera_config['exposure']
         self.__gain = self.__camera_config['gain']
         if not self.__debug:
@@ -200,12 +200,13 @@ class Camera_HK(Camera):
             else:
                 img_buff = (c_ubyte * stConvertParam.nDstLen)()
                 memmove(byref(img_buff), stConvertParam.pDstBuffer, stConvertParam.nDstLen)
-                self.__img[self.__roi[1]:self.__roi[3], self.__roi[0]:self.__roi[2]] = \
-                    np.asarray(img_buff).reshape((self.__size[1], self.__size[0], -1)).copy()
+                self.__img = np.asarray(img_buff)
+                self.__img = cv.copyMakeBorder(self.__img, 0, self.__roi[1], 0, 0, np.uint8, value=(0, 0, 0))
                 return True
         else:
             print("get one frame fail, ret[0x%x]" % ret)
             return False
+            # return True
 
     def get_img(self) -> [bool, np.ndarray]:
         if self.init_ok:
@@ -214,7 +215,9 @@ class Camera_HK(Camera):
                 return result, self.__img
             else:
                 result, self.__img = self.cap.read()
-                return bool(result), self.__img
+                return bool(result), cv.copyMakeBorder(self.__img[self.__roi[1]:self.__roi[3] + self.__roi[1], :, :], 0,
+                                                       self.__roi[1],
+                                                       0, 0, cv.BORDER_CONSTANT, value=(0, 0, 0))
         else:
             # print("init is failed dangerous!!!")
             return False, self.__img

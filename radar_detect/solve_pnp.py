@@ -25,10 +25,10 @@ class SolvePnp(CameraLocation):
 
     def add_point(self, x: int, y: int) -> None:
         if self.count < self.count_max - 1:
-            self.imgPoints[self.count, :] = np.array([float(x), float(y)])
+            self.imgPoints[self.count, :] = np.array([float(x), float(y) + self.offset_y])
             self.count += 1
         elif self.count == self.count_max - 1:
-            self.imgPoints[self.count, :] = np.array([float(x), float(y)])
+            self.imgPoints[self.count, :] = np.array([float(x), float(y) + self.offset_y])
         self._update_info()
 
     def del_point(self) -> None:
@@ -46,6 +46,7 @@ class SolvePnp(CameraLocation):
         self.names = objNames[int(self.debug)][side_text]
         self.imgPoints = np.zeros((self.count_max, 2), dtype=np.float32)
         self.objPoints = objPoints[int(self.debug)][side_text] * 1000  # 米转换成毫米
+
         if side == 0:
             side_text = f'cam_left'
         else:
@@ -53,6 +54,7 @@ class SolvePnp(CameraLocation):
         self.size = cam_config[side_text]['size']
         self.distCoeffs = cam_config[side_text]['C_0']
         self.cameraMatrix = cam_config[side_text]['K_0']
+        self.offset_y = cam_config[side_text]['roi'][1]
         self.count = 0
         self._update_info()
 

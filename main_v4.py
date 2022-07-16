@@ -32,7 +32,7 @@ from Serial.port_operation import Port_operate
 from radar_detect.solve_pnp import SolvePnp
 from radar_detect.eco_forecast import eco_forecast
 from radar_detect.decision import decision_tree
-from mapping.drawing import drawing
+from mapping.drawing import drawing, draw_message
 
 
 def process_detect(event, que, Event_Close, record, name):
@@ -185,6 +185,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         frame = np.zeros((162, 716, 3)).astype(np.uint8)
         self.set_image(frame, "left_demo")
         self.set_image(frame, "right_demo")
+        del frame
         self.board_textBrowser = {}
         self.pnp_textBrowser = {}
 
@@ -200,12 +201,31 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.ChangeView.setText("切换视角")
         self.ShutDown.setText("终止程序")
         self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
+        self.aspdokasd = 0
+        self.Eco_point = [0, 0, 0, 0]
 
     def condition_key_on_clicked(self, event) -> None:
         if event.key() == Qt.Key_Q:
             self.loc_alarm.change_mode(self.view_change)
             self._use_lidar = not self.loc_alarm.state[0]
             self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
+        elif event.key() == Qt.Key_1:  # 将此刻设为start_time
+            start_time = time.time()
+        elif event.key() == Qt.Key_2:  # 大能量机关激活
+            pass
+        elif event.key() == Qt.Key_3:  # 小能量机关激活
+            pass
+        elif event.key() == Qt.Key_E:  # 添加工程预警
+            self.text_api(draw_message("engineer", 0, "Engineer", "critical"))
+        elif event.key() == Qt.Key_F:  # 添加飞坡预警
+            self.text_api(draw_message("fly", 0, "Fly", "critical"))
+        elif event.key() == Qt.Key_H:  # 添加高亮模式
+            self.text_api(draw_message("highlight", 1, ("highlight", (0, 1800)), "critical"))
+        elif event.key() == Qt.Key_C:  # 添加清零
+            self.draw_module.clear_message()
+        elif event.key() == Qt.Key_P:  # 添加框
+            self.text_api(draw_message("p", 2, (self.aspdokasd, 0, 200, 200), "critical"))
+            self.aspdokasd += 2
 
     def ChangeView_on_clicked(self) -> None:
         """
@@ -300,14 +320,41 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if self.show_pc_state:
             # TODO: 这里的3072是个常值，最好改了
             x = int(event.x() / self.main_demo.width() * 3072)
-            y = int(event.y() / self.main_demo.height() * 2048)
+            y = int(event.y() / self.main_demo.height() * 2048) + cam_config['cam_left']['roi'][1]
             w = 10
             h = 5
             # 格式定义： [N, [bbox(xyxy), conf, cls, bbox(xyxy), conf, cls, col, N]
             self.repo_left.check(np.array([x, y, w, h, 1., 1, x, y, w, h, 1., 1., 1., 0]).reshape(1, -1))
-            dph = self.lidar.detect_depth(rects=[[x - 5, y - 2.5, w, h]]).reshape(-1, 1)
+            dph = self.lidar.detect_depth(
+                rects=[[x - 5, y - 2.5, w, h]]).reshape(-1, 1)
             if not np.any(np.isnan(dph)):
-                self.loc_alarm.pc_location(self.view_change, np.concatenate([np.array([[1., x, y]]), dph], axis=1))
+                self.loc_alarm.pc_location(self.view_change, np.concatenate(
+                    [np.array([[1., x, y]]), dph], axis=1))
+
+    def eco_mouseEvent(self, event) -> None:
+        if self.__pic_left is None:
+            return
+        if event.button() == Qt.LeftButton:
+            x = event.x()
+            y = event.y()
+            x = int(x / self.main_demo.width() * self.__pic_left.shape[1])
+            y = int(y / self.main_demo.height() * self.__pic_left.shape[0])
+            self.Eco_point[0] = x
+            self.Eco_point[1] = y
+        if event.button() == Qt.RightButton:
+            x = event.x()
+            y = event.y()
+            x = int(x / self.main_demo.width() * self.__pic_left.shape[1])
+            y = int(y / self.main_demo.height() * self.__pic_left.shape[0])
+            self.Eco_point[2] = x
+            self.Eco_point[3] = y
+        if self.Eco_point[2] > self.Eco_point[0] and self.Eco_point[3] > self.Eco_point[1]:
+            self.supply_detector.update_ori(self.__pic_left, self.Eco_point)
+            self.text_api(
+                draw_message("eco_board", 2,
+                             (self.Eco_point[0], self.Eco_point[1],
+                              self.Eco_point[2] - self.Eco_point[0],
+                              self.Eco_point[3] - self.Eco_point[1]), "info"))
 
     def epnp_next_on_clicked(self) -> None:
         self.sp.step(1)
@@ -463,7 +510,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if self.__pic_left is not None:
             self.draw_module.draw_message(self.__pic_left)
             self.set_image(self.__pic_left, "main_demo")
-            self.set_image(self.__pic_left[600:800, 700:1200], "far_demo")
+            self.set_image(self.__pic_left[400:600, 700:1200], "far_demo")
         if self.__pic_right is not None:
             self.set_image(self.__pic_right, "hero_demo")
 
@@ -492,13 +539,14 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                     if armors.shape[0] != 0:
                         dph = self.lidar.detect_depth(rects=armors[:, 1:].tolist()).reshape(-1, 1)
                         x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
-                        y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
+                        y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1) + cam_config['cam_left']['roi'][1]
                         t_loc_left = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, dph], axis=1)
                 else:
                     armors = self.__res_left[:, [11, 6, 7, 8, 9]]
                     armors = armors[np.logical_not(np.isnan(armors[:, 0]))]
                     x0 = (armors[:, 1] + (armors[:, 3] - armors[:, 1]) / 2).reshape(-1, 1)
-                    y0 = (armors[:, 2] + (armors[:, 4] - armors[:, 2]) / 2).reshape(-1, 1)
+                    y0 = (armors[:, 2] + (armors[:, 4] - armors[:, 2]) / 2).reshape(-1, 1) + \
+                         cam_config['cam_left']['roi'][1]
                     t_loc_left = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, np.zeros(x0.shape)], axis=1)
         t_loc_right = None
         self.loc_alarm.two_camera_merge_update(t_loc_left, t_loc_right, self.repo_left.get_rp_alarming())
@@ -518,25 +566,26 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 if self.view_change == 0 and isinstance(self.__pic_left, np.ndarray):
                     if self._use_lidar:
                         depth = self.lidar.read()
-                        self.draw_module.draw_pc(self.__pic_left, depth)
-                    self.draw_module.draw_CamPoints(self.__pic_left)
+                        self.draw_module.draw_pc(self.__pic_left, depth, cam_config['cam_left']['roi'])
+                    self.draw_module.draw_CamPoints(self.__pic_left, cam_config['cam_left']['roi'])
             else:
                 self.update_reproject()
                 self.update_location_alarm()
 
         # update serial
         if self.__serial:
-            Port_operate.get_message(self.hp_scene)
-            self.hp_scene.show()
             location = self.loc_alarm.get_location()
             Port_operate.gain_positions(location)
             Port_operate.gain_decisions(self.decision_tree.get_decision())
             if Port_operate.change_view != -1:
                 self.view_change = Port_operate.change_view
-            self.decision_tree.update_serial(Port_operate.positions_us(), Port_operate.HP()[0:8],
-                                             Port_operate.HP()[8:16],
+            self.decision_tree.update_serial(Port_operate.positions_us(),
+                                             Port_operate.HP()[8 * (1 - enemy_color):8 * (1 - enemy_color) + 8],
+                                             Port_operate.HP()[8 * enemy_color:8 * enemy_color + 8],
                                              Port_operate.get_state(), Port_operate.Remain_time)
-
+        self.supply_detector.eco_detect(self.__pic_left, self.loc_alarm.get_last_loc())
+        Port_operate.get_message(self.hp_scene)
+        self.hp_scene.show()
         self.decision_tree.update_information(self.loc_alarm.get_location(), self.repo_left.fly, self.repo_left.hero_r3,
                                               self.__res_left)
         self.decision_tree.decision_alarm()

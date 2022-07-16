@@ -27,7 +27,7 @@ class location_Delaunay(object):
             t = Delaunary_points[int(debug)][cam_side]
             self.cam_rect = t[0]
             self.c_points = np.array(t[1]).reshape((-1, 3)) * 1000
-            self.c_points = self.c_points[list(np.array(choose)-1)]
+            self.c_points = self.c_points[list(np.array(choose) - 1)]
             self._rvec = cam_config[cam_side]["rvec"]
             self._tvec = cam_config[cam_side]["tvec"]
             self._K_O = cam_config[cam_side]['K_0']
@@ -186,4 +186,3 @@ class location_Delaunay(object):
 
     def get_points(self):
         return self.cam_points
-

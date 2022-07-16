@@ -138,7 +138,7 @@ class Radar(object):
 
     __record_max_times = 100  # 最大存点云数量
 
-    def __init__(self, name, text_api, queue_size=300, imgsz=(1024, 1024)):
+    def __init__(self, name, text_api, queue_size=200, imgsz=(1024, 1024)):
         '''
         雷达处理类，对每个相机都要创建一个对象
 
@@ -289,7 +289,7 @@ class Radar(object):
 if __name__ == '__main__':
     # 测试demo 同时也是非常好的测距测试脚本
     # 还没改
-    from resources.config import cam_config
+    from config import cam_config
 
     cv2.namedWindow("img", cv2.WINDOW_NORMAL)  # 显示实际图片
     bag_file = '/home/hoshino/CLionProjects/camera_lidar_calibration/data/game/beijing.bag'

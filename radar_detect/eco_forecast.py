@@ -51,7 +51,7 @@ class eco_forecast(object):
         guess_num = -1
         score = np.zeros(3)
         now_time = time.time()
-        if not self._init_flag:
+        if self._init_flag:
             for i in range(score.size):
                 score[i] = self._get_score(detect_message[i], now_time)
             if score[np.argmax(score)] > self._fore_threshold:
@@ -61,10 +61,10 @@ class eco_forecast(object):
         else:
             pass
         if guess_num != -1 and guess_num != 0:
-            message = draw_message("eco_forecast", 0, f"检测到敌方加弹，推测为{guess_num}号", "critical")
+            message = draw_message("eco_forecast", 0, f"Add maybe{guess_num}", "warning")
             self.text_api(message)
         elif guess_num == 0:
-            message = draw_message("eco_forecast", 0, f"检测到敌方加弹", "critical")
+            message = draw_message("eco_forecast", 0, f"add!!!", "warning")
             self.text_api(message)
 
     def _get_score(self, sub_message: np.ndarray, now_time) -> float:
@@ -95,7 +95,7 @@ class eco_forecast(object):
         detect_flag = False
         kernel = cv.getStructuringElement(cv.MORPH_RECT, (5, 5))
         if self._init_flag and isinstance(pic, np.ndarray):
-            cut_pic = pic[self.cut[0]:(self.cut[0] + self.cut[2]), self.cut[1]:(self.cut[1] + self.cut[3])].copy()
+            cut_pic = pic[self.cut[1]:self.cut[3], self.cut[0]: self.cut[2]].copy()
             gray_pic = cv.cvtColor(cut_pic, cv.COLOR_BGR2GRAY)
             current_frame_gray = cv.GaussianBlur(gray_pic, (7, 7), 0)
             frame_diff = cv.absdiff(current_frame_gray, self.ori_pic)  # 进行帧差
@@ -112,10 +112,10 @@ class eco_forecast(object):
         """
         Args:
             pic:
-            cut: xywh
+            cut: xyxy
         """
-        cut_pic = pic[cut[0]:(cut[0] + cut[2]), cut[1]:(cut[1] + cut[3])].copy()
+        self.cut = cut.copy()
+        cut_pic = pic[cut[1]:cut[3], cut[0]: cut[2]].copy()
         gray_pic = cv.cvtColor(cut_pic, cv.COLOR_BGR2GRAY)
         self.ori_pic = cv.GaussianBlur(gray_pic, (7, 7), 0)
-        self.cut = cut
         self._init_flag = True
