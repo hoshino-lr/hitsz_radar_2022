@@ -18,6 +18,7 @@ import math
 
 class draw_message(object):
     valid_time = 3
+    board_valid_time = 0.3
 
     def __init__(self, title_, type_, message_, level_):
         """
@@ -25,7 +26,7 @@ class draw_message(object):
         Args:
             title_: 标题
             type_: 类型
-            message_: 内容 【message】【bbox】 【message+(point)】
+            message_: 内容 【message】【bbox】【message+(point)】
             level_: 等级
         """
         self.title = title_
@@ -35,7 +36,9 @@ class draw_message(object):
         self.time = time.time()
 
     def check_valid(self) -> bool:
-        if time.time() - self.time > self.valid_time:
+        if time.time() - self.time > self.valid_time and self.type != 2:
+            return False
+        elif time.time() - self.time > self.board_valid_time and self.type == 2:
             return False
         else:
             return True
@@ -88,20 +91,20 @@ class message_box(object):
         while not self.__warning_queue.empty():
             self.__warning_queue.get()
 
-    def get_top_message(self) -> str:
+    def get_top_message(self) -> draw_message:
         if not self.__critical_queue.empty():
             item = self.__critical_queue.queue[self.__critical_queue.qsize() - 1]
             if item.check_valid():
-                return item.message
-        elif not self.__warning_queue.empty():
+                return item
+        if not self.__warning_queue.empty():
             item = self.__warning_queue.queue[self.__warning_queue.qsize() - 1]
             if item.check_valid():
-                return item.message
-        elif not self.__info_queue.empty():
+                return item
+        if not self.__info_queue.empty():
             item = self.__info_queue.queue[self.__info_queue.qsize() - 1]
             if item.check_valid():
-                return item.message
-        return ""
+                return item
+        return draw_message(" ", 0, "", "critical")
 
     @staticmethod
     def _get_prefix(l_: draw_message) -> str:
@@ -151,25 +154,26 @@ class drawing(object):
         self._message_text = message_box()
 
     @staticmethod
-    def _draw_text(pic: np.ndarray, input_text) -> None:
+    def _draw_text(pic: np.ndarray, information: draw_message) -> None:
         """
 
         Args:
             pic:
-            input_text:
+            information:
 
         Returns:
 
         """
+        input_text = information.message
         tl = 5  # line/font thickness
         tf = max(tl - 1, 1)  # font thickness
         text_size = cv.getTextSize(input_text, 0, tl, tf)
-        middle_point = (int((pic.shape[1] - text_size[0][0]) / 2), pic.shape[0] - text_size[0][1])
+        middle_point = (int((pic.shape[1] - text_size[0][0]) / 2), int(pic.shape[0] - text_size[0][1] / 2))
         cv.putText(pic, input_text, middle_point, 0, tl, (20, 20, 255), thickness=tf,
                    lineType=cv.LINE_AA)
 
     @staticmethod
-    def _draw_alarm(pic: np.ndarray, message: list) -> None:
+    def _draw_alarm(pic: np.ndarray, information: draw_message) -> None:
         """
 
         Args:
@@ -179,26 +183,34 @@ class drawing(object):
         Returns:
 
         """
+        message = information.message
         tl = 6  # line/font thickness
         tf = max(tl - 1, 1)  # font thickness
         point = message[1]
-        cv.putText(pic, message[0], point, 0, tl / 3, (20, 20, 255), thickness=tf,
+        if information.level == "critical":
+            color = (20, 20, 255)
+        elif information.level == "info":
+            color = (255, 20, 20)
+        else:
+            color = (20, 255, 20)
+        cv.putText(pic, message[0], point, 0, tl / 3, color=color, thickness=tf,
                    lineType=cv.LINE_AA)
 
     @staticmethod
-    def _draw_board(pic: np.ndarray, message: list) -> None:
+    def _draw_board(pic: np.ndarray, information: draw_message) -> None:
         """
 
         Args:
             pic: frame
-            message: bbox
+            information: xyxy
 
         Returns:
 
         """
+        message = information.message
         tl = 3  # line/font thickness
         c1 = (message[0], message[1])
-        c2 = (message[0] + message[2], message[1] + message[3])
+        c2 = (message[2], message[3])
         cv.rectangle(pic, c1, c2, (255, 0, 255), thickness=tl, lineType=cv.LINE_AA)
 
     def update(self, message: draw_message) -> None:
@@ -256,12 +268,12 @@ class drawing(object):
             res = self._message_alarm.get_valid_messages()
             for item in res:
                 for it in item:
-                    self._draw_alarm(pic, it.message)
+                    self._draw_alarm(pic, it)
 
             res = self._message_board.get_valid_messages()
             for item in res:
                 for it in item:
-                    self._draw_board(pic, it.message)
+                    self._draw_board(pic, it)
 
     def browser_message(self) -> list:
         return self._message_text.get_all_messages()

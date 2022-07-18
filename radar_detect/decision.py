@@ -30,13 +30,16 @@ class decision_tree(object):
         self._rp_alarming = {}
         self._state = 0  # 增益
         self.text_api = text_api
-        self._car_decision = np.zeros((5, 2))
-        self._last_decision = np.zeros((5, 2))
+        self._car_decision = np.zeros((6, 4)).astype(np.uint8)
+        self._last_decision = np.zeros((6, 4)).astype(np.uint8)
         if enemy_color:
-            self.start_x = 28.
-        else:
             self.start_x = 0
+        else:
+            self.start_x = 28.
         self._start_time = time.time()
+        self._energy_time = time.time()
+        self._guard_time = time.time()
+        self._fly_numbers = np.array([])
         self._engineer_flag = False
         self._fly_flag = False
         self._tou_flag = False
@@ -51,6 +54,7 @@ class decision_tree(object):
             self._tou_alarm()
         else:
             self.clear_state()
+        self.generate_information()
 
     def _engineer_alarm(self):
         flag = False
@@ -99,16 +103,30 @@ class decision_tree(object):
                         break
 
     def _target_attack(self):
-        choose = np.bitwise_and(self._enemy_blood <= 100,
+        choose = np.bitwise_and(self._enemy_blood[:5, :] <= 100,
                                 np.bitwise_and(self._enemy_position != 0,
-                                               abs(self._enemy_position - self.start_x) <= 14)[:5, :])
+                                               abs(self._enemy_position - self.start_x) <= 14))
         if choose.any():
             best_choose = 0
             for i in range(5):
                 if choose[i][0] and self._enemy_blood[i] < self._enemy_blood[best_choose] and i != 1:
                     best_choose = i
-            for i in self._car_decision:
-                i[0] = best_choose + 1
+            for i in range(5):
+                self._car_decision[i][0] = best_choose + 1
+
+    def _guard_decision(self):
+        self._car_decision[5][2:] = [0, 0]
+        for r in self._rp_alarming.keys():
+            # 格式解析
+            _, _, _, location, _ = r.split('_')
+            if location in ["我方3号高地", "3号高地下我方盲道及公路区", "前哨站我方盲道"]:
+                if self._rp_alarming[r].shape[0] != 0:
+                    if location == "我方3号高地":
+                        self._car_decision[5][2:] = [1, 1]
+                    elif location == "前哨站我方盲道":
+                        self._car_decision[5][2:] = [2, 1]
+                    else:
+                        self._car_decision[5][2:] = [2, 2]
 
     def _blood_alarm(self):
         blood_minus = self._last_blood - self._our_blood
@@ -121,8 +139,39 @@ class decision_tree(object):
 
     def _fly_alarm(self):
         if self._fly_flag:
-            for i in range(self._our_blood.shape[0]):
+            for i in range(5):
                 self._car_decision[i][0] = 3
+
+    def _show_energy(self):
+        self.text_api(draw_message("remain_time", 1,
+                                   ("{0}:{1}".format(self._remain_time // 60, self._remain_time % 60), (1400, 120)),
+                                   "critical"))
+        remain_time = int(time.time() - self._energy_time)
+        if self._state == 0:
+            return
+        elif self._state == 2:
+            text = "BIG"
+            remain_time = 45 - remain_time
+            level = "critical"
+        elif self._state == 1:
+            text = "SMALL"
+            remain_time = 45 - remain_time
+            level = "critical"
+        elif self._state == 4:
+            text = "BIG"
+            remain_time = 45 - remain_time
+            level = "critical"
+        elif self._state == 3:
+            text = "SMALL"
+            remain_time = 45 - remain_time
+            level = "critical"
+        else:
+            text = "UNABLE"
+            remain_time = 30 - remain_time
+            level = "info"
+        self.text_api(draw_message("energy_time", 1,
+                                   ("{0}  {1}".format(text, remain_time), (1600, 120)),
+                                   level))
 
     def clear_state(self):
         self._enemy_position = np.zeros((5, 2))  # 敌方位置
@@ -134,46 +183,58 @@ class decision_tree(object):
         self._position_2d = None
         self._rp_alarming = {}
         self._state = 0  # 增益
-        self._car_decision = np.zeros((5, 2))
-        self._last_decision = np.zeros((5, 2))
+        self._car_decision = np.zeros((6, 4)).astype(np.uint8)
+        self._last_decision = np.zeros((6, 4)).astype(np.uint8)
         self._engineer_flag = False
         self._fly_flag = False
+        self._fly_numbers = np.array([])
 
     def update_serial(self, our_position: np.ndarray, our_blood: np.ndarray,
-                      enemy_blood: np.ndarray, state: int, remain_time: float):
+                      enemy_blood: np.ndarray, state: list, remain_time: float, high_light: bool):
 
         self._our_position = our_position
-        self._our_blood = our_blood
-        self._enemy_blood = enemy_blood
-        self._state = state
+        self._our_blood = our_blood.reshape((8, 1))
+        self._enemy_blood = enemy_blood.reshape((8, 1))
+        self._state = state[0]
+        self._energy_time = state[1]
         self._remain_time = remain_time
-        self._high_light = False
+        self._high_light = high_light
 
     def generate_information(self):
-
+        self._show_energy()
         if self._fly_flag:
-            self.text_api(draw_message("fly", 2, ("飞坡预警", (100, 2000)), "critical"))
+            self.text_api(draw_message("fly", 0, "FLY", "critical"))
+            if isinstance(self._position_2d, np.ndarray):
+                count = self._position_2d[:, 11]
+                for i in self._fly_numbers:
+                    arg = np.argwhere(count == i[0])
+                    c = arg[0][0]
+                    self.text_api(
+                        draw_message("fly_alarm", 2, self._position_2d[c][0:4].astype(int).tolist(), "critical"))
         if self._engineer_flag:
-            self.text_api(draw_message("engineer", 2, ("工程预警", (2500, 2000)), "critical"))
+            self.text_api(draw_message("engineer", 0, "Engineer", "critical"))
         if self._tou_qsz:
-            self.text_api(draw_message("tou_qsz", 0, "偷前哨站预警", "warning"))
+            self.text_api(draw_message("tou_qsz", 0, "HERO QSZ!!!", "warning"))
         if self._tou_flag:
-            self.text_api(draw_message("tou", 0, "偷家预警", "critical"))
-
+            self.text_api(draw_message("tou", 0, "TOU!!!", "critical"))
+        self._guard_decision()
         if isinstance(self._position_2d, np.ndarray):
             for i in self._position_2d:
                 if i[11] == 1:
                     if self._remain_time < 60 or self._high_light:
-                        self.text_api(draw_message(f"{i[11]}", 2, i[6:10].tolist(), "critical"))
-                else:
-                    if self._high_light:
-                        self.text_api(draw_message(f"{i[11]}", 2, i[6:10].tolist(), "warning"))
+                        self.text_api(draw_message(f"{i[11]}", 2, i[0:4].astype(int).tolist(), "critical"))
+                # else:
+                #     if self._high_light:
+                #         self.text_api(draw_message(f"{i[11]}", 2, i[0:4].astype(int).tolist(), "warning"))
 
-    def update_information(self, enemy_position: np.ndarray, fly_flag: bool, hero_r3: bool, position_2d):
+    def update_information(self, enemy_position: np.ndarray, fly_flag: bool, fly_numbers: np.ndarray, hero_r3: bool,
+                           position_2d):
         self._enemy_position = enemy_position
         self._hero_r3 = hero_r3
         self._fly_flag = fly_flag
+        self._fly_numbers = fly_numbers
         self._position_2d = position_2d
+        self.init_flag = True
 
     def get_decision(self) -> np.ndarray:
         return self._car_decision

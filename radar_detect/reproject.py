@@ -28,7 +28,11 @@ class Reproject(object):
         if DEBUG:  # 若为debug模式
             self._region = test_region
         else:
-            self._region = region
+            self._region = region.copy()
+            for loc in self._region:
+                _, team, _, _ = loc.split('_')
+                if color2enemy[team] != enemy_color:
+                    self._region.pop(loc)
         self._scene_region = {}  # 反投影位置图形
         self._name = name
         self._enemy = enemy_color
@@ -38,7 +42,7 @@ class Reproject(object):
         self.hero_r3 = False
         self._text_api = text_api  # 发送text的api
         self.rp_alarming = {}
-
+        self.fly_result = np.array([])
         self._region_count = {}  # 检测区域计数
         self._time = {}  # 时间间隔
         self._start = {}  # 开始时间
@@ -55,7 +59,7 @@ class Reproject(object):
             cor = None
             height = None
             rtype, team, location, height_type = r.split('_')
-            if location not in enemy_case or color2enemy[team] == self._enemy:  # 筛选出敌方的区域
+            if color2enemy[team] == self._enemy:  # 筛选出敌方的区域
                 if rtype == 's' or rtype == 'a':  # 筛选需要进行反投影的区域
                     self._region_count[f'{location}'] = 0  # 初始化区域检测计数
                     self._time[f'{location}'] = 0  # 初始化时间间隔
@@ -128,26 +132,26 @@ class Reproject(object):
             y2 = armors[:, 5].reshape(-1, 1)
             points = np.concatenate([x1, y1, x2, y1, x2, y2, x1, y2], axis=1)
             # 对仅预测出颜色的敌方预测框进行数据整合
-            for i in cars:
-                if i[0] == 0:
-                    color_bbox.append(i)
-            if len(color_bbox):
-                color_bbox = np.stack(color_bbox, axis=0)
-            if isinstance(color_bbox, np.ndarray):
-                # 预估装甲板位置，见技术报告
-                color_cls = color_bbox[:, 0].reshape(-1, 1)
-                color_bbox[:, 3] = (color_bbox[:, 3] - color_bbox[:, 1]) // 3
-                color_bbox[:, 4] = (color_bbox[:, 4] - color_bbox[:, 2]) // 5
-                color_bbox[:, 1] += color_bbox[:, 3]
-                color_bbox[:, 2] += color_bbox[:, 4] * 3
-                x1 = color_bbox[:, 1]
-                y1 = color_bbox[:, 2]
-                x2 = x1 + color_bbox[:, 3]
-                y2 = y1 + color_bbox[:, 4]
-                color_fp = np.stack([x1, y1, x2, y1, x2, y2, x1, y2], axis=1)
-                # 与之前的数据进行整合
-                points = np.concatenate([points, color_fp], axis=0)
-                cls = np.concatenate([cls, color_cls], axis=0)
+            # for i in cars:
+            #     if i[0] == 0:
+            #         color_bbox.append(i)
+            # if len(color_bbox):
+            #     color_bbox = np.stack(color_bbox, axis=0)
+            # if isinstance(color_bbox, np.ndarray):
+            #     # 预估装甲板位置，见技术报告
+            #     color_cls = color_bbox[:, 0].reshape(-1, 1)
+            #     color_bbox[:, 3] = (color_bbox[:, 3] - color_bbox[:, 1]) // 3
+            #     color_bbox[:, 4] = (color_bbox[:, 4] - color_bbox[:, 2]) // 5
+            #     color_bbox[:, 1] += color_bbox[:, 3]
+            #     color_bbox[:, 2] += color_bbox[:, 4] * 3
+            #     x1 = color_bbox[:, 1]
+            #     y1 = color_bbox[:, 2]
+            #     x2 = x1 + color_bbox[:, 3]
+            #     y2 = y1 + color_bbox[:, 4]
+            #     color_fp = np.stack([x1, y1, x2, y1, x2, y2, x1, y2], axis=1)
+            #     # 与之前的数据进行整合
+            #     points = np.concatenate([points, color_fp], axis=0)
+            #     cls = np.concatenate([cls, color_cls], axis=0)
             points = points.reshape((-1, 4, 2))
             for r in self._scene_region.keys():
                 # 判断对于各个预测框，是否有点在该区域内
@@ -186,6 +190,7 @@ class Reproject(object):
                             if self._region_count[f'{location}'] >= self._frame:
                                 if location == "飞坡":
                                     self.fly = True
+                                    self.fly_result = self.rp_alarming[r]
                                 print(f"[ERROR] 反投影{location}", f"在{location}处有敌人！！！")
                                 self._region_count[f'{location}'] = 0
                             self._time[f'{location}'] = 0

@@ -139,13 +139,13 @@ class Radar(object):
     __record_max_times = 100  # 最大存点云数量
 
     def __init__(self, name, text_api, queue_size=200, imgsz=(1024, 1024)):
-        '''
+        """
         雷达处理类，对每个相机都要创建一个对象
 
         :param name:相机名字
         :param queue_size:队列最大长度
         :param imgsz:相机图像大小
-        '''
+        """
         from config import cam_config
         if not Radar.__init_flag:
             # 当雷达还未有一个对象时，初始化接收节点

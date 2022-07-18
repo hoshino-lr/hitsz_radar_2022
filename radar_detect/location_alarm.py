@@ -72,6 +72,9 @@ class Alarm(draw_map.CompeteMap):
         # confidence 车辆置信度字典，键为字符'1'-'5'，值为车辆的置信度
         self._confidence = {}
 
+        # 一阶低通滤波
+        self.filter = 0.8
+
         # 分别为左右相机存储位置信息，z坐标缓存，相机世界坐标系位置，以及（相机到世界）转移矩阵
         self._locations = [None, None]
         self._z_cache = [None, None]
@@ -136,54 +139,55 @@ class Alarm(draw_map.CompeteMap):
         """
         for loc in self._region.keys():
             alarm_type, team, target, l_type = loc.split('_')
-            targets = []
-            # 检测敌方
-            for armor in list(self._location.keys())[0:5]:
-                l_ = np.float32(self._location[armor])
-                if is_inside_polygon(np.array(self._region[loc])[:, :2], l_[0:2]):
-                    targets.append(armor)
-                # if alarm_type == 'm' or alarm_type == 'a':  # 若为位置预警
-                #     if shape_type == 'r' and (
-                #             target in enemy_case or color2enemy[team] == self._enemy):  # 对于特殊地点，只考虑对敌方进行预警
-                #         # 矩形区域采用范围判断
-                #         if self._region[loc][0] >= l_[0] >= self._region[loc][2] \
-                #                 and self._region[loc][3] <= l_[1] <= self._region[loc][1]:
-                #             targets.append(armor)
-                #     # base alarm
-                #     if shape_type == 'l' and color2enemy[team] != self._enemy:
-                #         # 直线检测
-                #         up_p = np.float32(self._region[loc][:2])  # 上端点
-                #         dw_p = np.float32(self._region[loc][2:4])  # 下端点
-                #         dis_thres = self._region[loc][4]
-                #         up_l = up_p - dw_p  # 直线向上的向量
-                #         dw_l = dw_p - up_p  # 直线向下的向量
-                #         m_r = np.array([up_l[1], -up_l[0]], dtype=np.float32)  # 方向向量，向右
-                #         m_l = np.array([-up_l[1], up_l[0]], dtype=np.float32)  # 方向向量，向左
-                #
-                #         def f_dis(m):
-                #             return m @ (l_[0:2] - dw_p) / \
-                #                    np.linalg.norm(m)  # 计算从下端点到物体点在各方向向量上的投影
-                #
-                #         if l_type == 'l':
-                #             dis = f_dis(m_l)
-                #         elif l_type == 'r':
-                #             dis = f_dis(m_r)
-                #         else:  # l_type == 'a'
-                #             dis = abs(f_dis(m_r))  # 绝对距离
-                #         # 当物体位置在线段内侧，且距离小于阈值时，预警
-                #         if up_l @ (l_[0:2] - dw_p) > 0 and dw_l @ (l_[0:2] - up_p) > 0 and \
-                #                 dis_thres >= dis >= 0:
-                #             targets.append(armor)
-                #     if shape_type == 'fp' and (target not in enemy_case or color2enemy[team] == self._enemy):
-                #         # 判断是否在凸四边形内
-                #         if is_inside(np.float32(self._region[loc][:8]).reshape(4, 2), point=l_[0:2]):
-                #             targets.append(armor)
+            if color2enemy[team] == self._enemy:
+                targets = []
+                # 检测敌方
+                for armor in list(self._location.keys())[0:5]:
+                    l_ = np.float32(self._location[armor])
+                    if is_inside_polygon(np.array(self._region[loc])[:, :2], l_[0:2]):
+                        targets.append(armor)
+                    # if alarm_type == 'm' or alarm_type == 'a':  # 若为位置预警
+                    #     if shape_type == 'r' and (
+                    #             target in enemy_case or color2enemy[team] == self._enemy):  # 对于特殊地点，只考虑对敌方进行预警
+                    #         # 矩形区域采用范围判断
+                    #         if self._region[loc][0] >= l_[0] >= self._region[loc][2] \
+                    #                 and self._region[loc][3] <= l_[1] <= self._region[loc][1]:
+                    #             targets.append(armor)
+                    #     # base alarm
+                    #     if shape_type == 'l' and color2enemy[team] != self._enemy:
+                    #         # 直线检测
+                    #         up_p = np.float32(self._region[loc][:2])  # 上端点
+                    #         dw_p = np.float32(self._region[loc][2:4])  # 下端点
+                    #         dis_thres = self._region[loc][4]
+                    #         up_l = up_p - dw_p  # 直线向上的向量
+                    #         dw_l = dw_p - up_p  # 直线向下的向量
+                    #         m_r = np.array([up_l[1], -up_l[0]], dtype=np.float32)  # 方向向量，向右
+                    #         m_l = np.array([-up_l[1], up_l[0]], dtype=np.float32)  # 方向向量，向左
+                    #
+                    #         def f_dis(m):
+                    #             return m @ (l_[0:2] - dw_p) / \
+                    #                    np.linalg.norm(m)  # 计算从下端点到物体点在各方向向量上的投影
+                    #
+                    #         if l_type == 'l':
+                    #             dis = f_dis(m_l)
+                    #         elif l_type == 'r':
+                    #             dis = f_dis(m_r)
+                    #         else:  # l_type == 'a'
+                    #             dis = abs(f_dis(m_r))  # 绝对距离
+                    #         # 当物体位置在线段内侧，且距离小于阈值时，预警
+                    #         if up_l @ (l_[0:2] - dw_p) > 0 and dw_l @ (l_[0:2] - up_p) > 0 and \
+                    #                 dis_thres >= dis >= 0:
+                    #             targets.append(armor)
+                    #     if shape_type == 'fp' and (target not in enemy_case or color2enemy[team] == self._enemy):
+                    #         # 判断是否在凸四边形内
+                    #         if is_inside(np.float32(self._region[loc][:8]).reshape(4, 2), point=l_[0:2]):
+                    #             targets.append(armor)
 
-            if len(targets):
-                # 发送预警
-                self._add_twinkle(loc)
-                # targets_text = ' '.join(targets)
-                # str_text += f"{target}出现{team} {targets_text}\n"
+                if len(targets):
+                    # 发送预警
+                    self._add_twinkle(loc)
+                    # targets_text = ' '.join(targets)
+                    # str_text += f"{target}出现{team} {targets_text}\n"
 
         # message_ = draw_message("位置预警-信息输出", 0, str_text, "WARNING")
         # self._touch_api(message_)
@@ -234,13 +238,18 @@ class Alarm(draw_map.CompeteMap):
         # 预测填入
         for i in range(1, 6):
             if self._confidence[i] >= self.con_thre:
+                if self._current_time[str(i)] - self._last_location[str(i)][3] < 2 and abs(
+                        self._last_location[str(i)][0] - now[i - 1][0]) + \
+                        abs(self._last_location[str(i)][1] - now[i - 1][1]) < 3:
+                    now[i - 1] = now[i - 1] * self.filter + np.array(self._last_location[str(i)][0:3]) * (
+                            1 - self.filter)
                 self._location[str(i)][0:3] = now[i - 1].tolist()
                 self._last_location[str(i)][0:3] = now[i - 1].tolist()
                 self._last_location[str(i)][3] = self._current_time[str(i)]
             else:
                 self._location[str(i)][0:3] = [0, 0, 0]
-        # push new data
-        self._location_cache = self._location.copy()
+            # push new data
+            self._location_cache = self._location.copy()
 
     def check(self):
         """
@@ -397,8 +406,8 @@ class Alarm(draw_map.CompeteMap):
         return np.array(list(i[0:2] for i in list(self._location.values())))[:5, :]
 
     def get_mode(self):
-        return f"左相机定位：{self.state_name[self.state[0]]}\t" \
-               f"右相机定位：{self.state_name[self.state[1]]}"
+        return f"左相机定位：{self.state_name[self.state[0]]}\t"
+        # f"右相机定位：{self.state_name[self.state[1]]}"
 
     def pc_location(self, camera_type, armor: np.ndarray):
         """

@@ -215,9 +215,13 @@ class Camera_HK(Camera):
                 return result, self.__img
             else:
                 result, self.__img = self.cap.read()
-                return bool(result), cv.copyMakeBorder(self.__img[self.__roi[1]:self.__roi[3] + self.__roi[1], :, :], 0,
-                                                       self.__roi[1],
-                                                       0, 0, cv.BORDER_CONSTANT, value=(0, 0, 0))
+                if result:
+                    return bool(result), cv.copyMakeBorder(
+                        self.__img[self.__roi[1]:self.__roi[3] + self.__roi[1], :, :], 0,
+                        self.__roi[1],
+                        0, 0, cv.BORDER_CONSTANT, value=(0, 0, 0))
+                else:
+                    return bool(result), self.__img
         else:
             # print("init is failed dangerous!!!")
             return False, self.__img

@@ -203,29 +203,37 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
         self.aspdokasd = 0
         self.Eco_point = [0, 0, 0, 0]
+        self.num = True
 
     def condition_key_on_clicked(self, event) -> None:
         if event.key() == Qt.Key_Q:
             self.loc_alarm.change_mode(self.view_change)
             self._use_lidar = not self.loc_alarm.state[0]
             self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
-        elif event.key() == Qt.Key_1:  # 将此刻设为start_time
-            start_time = time.time()
-        elif event.key() == Qt.Key_2:  # 大能量机关激活
-            pass
-        elif event.key() == Qt.Key_3:  # 小能量机关激活
-            pass
+        elif event.key() == Qt.Key_T:  # 将此刻设为start_time
+            Port_operate.start_time = time.time()
+        elif event.key() == Qt.Key_1:  # xiao能量机关激活
+            Port_operate.set_state(1, time.time())
+        elif event.key() == Qt.Key_2:  # da能量机关激活
+            Port_operate.set_state(2, time.time())
+        elif event.key() == Qt.Key_3:  # xiao能量机关激活
+            Port_operate.set_state(3, time.time())
+        elif event.key() == Qt.Key_4:  # da能量机关激活
+            Port_operate.set_state(4, time.time())
+        elif event.key() == Qt.Key_5:
+            Port_operate.set_state(0, time.time())
         elif event.key() == Qt.Key_E:  # 添加工程预警
             self.text_api(draw_message("engineer", 0, "Engineer", "critical"))
         elif event.key() == Qt.Key_F:  # 添加飞坡预警
             self.text_api(draw_message("fly", 0, "Fly", "critical"))
         elif event.key() == Qt.Key_H:  # 添加高亮模式
-            self.text_api(draw_message("highlight", 1, ("highlight", (0, 1800)), "critical"))
+            Port_operate.highlight = not Port_operate.highlight
         elif event.key() == Qt.Key_C:  # 添加清零
             self.draw_module.clear_message()
-        elif event.key() == Qt.Key_P:  # 添加框
-            self.text_api(draw_message("p", 2, (self.aspdokasd, 0, 200, 200), "critical"))
-            self.aspdokasd += 2
+        elif event.key() == Qt.Key_P:  # 换框
+            self.num = not self.num
+        else:
+            pass
 
     def ChangeView_on_clicked(self) -> None:
         """
@@ -349,12 +357,12 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.Eco_point[2] = x
             self.Eco_point[3] = y
         if self.Eco_point[2] > self.Eco_point[0] and self.Eco_point[3] > self.Eco_point[1]:
-            self.supply_detector.update_ori(self.__pic_left, self.Eco_point)
+            self.supply_detector.update_ori(self.__pic_left, self.Eco_point, self.num)
             self.text_api(
                 draw_message("eco_board", 2,
                              (self.Eco_point[0], self.Eco_point[1],
-                              self.Eco_point[2] - self.Eco_point[0],
-                              self.Eco_point[3] - self.Eco_point[1]), "info"))
+                              self.Eco_point[2],
+                              self.Eco_point[3]), "info"))
 
     def epnp_next_on_clicked(self) -> None:
         self.sp.step(1)
@@ -501,8 +509,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         else:
             self.set_board_text("INFO", "右相机", "右相机正常工作")
 
-        # text = "<br \>".join(self.draw_module.browser_message())  # css format to replace \n
-        # self.textBrowser.setText(text)
         text = "<br \>".join(list(self.board_textBrowser.values()))  # css format to replace \n
         self.condition.setText(text)
 
@@ -537,17 +543,19 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                     armors[:, 4] = armors[:, 4] - armors[:, 2]
                     armors = armors[np.logical_not(np.isnan(armors[:, 0]))]
                     if armors.shape[0] != 0:
+                        armors[:, 2] += cam_config['cam_left']['roi'][1]
                         dph = self.lidar.detect_depth(rects=armors[:, 1:].tolist()).reshape(-1, 1)
                         x0 = (armors[:, 1] + armors[:, 3] / 2).reshape(-1, 1)
-                        y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1) + cam_config['cam_left']['roi'][1]
+                        y0 = (armors[:, 2] + armors[:, 4] / 2).reshape(-1, 1)
                         t_loc_left = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, dph], axis=1)
                 else:
                     armors = self.__res_left[:, [11, 6, 7, 8, 9]]
                     armors = armors[np.logical_not(np.isnan(armors[:, 0]))]
-                    x0 = (armors[:, 1] + (armors[:, 3] - armors[:, 1]) / 2).reshape(-1, 1)
-                    y0 = (armors[:, 2] + (armors[:, 4] - armors[:, 2]) / 2).reshape(-1, 1) + \
-                         cam_config['cam_left']['roi'][1]
-                    t_loc_left = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, np.zeros(x0.shape)], axis=1)
+                    if armors.shape[0] != 0:
+                        armors[:, 2] += cam_config['cam_left']['roi'][1]
+                        x0 = (armors[:, 1] + (armors[:, 3] - armors[:, 1]) / 2).reshape(-1, 1)
+                        y0 = (armors[:, 2] + (armors[:, 4] - armors[:, 2]) / 2).reshape(-1, 1)
+                        t_loc_left = np.concatenate([armors[:, 0].reshape(-1, 1), x0, y0, np.zeros(x0.shape)], axis=1)
         t_loc_right = None
         self.loc_alarm.two_camera_merge_update(t_loc_left, t_loc_right, self.repo_left.get_rp_alarming())
         self.loc_alarm.check()
@@ -579,14 +587,19 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             Port_operate.gain_decisions(self.decision_tree.get_decision())
             if Port_operate.change_view != -1:
                 self.view_change = Port_operate.change_view
+            Port_operate.Receive_State_Data([0] * 16)
             self.decision_tree.update_serial(Port_operate.positions_us(),
                                              Port_operate.HP()[8 * (1 - enemy_color):8 * (1 - enemy_color) + 8],
                                              Port_operate.HP()[8 * enemy_color:8 * enemy_color + 8],
-                                             Port_operate.get_state(), Port_operate.Remain_time)
-        self.supply_detector.eco_detect(self.__pic_left, self.loc_alarm.get_last_loc())
+                                             Port_operate.get_state(),
+                                             int(420 - time.time() + Port_operate.start_time),
+                                             Port_operate.highlight)
+        self.supply_detector.eco_detect(self.__pic_left, self.loc_alarm.get_last_loc(),
+                                        lambda x: self.set_image(x, "hero_demo"))
         Port_operate.get_message(self.hp_scene)
         self.hp_scene.show()
-        self.decision_tree.update_information(self.loc_alarm.get_location(), self.repo_left.fly, self.repo_left.hero_r3,
+        self.decision_tree.update_information(self.loc_alarm.get_location(), self.repo_left.fly,
+                                              self.repo_left.fly_result, self.repo_left.hero_r3,
                                               self.__res_left)
         self.decision_tree.decision_alarm()
         self.update_image()

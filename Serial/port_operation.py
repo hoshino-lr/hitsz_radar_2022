@@ -12,20 +12,20 @@ class Port_operate(object):
 
     _Robot_positions = np.zeros((5, 2), dtype=np.float32)  # 敌方所有机器人坐标
     _Robot_positions_us = np.zeros((5, 2), dtype=np.float32)  # 敌方所有机器人坐标
-    _Robot_decisions = np.zeros((5, 2), dtype=np.float32)  # 我方所有机器人状态
+    _Robot_decisions = np.zeros((6, 4), dtype=np.uint8)  # 我方所有机器人状态
     _Now_stage = 0
     _Now_state = 0
     _last_state = 0
     _Game_Start_Flag = False
     _Game_End_Flag = False
     Remain_time = 0  # 剩余时间
-
+    start_time = time.time()
     change_view = -1
     highlight = False
     missile_bit = False
 
     _init_hp = np.ones(10, dtype=int) * 500  # 初始血量
-    _HP = np.ones(16, dtype=int) * 500  # 血量
+    _HP = np.ones(16, dtype=int) * 50  # 血量
     _max_hp = _init_hp.copy()  # 最大血量
     _hp_up = np.array([100, 150, 200, 250, 300, 350, 400, 450, 500])  # 各个升级血量阶段
     _last_hp = _init_hp.copy()
@@ -49,7 +49,7 @@ class Port_operate(object):
     @staticmethod
     def gain_decisions(decisions):
         # 传入位置
-        Port_operate._Robot_decisions = np.float32(decisions)
+        Port_operate._Robot_decisions = np.uint8(decisions)
 
     @staticmethod
     def positions():
@@ -70,6 +70,11 @@ class Port_operate(object):
     def get_state():
         # 传出位置
         return [Port_operate._Now_state, Port_operate._energy_time]
+
+    @staticmethod
+    def set_state(now_state, energy_time):
+        Port_operate._last_state = Port_operate._Now_state = now_state
+        Port_operate._energy_time = energy_time
 
     @staticmethod
     def HP():
@@ -195,13 +200,14 @@ class Port_operate(object):
             if sender_id == 0x106 or sender_id == 0x6:
                 Port_operate.change_view = buffer[13]
                 Port_operate.highlight = buffer[14]
-                Port_operate.missile_bit = buffer[15]
-                if Port_operate.missile_bit:
+                if Port_operate.missile_bit != buffer[15]:
                     Port_operate._energy_time = time.time()
                     if Port_operate.Remain_time < 240:
                         Port_operate._Now_state = 4
                     else:
                         Port_operate._Now_state = 3
+                    Port_operate._last_state = Port_operate._Now_state
+                    Port_operate.missile_bit = buffer[15]
 
             elif sender_id >= 0x100:
                 Port_operate._Robot_positions_us[sender_id - 0x100] = np.array([buffer[13], buffer[14]])
@@ -216,26 +222,25 @@ class Port_operate(object):
         # 能量机关状态
         s_energy = (buffer[7] >> 4) & 0x1
         b_energy = (buffer[7] >> 5) & 0x1
-        if s_energy == 1:
-            Port_operate._Now_state = 1
-        elif b_energy == 1:
-            Port_operate._Now_state = 2
-        else:
-            Port_operate._Now_state = 0
-        if Port_operate._last_state != Port_operate._Now_state:
-            if Port_operate._Now_state == 1:
-                Port_operate._energy_time = time.time()
-            elif Port_operate._Now_state == 1:
-                Port_operate._energy_time = time.time()
-            else:
-                Port_operate._energy_time = time.time()
-            Port_operate._last_state = Port_operate._Now_state
-        else:
+        if Port_operate._Now_state >= 3:
             if time.time() - Port_operate._energy_time >= 45:
                 Port_operate._Now_state = -1
+                Port_operate._last_state = Port_operate._Now_state
                 Port_operate._energy_time = time.time()
-            if Port_operate._Now_state == -1 and time.time() - Port_operate._energy_time >= 30:
+        else:
+            if s_energy == 1:
+                Port_operate._Now_state = 1
+            elif b_energy == 1:
+                Port_operate._Now_state = 2
+            elif Port_operate._Now_state != -1:
                 Port_operate._Now_state = 0
+            if Port_operate._last_state != Port_operate._Now_state:
+                Port_operate._energy_time = time.time()
+                if Port_operate._Now_state == 0:
+                    Port_operate._Now_state = -1
+                Port_operate._last_state = Port_operate._Now_state
+        if Port_operate._Now_state == -1 and time.time() - Port_operate._energy_time >= 30:
+            Port_operate._Now_state = 0
             Port_operate._last_state = Port_operate._Now_state
 
     @staticmethod
@@ -247,7 +252,7 @@ class Port_operate(object):
         buffer[4] = official_Judge_Handler.myGet_CRC8_Check_Sum(id(buffer), 5 - 1, 0xff)  # 帧头 CRC8 校验
 
     @staticmethod
-    def robo_alarm(target_id, my_id, alarm_type: int, attack_target: int, ser):
+    def robo_alarm(target_id, my_id, alarm_type: int, attack_target: int, cradle_head: int, direction: int, ser):
         # 车间通信
         buffer = [0]
         buffer *= 19
@@ -262,8 +267,8 @@ class Port_operate(object):
         buffer[12] = 0
         buffer[13] = alarm_type  # 预警信息 0：normal 1：attack 2：run 3：fly
         buffer[14] = attack_target
-        buffer[15] = 0  # 上下云台
-        buffer[16] = 0  # 方位
+        buffer[15] = cradle_head  # 上下云台
+        buffer[16] = direction  # 方位
         official_Judge_Handler.Append_CRC16_Check_Sum(id(buffer), 19)
         buffer_tmp_array = [0]
         buffer_tmp_array *= 19
@@ -324,26 +329,28 @@ class Port_operate(object):
 
     @staticmethod
     def port_manager(ser):
-
-        # 英雄飞坡预警
         alarm_type = int(Port_operate.decisions()[Port_operate.port_manager.nID][0])
         attack_target = int(Port_operate.decisions()[Port_operate.port_manager.nID][1])
+        cradle_head = int(Port_operate.decisions()[Port_operate.port_manager.nID][2])
+        direction = int(Port_operate.decisions()[Port_operate.port_manager.nID][3])
         # 敌方判断
         if enemy_color == 0:
             # 敌方为红方
             my_id = 109
-            Port_operate.robo_alarm(Port_operate.port_manager.b_id, my_id, alarm_type, attack_target, ser)
+            Port_operate.robo_alarm(Port_operate.port_manager.b_id, my_id, alarm_type, attack_target, cradle_head,
+                                    direction, ser)
             time.sleep(0.1)
-            if Port_operate.port_manager.b_id == 105:
+            if Port_operate.port_manager.b_id == 107:
                 Port_operate.port_manager.b_id = 101
             else:
                 Port_operate.port_manager.b_id += 1
         if enemy_color == 1:
             # 敌方为蓝方
             my_id = 9
-            Port_operate.robo_alarm(Port_operate.port_manager.b_id, my_id, alarm_type, attack_target, ser)
+            Port_operate.robo_alarm(Port_operate.port_manager.b_id, my_id, alarm_type, attack_target, cradle_head,
+                                    direction, ser)
             time.sleep(0.1)
-            if Port_operate.port_manager.r_id == 5:
+            if Port_operate.port_manager.r_id == 7:
                 Port_operate.port_manager.r_id = 1
             else:
                 Port_operate.port_manager.r_id += 1
