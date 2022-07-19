@@ -79,6 +79,11 @@ def armor_filter(armors: np.ndarray):
             armors_mask = armors[mask]
             if armors_mask.shape[0]:
                 armor = armors_mask[np.argmax(armors_mask[:, 9])]
+
+                armor[6] = armor[0] + (armor[2] - armor[0]) * 0.4
+                armor[7] = armor[1] + (armor[3] - armor[1]) * 0.75
+                armor[8] = armor[0] + (armor[2] - armor[0]) * 0.6
+                armor[9] = armor[1] + (armor[3] - armor[1]) * 0.85
                 results.append(armor)
         if len(results):
             armors = np.stack(results, axis=0)

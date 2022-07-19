@@ -204,6 +204,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.aspdokasd = 0
         self.Eco_point = [0, 0, 0, 0]
         self.num = True
+        self.energy_info = [0] * 16
 
     def condition_key_on_clicked(self, event) -> None:
         if event.key() == Qt.Key_Q:
@@ -213,15 +214,15 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         elif event.key() == Qt.Key_T:  # 将此刻设为start_time
             Port_operate.start_time = time.time()
         elif event.key() == Qt.Key_1:  # xiao能量机关激活
-            Port_operate.set_state(1, time.time())
+            self.energy_info[7] = 16
         elif event.key() == Qt.Key_2:  # da能量机关激活
-            Port_operate.set_state(2, time.time())
+            self.energy_info[7] = 32
         elif event.key() == Qt.Key_3:  # xiao能量机关激活
             Port_operate.set_state(3, time.time())
         elif event.key() == Qt.Key_4:  # da能量机关激活
             Port_operate.set_state(4, time.time())
         elif event.key() == Qt.Key_5:
-            Port_operate.set_state(0, time.time())
+            self.energy_info[7] = 0
         elif event.key() == Qt.Key_E:  # 添加工程预警
             self.text_api(draw_message("engineer", 0, "Engineer", "critical"))
         elif event.key() == Qt.Key_F:  # 添加飞坡预警
@@ -587,7 +588,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             Port_operate.gain_decisions(self.decision_tree.get_decision())
             if Port_operate.change_view != -1:
                 self.view_change = Port_operate.change_view
-            Port_operate.Receive_State_Data([0] * 16)
+            Port_operate.Receive_State_Data(self.energy_info)
             self.decision_tree.update_serial(Port_operate.positions_us(),
                                              Port_operate.HP()[8 * (1 - enemy_color):8 * (1 - enemy_color) + 8],
                                              Port_operate.HP()[8 * enemy_color:8 * enemy_color + 8],

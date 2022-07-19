@@ -169,6 +169,9 @@ class decision_tree(object):
             text = "UNABLE"
             remain_time = 30 - remain_time
             level = "info"
+            self.text_api(draw_message("energy_time", 1,
+                                       ("", (1600, 120)),
+                                       "critical"))
         self.text_api(draw_message("energy_time", 1,
                                    ("{0}  {1}".format(text, remain_time), (1600, 120)),
                                    level))

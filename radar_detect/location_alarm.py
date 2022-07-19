@@ -223,31 +223,36 @@ class Alarm(draw_map.CompeteMap):
         位置预测
         """
         # 上两帧位置 (2,N)
-        pre = np.float32(list(i[0:3] for i in list(self._location_cache.values())))
+        # pre = np.float32(list(i[0:3] for i in list(self._location_cache.values())))
         # 该帧预测位置；将包含时间的信息中的位置信息提取出
-        now = np.float32(list(i[0:3] for i in list(self._location.values())))
+        # now = np.float32(list(i[0:3] for i in list(self._location.values())))
 
-        pre1_zero = self._f_equal_zero(pre)  # the last frame 上一帧
-        now_zero = self._f_equal_zero(now)  # the latest frame 当前帧
+        # pre1_zero = self._f_equal_zero(pre)  # the last frame 上一帧
+        # now_zero = self._f_equal_zero(now)  # the latest frame 当前帧
 
         # 仅对该帧全零，上帧不为0的id做预测
-        do_prediction = np.logical_and(np.logical_not(pre1_zero), now_zero)
+        # do_prediction = np.logical_and(np.logical_not(pre1_zero), now_zero)
 
-        now[do_prediction] = pre[do_prediction]
+        # now[do_prediction] = pre[do_prediction]
 
         # 预测填入
         for i in range(1, 6):
-            if self._confidence[i] >= self.con_thre:
-                if self._current_time[str(i)] - self._last_location[str(i)][3] < 2 and abs(
-                        self._last_location[str(i)][0] - now[i - 1][0]) + \
-                        abs(self._last_location[str(i)][1] - now[i - 1][1]) < 3:
-                    now[i - 1] = now[i - 1] * self.filter + np.array(self._last_location[str(i)][0:3]) * (
-                            1 - self.filter)
-                self._location[str(i)][0:3] = now[i - 1].tolist()
-                self._last_location[str(i)][0:3] = now[i - 1].tolist()
-                self._last_location[str(i)][3] = self._current_time[str(i)]
+            if self._confidence[i] >= self.con_thre and self._location[str(i)][0] > 0:
+                if self._current_time[str(i)] - self._last_location[str(i)][3] < 2:
+                    if abs(self._last_location[str(i)][0] - self._location[str(i)][0]) + \
+                            abs(self._last_location[str(i)][1] - self._location[str(i)][1]) > 2:
+                        temp = (np.array(self._location[str(i)][0:3]) * (1 - self.filter) + np.array(
+                            self._last_location[str(i)][0:3]) * self.filter).tolist()
+                    else:
+                        temp = (np.array(self._location[str(i)][0:3]) * self.filter + np.array(
+                            self._last_location[str(i)][0:3]) * (1 - self.filter)).tolist()
+                else:
+                    temp = self._location[str(i)][0:3]
+                temp.append(self._current_time[str(i)])
+                self._location[str(i)] = temp
+                self._last_location[str(i)] = self._location[str(i)]
             else:
-                self._location[str(i)][0:3] = [0, 0, 0]
+                self._location[str(i)] = [0, 0, 0, 0]
             # push new data
             self._location_cache = self._location.copy()
 
@@ -289,7 +294,7 @@ class Alarm(draw_map.CompeteMap):
         # 预测填入
         T = time.time()
         for i in range(1, 6):
-            self._location[str(i)][0:2] = left_location[i - 1].tolist()
+            self._location[str(i)][0:3] = left_location[i - 1].tolist()
             # 当前未检测到的对应装甲板
             if self._location[str(i)][0:2] != [0, 0]:
                 self._current_time[str(i)] = T

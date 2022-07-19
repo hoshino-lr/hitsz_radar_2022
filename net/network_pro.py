@@ -20,7 +20,7 @@ class Predictor(object):
     # 输入图片与输出结果
     output = []
     name = ""
-    img_show = False
+    img_show = True
     record_state = False
 
     # net1参数

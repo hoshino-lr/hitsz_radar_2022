@@ -49,7 +49,7 @@ cam_config = {
         "size": (3072, 2048),
         "roi": (0, 200, 3072, 1848),
         "using_net": True,
-        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_data/16_14_47_left.avi",
+        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_data/内录/19_13_36_left.avi",
         "K_0": np.mat([[2580.7380664637653, 0.0, 1535.9830165125002],
                        [0.0, 2582.8839945792183, 1008.784910706948],
                        [0.0, 0.0, 1.0]]),

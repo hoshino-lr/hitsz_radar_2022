@@ -29,7 +29,7 @@ class Reproject(object):
             self._region = test_region
         else:
             self._region = region.copy()
-            for loc in self._region:
+            for loc in list(self._region.keys()):
                 _, team, _, _ = loc.split('_')
                 if color2enemy[team] != enemy_color:
                     self._region.pop(loc)
