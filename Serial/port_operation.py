@@ -69,7 +69,7 @@ class Port_operate(object):
     @staticmethod
     def get_state():
         # 传出位置
-        return [Port_operate._Now_state, Port_operate._energy_time]
+        return [Port_operate._stage, Port_operate._Now_state, Port_operate._energy_time]
 
     @staticmethod
     def set_state(now_state, energy_time):
@@ -119,6 +119,7 @@ class Port_operate(object):
             Port_operate._max_hp = Port_operate._init_hp.copy()
         Port_operate._Now_stage = buffer[7] >> 4
         Port_operate.Remain_time = (0x0000 | buffer[8]) | (buffer[9] << 8)
+        Port_operate.start_time = time.time() - 420 + Port_operate.Remain_time
 
     @staticmethod
     def Robot_HP(buffer):
@@ -196,8 +197,8 @@ class Port_operate(object):
     def Receive_Robot_Data(buffer):
         # 车间通信
         if Port_operate._Game_Start_Flag:
-            sender_id = (buffer[8] << 8) | buffer[7]
-            if sender_id == 0x106 or sender_id == 0x6:
+            sender_id = (buffer[10] << 8) | buffer[9]
+            if sender_id == 106 or sender_id == 6:
                 Port_operate.change_view = buffer[13]
                 Port_operate.highlight = buffer[14]
                 if Port_operate.missile_bit != buffer[15]:
@@ -209,8 +210,8 @@ class Port_operate(object):
                     Port_operate._last_state = Port_operate._Now_state
                     Port_operate.missile_bit = buffer[15]
 
-            elif sender_id >= 0x100:
-                Port_operate._Robot_positions_us[sender_id - 0x100] = np.array([buffer[13], buffer[14]])
+            elif sender_id >= 100:
+                Port_operate._Robot_positions_us[sender_id - 100] = np.array([buffer[13], buffer[14]])
             else:
                 Port_operate._Robot_positions_us[sender_id] = np.array([buffer[13], buffer[14]])
         else:

@@ -12,7 +12,6 @@ from radar_detect.common import is_inside, is_inside_polygon
 import mapping.draw_map as draw_map  # 引入draw_map模块，使用其中的CompeteMap类
 from config import armor_list, color2enemy, enemy_color, enemy_case, cam_config, real_size, region, test_region, choose
 from radar_detect.location_Delaunay import location_Delaunay
-from mapping.drawing import draw_message
 
 
 class Alarm(draw_map.CompeteMap):
@@ -26,13 +25,13 @@ class Alarm(draw_map.CompeteMap):
     _pred_time = 5  # 预测几次  一开始是10
     _pred_ratio = 0  # 预测速度比例
 
-    con_thre = 0.6  # 置信度阈值
+    con_thre = 0.5  # 置信度阈值
     con_decre1 = 0.075  # 置信度没超过阈值时的衰减速度
     con_incre = 0.10  # 置信度增加速度
-    con_decre2 = 0.05  # 置信度超过阈值时的衰减速度
+    con_decre2 = 0.025  # 置信度超过阈值时的衰减速度
 
     _lp = True  # 是否位置预测
-    _z_a = True  # 是否进行z轴突变调整
+    _z_a = False  # 是否进行z轴突变调整
     _z_thre = 0.2  # z轴突变调整
     _ground_thre = 100  # 地面阈值，我们最后调到了100就是没用这个阈值，看情况调
 
@@ -73,7 +72,7 @@ class Alarm(draw_map.CompeteMap):
         self._confidence = {}
 
         # 一阶低通滤波
-        self.filter = 0.8
+        self.filter = 0.5
 
         # 分别为左右相机存储位置信息，z坐标缓存，相机世界坐标系位置，以及（相机到世界）转移矩阵
         self._locations = [None, None]
@@ -95,7 +94,7 @@ class Alarm(draw_map.CompeteMap):
         self._location_pred_time = np.zeros(5, dtype=int)  # 预测次数记录
 
         # 对错误值进行预测
-        self.thre_predict = [4, 25]
+        self.thre_predict = [4, 24]
 
         # 判断x各行是否为全零的函数
         self._f_equal_zero = lambda x: np.isclose(
@@ -213,10 +212,9 @@ class Alarm(draw_map.CompeteMap):
                                         z_0 - self._camera_position[camera_type][2]) / line[2]
                         new_line = ratio * line
                         l_[1:] = new_line + self._camera_position[camera_type]
-                        # if self._debug:
-                        #     # z轴变换debug输出
-                        #     print('{0} from'.format(
-                        #         armor_list[int(l_[0]) - 1]), ori, 'to', l_[1:])
+                        # z轴变换debug输出
+                        print('z_adjust_{0} from'.format(
+                            armor_list[int(l_[0]) - 1]), ori, 'to', l_[1:])
 
     def _location_prediction(self):
         """
@@ -238,19 +236,20 @@ class Alarm(draw_map.CompeteMap):
         # 预测填入
         for i in range(1, 6):
             if self._confidence[i] >= self.con_thre and self._location[str(i)][0] > 0:
-                if self._current_time[str(i)] - self._last_location[str(i)][3] < 2:
-                    if abs(self._last_location[str(i)][0] - self._location[str(i)][0]) + \
-                            abs(self._last_location[str(i)][1] - self._location[str(i)][1]) > 2:
-                        temp = (np.array(self._location[str(i)][0:3]) * (1 - self.filter) + np.array(
-                            self._last_location[str(i)][0:3]) * self.filter).tolist()
+                if self._last_location[str(i)][0] > 0:
+                    if self._current_time[str(i)] - self._last_location[str(i)][3] < 2:
+                        if abs(self._last_location[str(i)][0] - self._location[str(i)][0]) + \
+                                abs(self._last_location[str(i)][1] - self._location[str(i)][1]) > 3:
+                            temp = self._location[str(i)][0:3]
+                        else:
+                            temp = (np.array(self._location[str(i)][0:3]) * self.filter + np.array(
+                                self._last_location[str(i)][0:3]) * (1 - self.filter)).tolist()
                     else:
-                        temp = (np.array(self._location[str(i)][0:3]) * self.filter + np.array(
-                            self._last_location[str(i)][0:3]) * (1 - self.filter)).tolist()
+                        temp = self._location[str(i)][0:3]
                 else:
                     temp = self._location[str(i)][0:3]
                 temp.append(self._current_time[str(i)])
-                self._location[str(i)] = temp
-                self._last_location[str(i)] = self._location[str(i)]
+                self._last_location[str(i)] = temp
             else:
                 self._location[str(i)] = [0, 0, 0, 0]
             # push new data
@@ -344,25 +343,12 @@ class Alarm(draw_map.CompeteMap):
                         B = np.concatenate(
                             [np.array(C).flatten(), np.ones(1)], axis=0)
                         l1[1:] = (self._T[0] @ B)[:3] / 1000
-
                         # 结合反投影模块信息判断车辆位置是否在指定区域内
                         for i in rp_alarming.keys():
                             # 反投影模块信息表明当前区域有对应编号车辆
                             if (rp_alarming[i] == armor).any():
-                                if is_inside_polygon(self._region[i][:2], l1[1:3]):
+                                if is_inside_polygon(np.array(self._region[i])[:, :2], l1[1:3]):
                                     break
-                                # # 矩形区域采用范围判断
-                                # if shape_type == 'r':
-                                #     # 车辆在对应区域内，则不做处理
-                                #     if self._region[i][0] >= l1[1] >= self._region[i][2] \
-                                #             and self._region[i][3] <= l1[2] <= self._region[i][1]:
-                                #         break
-                                #
-                                # # 判断是否在凸四边形内
-                                # if shape_type == 'fp':
-                                #     if is_inside(np.float32(self._region[i][:8]).reshape(4, 2), point=l1[1:3]):
-                                #         break
-                                # # 反投影模块与雷达点云信息不匹配，采用德劳内定位
                                 else:
                                     # 使用德劳内定位
                                     l1 = locations[locations[:, 0] == armor].reshape(-1)
@@ -426,6 +412,7 @@ class Alarm(draw_map.CompeteMap):
             B = np.concatenate(
                 [np.array(C).flatten(), np.ones(1)], axis=0)
             l1[1:] = (self._T[0] @ B)[:3] / 1000
+            print(l1)
         else:
             l1 = armor.reshape(-1)
             l1[1:] = self._loc_D[camera_type].get_point_pos(l1, self.state[camera_type]).reshape(-1)

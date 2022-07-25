@@ -13,7 +13,7 @@ enemy_color = 0  # 0：敌方为红色；1：敌方为蓝色
 USEABLE = {
     "cam_left": True,
     "cam_right": False,
-    "serial": True,
+    "serial": False,
     "Lidar": False,
     "locate_state": [0, 1],
 }

@@ -59,6 +59,7 @@ def read(ser):
 
         # 比赛状态数据
         if bufferbyte == 19 and cmd_id == 0x0001:
+
             if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 20):
                 # 处理比赛信息
                 Port_operate.Update_gamedata(buffer)
@@ -97,13 +98,13 @@ def read(ser):
 
         # 小地图通信
         if bufferbyte == 24 and cmd_id == 0x0303:
-            if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 24):
+            if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 25):
                 # 此处加入处理
                 read_init(buffer)
                 continue
 
         # 云台手通信
-        if bufferbyte == 19 and cmd_id == 0x0301:  # 2bite数据
+        if bufferbyte == 18 and cmd_id == 0x0301:  # 2bite数据
             if official_Judge_Handler.myVerify_CRC16_Check_Sum(id(buffer), 19):
                 # 比赛阶段信息
                 Port_operate.Receive_Robot_Data(buffer)

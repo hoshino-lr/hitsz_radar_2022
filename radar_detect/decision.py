@@ -44,6 +44,7 @@ class decision_tree(object):
         self._fly_flag = False
         self._tou_flag = False
         self._tou_qsz = False
+        self._remain_time = 0
 
     def decision_alarm(self):
         # abandon
@@ -66,7 +67,7 @@ class decision_tree(object):
         for r in self._rp_alarming.keys():
             # 格式解析
             _, _, _, location, _ = r.split('_')
-            if location in ["我方公路区", "哨兵前盲道"]:
+            if location in ["3号高地下我方盲道及公路区", "前哨站我方盲道"]:
                 if 2 in self._rp_alarming[r]:
                     flag = True
         self._engineer_flag = flag
@@ -75,44 +76,38 @@ class decision_tree(object):
         if self._state == 2:
             pass
         elif self._state == 4:
-            decision = self._our_blood / self._our_blood_max <= 0.4
-            for i in range(5):
-                if decision[i][0]:
-                    self._car_decision[i][0] = 2
+            decision = (self._our_blood / self._our_blood_max <= 0.4).reshape(-1)[:6]
+            self._car_decision[decision, 0] = 2
         else:
-            decision = self._our_blood / self._our_blood_max <= 0.25
-            for i in range(5):
-                if decision[i][0]:
-                    self._car_decision[i][0] = 2
+            decision = (self._our_blood / self._our_blood_max <= 0.25).reshape(-1)[:6]
+            self._car_decision[decision, 0] = 2
 
     def _tou_alarm(self):
         self._tou_flag = False
         car_flag = False
-        for i in range(5):
-            if self._our_position[i][0] != 0 and i != 1:
-                distance = abs(self._enemy_position[i][0] - self.start_x)
-                if distance <= 8:
-                    car_flag = True
-                    break
+        # for i in range(5):
+        #     if self._our_position[i][0] != 0:
+        #         distance = abs(self._enemy_position[i][0] - self.start_x)
+        #         if distance <= 8:
+        #             car_flag = True
+        #             break
         if not car_flag:
-            for i in range(5):
-                if self._enemy_position[i][0] != 0 and i != 1:
-                    distance = abs(self._enemy_position[i][0] - self.start_x)
-                    if distance <= 8:
-                        self._tou_flag = True
-                        break
+            result = np.bitwise_and(self._enemy_position[:, 0] != 0,
+                                    abs(self._enemy_position[:, 0] - self.start_x) <= 10)
+            result[1] = False
+            if result.any():
+                self._tou_flag = True
 
     def _target_attack(self):
-        choose = np.bitwise_and(self._enemy_blood[:5, :] <= 100,
-                                np.bitwise_and(self._enemy_position != 0,
-                                               abs(self._enemy_position - self.start_x) <= 14))
+        choose = np.bitwise_and(self._enemy_blood[:5, 0] <= 100,
+                                np.bitwise_and(self._enemy_position[:, 0] != 0,
+                                               abs(self._enemy_position - self.start_x)[:, 0] <= 14))
+        choose[1] = False
         if choose.any():
-            best_choose = 0
-            for i in range(5):
-                if choose[i][0] and self._enemy_blood[i] < self._enemy_blood[best_choose] and i != 1:
-                    best_choose = i
-            for i in range(5):
-                self._car_decision[i][0] = best_choose + 1
+            valid_c = np.argwhere(choose == True).reshape(-1).tolist()
+            best_c = np.argmin(self._enemy_blood[valid_c, 0])
+            best_c = valid_c[best_c]
+            self._car_decision[:, 1] = best_c + 1
 
     def _guard_decision(self):
         self._car_decision[5][2:] = [0, 0]
@@ -139,8 +134,7 @@ class decision_tree(object):
 
     def _fly_alarm(self):
         if self._fly_flag:
-            for i in range(5):
-                self._car_decision[i][0] = 3
+            self._car_decision[:, 0] = 3
 
     def _show_energy(self):
         self.text_api(draw_message("remain_time", 1,
@@ -198,34 +192,32 @@ class decision_tree(object):
         self._our_position = our_position
         self._our_blood = our_blood.reshape((8, 1))
         self._enemy_blood = enemy_blood.reshape((8, 1))
-        self._state = state[0]
-        self._energy_time = state[1]
+        self._stage, self._state, self._energy_time = state
         self._remain_time = remain_time
         self._high_light = high_light
 
     def generate_information(self):
         self._show_energy()
         if self._fly_flag:
-            self.text_api(draw_message("fly", 0, "FLY", "critical"))
+            self.text_api(draw_message("fly", 0, f"FLY_{self._fly_numbers}", "critical"))
             if isinstance(self._position_2d, np.ndarray):
                 count = self._position_2d[:, 11]
-                for i in self._fly_numbers:
-                    arg = np.argwhere(count == i[0])
-                    c = arg[0][0]
-                    self.text_api(
-                        draw_message("fly_alarm", 2, self._position_2d[c][0:4].astype(int).tolist(), "critical"))
+                arg = np.argwhere(count == self._fly_numbers)[0][0]
+                self.text_api(
+                    draw_message("fly_alarm", 2, self._position_2d[arg][0:4].astype(int).tolist(), "critical"))
         if self._engineer_flag:
             self.text_api(draw_message("engineer", 0, "Engineer", "critical"))
         if self._tou_qsz:
             self.text_api(draw_message("tou_qsz", 0, "HERO QSZ!!!", "warning"))
         if self._tou_flag:
-            self.text_api(draw_message("tou", 0, "TOU!!!", "critical"))
+            self.text_api(draw_message("tou", 0, "DEFEND!!!", "critical"))
         self._guard_decision()
         if isinstance(self._position_2d, np.ndarray):
-            for i in self._position_2d:
-                if i[11] == 1:
-                    if self._remain_time < 60 or self._high_light:
-                        self.text_api(draw_message(f"{i[11]}", 2, i[0:4].astype(int).tolist(), "critical"))
+            if (self._remain_time < 600 or self._high_light) and self._position_2d.size > 0:
+                arg = np.argwhere(self._position_2d[:, 11] == 1).reshape(-1, 1)
+                if arg.size > 0:
+                    self.text_api(
+                        draw_message("hero", 2, self._position_2d[arg[0][0]][0:4].astype(int).tolist(), "critical"))
                 # else:
                 #     if self._high_light:
                 #         self.text_api(draw_message(f"{i[11]}", 2, i[0:4].astype(int).tolist(), "warning"))

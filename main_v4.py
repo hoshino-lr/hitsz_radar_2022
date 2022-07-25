@@ -53,11 +53,12 @@ def process_detect(event, que, Event_Close, record, name):
                 t3 = time.time()
                 res = predictor.detect_cars(frame)
                 pub(event, que, res)
+                time.sleep(0.03)
                 t1 = t1 + time.time() - t3
                 count += 1
                 if count == 100:
                     fps = float(count) / t1
-                    print(f'{name} count:{count} fps: {int(fps)}')
+                    # print(f'{name} count:{count} fps: {int(fps)}')
                     count = 0
                     t1 = 0
             else:
@@ -201,10 +202,9 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.ChangeView.setText("切换视角")
         self.ShutDown.setText("终止程序")
         self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
-        self.aspdokasd = 0
         self.Eco_point = [0, 0, 0, 0]
+        self.Eco_cut = [700, 1300, 400, 600]
         self.num = True
-        self.energy_info = [0] * 16
 
     def condition_key_on_clicked(self, event) -> None:
         if event.key() == Qt.Key_Q:
@@ -231,8 +231,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             Port_operate.highlight = not Port_operate.highlight
         elif event.key() == Qt.Key_C:  # 添加清零
             self.draw_module.clear_message()
-        elif event.key() == Qt.Key_P:  # 换框
-            self.num = not self.num
         else:
             pass
 
@@ -340,21 +338,33 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 self.loc_alarm.pc_location(self.view_change, np.concatenate(
                     [np.array([[1., x, y]]), dph], axis=1))
 
+    def eco_key_on_clicked(self, event) -> None:
+        if event.key() == Qt.Key_P:  # 换框
+            self.num = not self.num
+        elif event.key() == Qt.Key_W:
+            self.Eco_cut[2] -= 10
+            self.Eco_cut[3] -= 10
+        elif event.key() == Qt.Key_S:
+            self.Eco_cut[2] += 10
+            self.Eco_cut[3] += 10
+        elif event.key() == Qt.Key_A:
+            self.Eco_cut[0] -= 10
+            self.Eco_cut[1] -= 10
+        elif event.key() == Qt.Key_D:
+            self.Eco_cut[0] += 10
+            self.Eco_cut[1] += 10
+
     def eco_mouseEvent(self, event) -> None:
         if self.__pic_left is None:
             return
+        x = event.x()
+        y = event.y()
+        x = int(x / self.far_demo.width() * (self.Eco_cut[1] - self.Eco_cut[0]) + self.Eco_cut[0])
+        y = int(y / self.far_demo.height() * (self.Eco_cut[3] - self.Eco_cut[2]) + self.Eco_cut[2])
         if event.button() == Qt.LeftButton:
-            x = event.x()
-            y = event.y()
-            x = int(x / self.main_demo.width() * self.__pic_left.shape[1])
-            y = int(y / self.main_demo.height() * self.__pic_left.shape[0])
             self.Eco_point[0] = x
             self.Eco_point[1] = y
         if event.button() == Qt.RightButton:
-            x = event.x()
-            y = event.y()
-            x = int(x / self.main_demo.width() * self.__pic_left.shape[1])
-            y = int(y / self.main_demo.height() * self.__pic_left.shape[0])
             self.Eco_point[2] = x
             self.Eco_point[3] = y
         if self.Eco_point[2] > self.Eco_point[0] and self.Eco_point[3] > self.Eco_point[1]:
@@ -517,7 +527,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if self.__pic_left is not None:
             self.draw_module.draw_message(self.__pic_left)
             self.set_image(self.__pic_left, "main_demo")
-            self.set_image(self.__pic_left[400:600, 700:1200], "far_demo")
+            self.set_image(self.__pic_left[self.Eco_cut[2]:self.Eco_cut[3], self.Eco_cut[0]:self.Eco_cut[1]],
+                           "far_demo")
         if self.__pic_right is not None:
             self.set_image(self.__pic_right, "hero_demo")
 
@@ -588,7 +599,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             Port_operate.gain_decisions(self.decision_tree.get_decision())
             if Port_operate.change_view != -1:
                 self.view_change = Port_operate.change_view
-            Port_operate.Receive_State_Data(self.energy_info)
+            # Port_operate.Receive_State_Data(self.energy_info)
+            # Port_operate.Receive_State_Data(Port_operate.get)
             self.decision_tree.update_serial(Port_operate.positions_us(),
                                              Port_operate.HP()[8 * (1 - enemy_color):8 * (1 - enemy_color) + 8],
                                              Port_operate.HP()[8 * enemy_color:8 * enemy_color + 8],

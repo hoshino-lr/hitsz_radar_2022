@@ -25,6 +25,7 @@ class Reproject(object):
         self._rvec = cam_config[name]['rvec']
         self._K_O = cam_config[name]['K_0']
         self._C_O = cam_config[name]['C_0']
+        self._y_offset = cam_config[name]["roi"][1]
         if DEBUG:  # 若为debug模式
             self._region = test_region
         else:
@@ -91,7 +92,7 @@ class Reproject(object):
                     #         height = np.ones((cor.shape[0], 1))
                     #         height[1:3] *= self._region[r][9]
                     #         height[[0, 3]] *= self._region[r][8]
-                    if isinstance(cor, np.ndarray) and isinstance(height, np.ndarray):
+                    if isinstance(cor, np.ndarray):
                         # cor = np.concatenate([cor, height], axis=1) * 1000  # 合并高度坐标 顺便把米转换为毫米
                         recor = cv2.projectPoints(cor, self._rvec, self._tvec, self._K_O, self._C_O)[0] \
                             .astype(int).reshape(-1, 2)  # 得到反投影坐标
@@ -122,14 +123,14 @@ class Reproject(object):
                 armors = net_input[:, [11, 13, 6, 7, 8, 9]]
                 cars = net_input[:, [11, 0, 1, 2, 3]]
 
-        color_bbox = []
+        # color_bbox = []
         if isinstance(armors, np.ndarray) and isinstance(cars, np.ndarray):
             cls = armors[:, 0].reshape(-1, 1)
             # 默认使用bounding box为points四点
             x1 = armors[:, 2].reshape(-1, 1)
-            y1 = armors[:, 3].reshape(-1, 1)
+            y1 = armors[:, 3].reshape(-1, 1) + self._y_offset
             x2 = armors[:, 4].reshape(-1, 1)
-            y2 = armors[:, 5].reshape(-1, 1)
+            y2 = armors[:, 5].reshape(-1, 1) + self._y_offset
             points = np.concatenate([x1, y1, x2, y1, x2, y2, x1, y2], axis=1)
             # 对仅预测出颜色的敌方预测框进行数据整合
             # for i in cars:
@@ -155,45 +156,43 @@ class Reproject(object):
             points = points.reshape((-1, 4, 2))
             for r in self._scene_region.keys():
                 # 判断对于各个预测框，是否有点在该区域内
-                mask = np.array([[is_inside_polygon(self._scene_region[r], p) for p in cor] for cor in points])
+                mask = np.array([[is_inside_polygon(self._scene_region[r][:, :2], p) for p in cor] for cor in points])
                 mask = np.sum(mask, axis=1) > 0  # True or False,只要有一个点在区域内，则为True
                 alarm_target = cls[mask]  # 需要预警的装甲板种类
                 if len(alarm_target):
-                    self.rp_alarming = {r: alarm_target.reshape(-1, 1)}
+                    self.rp_alarming[r] = alarm_target.reshape(-1, 1)
 
     def push_text(self) -> None:
         """
         发送信息
         """
-
         if self._scene_init:
             for r in self.rp_alarming.keys():
                 # 格式解析
-                _, _, _, location, _ = r.split('_')
-                if location == "3号高地":
+                _, _, location, _ = r.split('_')
+                if location == "敌方3号高地":
                     result = self.rp_alarming[r] == 1
                     if result.any():
                         self.hero_r3 = True
                         print(f"[ERROR] 反投影{location}", f"在{location}处有英雄！！！")
+                if location == "飞坡":
+                    self.fly = True
+                    self.fly_result = int(self.rp_alarming[r][0][0])
+                if self._time[f'{location}'] == 0:
+                    self._start[f'{location}'] = time.time()
+                    self._region_count[f'{location}'] += 1
+                    self._end[f'{location}'] = time.time()
+                    self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
                 else:
-                    if self._time[f'{location}'] == 0:
-                        self._start[f'{location}'] = time.time()
+                    self._end[f'{location}'] = time.time()
+                    self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
+                    if self._time[f'{location}'] <= 1:
                         self._region_count[f'{location}'] += 1
-                        self._end[f'{location}'] = time.time()
-                        self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
-                    else:
-                        self._end[f'{location}'] = time.time()
-                        self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
-                        if self._time[f'{location}'] <= 1:
-                            self._region_count[f'{location}'] += 1
-                        if self._time[f'{location}'] >= self._clock:
-                            if self._region_count[f'{location}'] >= self._frame:
-                                if location == "飞坡":
-                                    self.fly = True
-                                    self.fly_result = self.rp_alarming[r]
-                                print(f"[ERROR] 反投影{location}", f"在{location}处有敌人！！！")
-                                self._region_count[f'{location}'] = 0
-                            self._time[f'{location}'] = 0
+                    if self._time[f'{location}'] >= self._clock:
+                        if self._region_count[f'{location}'] >= self._frame:
+                            print(f"[ERROR] 反投影{location}", f"在{location}处有敌人！！！")
+                            self._region_count[f'{location}'] = 0
+                        self._time[f'{location}'] = 0
 
     def get_rp_alarming(self):
         return self.rp_alarming

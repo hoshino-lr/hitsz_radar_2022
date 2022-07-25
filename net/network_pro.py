@@ -20,12 +20,12 @@ class Predictor(object):
     # 输入图片与输出结果
     output = []
     name = ""
-    img_show = True
+    img_show = False
     record_state = False
 
     # net1参数
-    net1_confThreshold = 0.3
-    net1_nmsThreshold = 0.4
+    net1_confThreshold = 0.5
+    net1_nmsThreshold = 0.45
     net1_inpHeight = 640
     net1_inpWidth = 640
     net1_trt_file = net1_engine
@@ -37,7 +37,7 @@ class Predictor(object):
     net1_strides = [8, 16, 32]
 
     # net2参数
-    net2_confThreshold = 0.4
+    net2_confThreshold = 0.6
     net2_nmsThreshold = 0.45
     net2_inpHeight = 640
     net2_inpWidth = 640
@@ -363,7 +363,6 @@ class Predictor(object):
         # 拼图 用于第二层检测的前处理
         # 将每一辆车的图片resize成213x213的图片，放进9x9的网格图片中
         # 输出为一张640x640的图片
-        step = 213
         jig_picture = np.zeros((640, 640, 3), dtype=np.uint8)
         count = 0
         for i in det_points:
