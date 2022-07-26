@@ -8,9 +8,9 @@ import cv2 as cv
 import numpy as np
 import time
 
-from radar_detect.common import is_inside, is_inside_polygon
+from radar_detect.common import is_inside_polygon
 import mapping.draw_map as draw_map  # 引入draw_map模块，使用其中的CompeteMap类
-from config import armor_list, color2enemy, enemy_color, enemy_case, cam_config, real_size, region, test_region, choose
+from config import armor_list, color2enemy, enemy_color, cam_config, real_size, region, test_region, choose
 from radar_detect.location_Delaunay import location_Delaunay
 
 
@@ -76,7 +76,7 @@ class Alarm(draw_map.CompeteMap):
 
         # 分别为左右相机存储位置信息，z坐标缓存，相机世界坐标系位置，以及（相机到世界）转移矩阵
         self._locations = [None, None]
-        self._z_cache = [None, None]
+        # self._z_cache = [None, None]
         self._camera_position = [None, None]
         self._T = [None, None]
         if int(enemy_color) == 0:
@@ -191,30 +191,23 @@ class Alarm(draw_map.CompeteMap):
         # message_ = draw_message("位置预警-信息输出", 0, str_text, "WARNING")
         # self._touch_api(message_)
 
-    def _adjust_z_one_armor(self, l_, camera_type):
+    def _adjust_z(self, camera_type):
         """
         z轴突变调整，仅针对一个装甲板
         :param l_:(cls+x+y+z) 一个id的位置
         :param camera_type:相机编号
         """
-        if isinstance(self._z_cache[camera_type], np.ndarray):
-            # 检查上一帧缓存z坐标中有没有对应id
-            mask = np.array(self._z_cache[camera_type][:, 0] == l_[0])
-            if mask.any():
-                z_0 = self._z_cache[camera_type][mask][:, 1]
-                if z_0 < self._ground_thre:  # only former is on ground do adjust
-                    z = l_[3]
-                    if z - z_0 > self._z_thre:  # only adjust the step from down to up
-                        # 以下计算过程详见技术报告公式
-                        ori = l_[1:].copy()
-                        line = l_[1:] - self._camera_position[camera_type]
-                        ratio = (
-                                        z_0 - self._camera_position[camera_type][2]) / line[2]
-                        new_line = ratio * line
-                        l_[1:] = new_line + self._camera_position[camera_type]
-                        # z轴变换debug输出
-                        print('z_adjust_{0} from'.format(
-                            armor_list[int(l_[0]) - 1]), ori, 'to', l_[1:])
+        position = self._T[camera_type][:, 3].copy().reshape(-1)
+        t = time.time()
+        for i in range(1, 6):
+            if self._location[str(i)][2] >= 1.2 and (t - self._last_location[str(i)][3]) < 1:
+                z_ratio = (position[2] - self._location[str(i)][2]) / (
+                        self._location[str(i)][2] - self._last_location[str(i)][2])
+                self._location[str(i)][2] = self._last_location[str(i)][2]
+                self._location[str(i)][0] = self._location[str(i)][0] - z_ratio * (
+                        position[0] - self._location[str(i)][0])
+                self._location[str(i)][1] = self._location[str(i)][1] - z_ratio * (
+                        position[1] - self._location[str(i)][1])
 
     def _location_prediction(self):
         """
@@ -234,10 +227,13 @@ class Alarm(draw_map.CompeteMap):
         # now[do_prediction] = pre[do_prediction]
 
         # 预测填入
+        if self._z_a:
+            self._adjust_z(0)
+
         for i in range(1, 6):
             if self._confidence[i] >= self.con_thre and self._location[str(i)][0] > 0:
                 if self._last_location[str(i)][0] > 0:
-                    if self._current_time[str(i)] - self._last_location[str(i)][3] < 2:
+                    if self._current_time[str(i)] - self._last_location[str(i)][3] < 1:
                         if abs(self._last_location[str(i)][0] - self._location[str(i)][0]) + \
                                 abs(self._last_location[str(i)][1] - self._location[str(i)][1]) > 3:
                             temp = self._location[str(i)][0:3]
@@ -329,8 +325,6 @@ class Alarm(draw_map.CompeteMap):
 
         if isinstance(locations, np.ndarray):
             pred_loc = []
-            if self._z_a:
-                cache_pred = []
             locations[1:3] = np.around(locations[1:3])
             for armor in range(1, 6):
                 if (locations[:, 0] == armor).any():
@@ -371,9 +365,6 @@ class Alarm(draw_map.CompeteMap):
                     self._confidence[armor] = min(1.1, self._confidence[armor] + self.con_incre)
                     if self._confidence[armor] < self.con_thre:
                         continue
-                    if self._z_a:
-                        self._adjust_z_one_armor(l1, 0)
-                        cache_pred.append(l1[[0, 3]])
                     pred_loc.append(l1.reshape(-1))
                 else:
                     # 装甲板未出现，置信度衰减处理
@@ -387,10 +378,6 @@ class Alarm(draw_map.CompeteMap):
                 l_ = np.stack(pred_loc, axis=0)
                 choose = l_[:, 0].reshape(-1).astype(np.int32)
                 choose = choose - np.ones_like(choose)
-                # z cache
-                if self._z_a:
-                    self._z_cache[0] = np.stack(cache_pred, axis=0)
-
                 self._locations[camera_type][choose] = l_[:, 1:4].copy()
 
     def get_location(self):

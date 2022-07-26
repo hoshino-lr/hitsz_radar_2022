@@ -204,7 +204,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
         self.Eco_point = [0, 0, 0, 0]
         self.Eco_cut = [700, 1300, 400, 600]
-        self.num = True
+        self._num_kk = 0
+        self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1}框框")
 
     def condition_key_on_clicked(self, event) -> None:
         if event.key() == Qt.Key_Q:
@@ -213,16 +214,10 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
         elif event.key() == Qt.Key_T:  # 将此刻设为start_time
             Port_operate.start_time = time.time()
-        elif event.key() == Qt.Key_1:  # xiao能量机关激活
-            self.energy_info[7] = 16
-        elif event.key() == Qt.Key_2:  # da能量机关激活
-            self.energy_info[7] = 32
         elif event.key() == Qt.Key_3:  # xiao能量机关激活
             Port_operate.set_state(3, time.time())
         elif event.key() == Qt.Key_4:  # da能量机关激活
             Port_operate.set_state(4, time.time())
-        elif event.key() == Qt.Key_5:
-            self.energy_info[7] = 0
         elif event.key() == Qt.Key_E:  # 添加工程预警
             self.text_api(draw_message("engineer", 0, "Engineer", "critical"))
         elif event.key() == Qt.Key_F:  # 添加飞坡预警
@@ -340,7 +335,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
 
     def eco_key_on_clicked(self, event) -> None:
         if event.key() == Qt.Key_P:  # 换框
-            self.num = not self.num
+            self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1}框框")
+            self._num_kk = abs(1 - self._num_kk)
         elif event.key() == Qt.Key_W:
             self.Eco_cut[2] -= 10
             self.Eco_cut[3] -= 10
@@ -368,7 +364,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.Eco_point[2] = x
             self.Eco_point[3] = y
         if self.Eco_point[2] > self.Eco_point[0] and self.Eco_point[3] > self.Eco_point[1]:
-            self.supply_detector.update_ori(self.__pic_left, self.Eco_point, self.num)
+            self.supply_detector.update_ori(self.__pic_left, self.Eco_point, self._num_kk)
             self.text_api(
                 draw_message("eco_board", 2,
                              (self.Eco_point[0], self.Eco_point[1],
@@ -511,15 +507,24 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.PRE_right.start()
 
     def update_state(self) -> None:
+        # if isinstance(self.__res_left, bool):
+        #     self.set_board_text("ERROR", "左相机", "左相机寄了")
+        # else:
+        #     self.set_board_text("INFO", "左相机", "左相机正常工作")
+        # if isinstance(self.__res_right, bool):
+        #     self.set_board_text("ERROR", "右相机", "右相机寄了")
+        # else:
+        #     self.set_board_text("INFO", "右相机", "右相机正常工作")
+        text = ""
         if isinstance(self.__res_left, bool):
-            self.set_board_text("ERROR", "左相机", "左相机寄了")
+            text += "左相机寄了      "
         else:
-            self.set_board_text("INFO", "左相机", "左相机正常工作")
+            text += "左相机正常工作  "
         if isinstance(self.__res_right, bool):
-            self.set_board_text("ERROR", "右相机", "右相机寄了")
+            text += "右相机寄了"
         else:
-            self.set_board_text("INFO", "右相机", "右相机正常工作")
-
+            text += "右相机正常工作"
+        self.set_board_text("INFO", "相机", text)
         text = "<br \>".join(list(self.board_textBrowser.values()))  # css format to replace \n
         self.condition.setText(text)
 
@@ -594,8 +599,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
 
         # update serial
         if self.__serial:
-            location = self.loc_alarm.get_location()
-            Port_operate.gain_positions(location)
+            Port_operate.gain_positions(self.loc_alarm.get_last_loc())
             Port_operate.gain_decisions(self.decision_tree.get_decision())
             if Port_operate.change_view != -1:
                 self.view_change = Port_operate.change_view
@@ -611,7 +615,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                                         lambda x: self.set_image(x, "hero_demo"))
         Port_operate.get_message(self.hp_scene)
         self.hp_scene.show()
-        self.decision_tree.update_information(self.loc_alarm.get_location(), self.repo_left.fly,
+        self.decision_tree.update_information(self.loc_alarm.get_last_loc(), self.repo_left.fly,
                                               self.repo_left.fly_result, self.repo_left.hero_r3,
                                               self.__res_left)
         self.decision_tree.decision_alarm()
@@ -656,7 +660,7 @@ class LOGGER(object):
         self.logger.addHandler(fh)
 
     def write(self, message):
-        self.terminal.write(message)
+        # self.terminal.write(message)
         if message == '\n':
             return
         if "[ERROR]" in message:

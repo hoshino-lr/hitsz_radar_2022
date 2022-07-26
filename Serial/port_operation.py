@@ -10,8 +10,8 @@ from config import enemy_color, BO
 class Port_operate(object):
     _bytes2int = lambda x: (0x0000 | x[0]) | (x[1] << 8)
 
-    _Robot_positions = np.zeros((5, 2), dtype=np.float32)  # 敌方所有机器人坐标
-    _Robot_positions_us = np.zeros((5, 2), dtype=np.float32)  # 敌方所有机器人坐标
+    _Robot_positions = np.zeros((5, 4), dtype=np.float32)  # 敌方所有机器人坐标
+    _Robot_positions_us = np.zeros((5, 2), dtype=np.float32)  # 我方所有机器人坐标
     _Robot_decisions = np.zeros((6, 4), dtype=np.uint8)  # 我方所有机器人状态
     _Now_stage = 0
     _Now_state = 0
@@ -280,32 +280,33 @@ class Port_operate(object):
     @staticmethod
     def Map_Transmit(ser):
         # 画小地图
-        position = Port_operate.positions()[Port_operate.Map_Transmit.nID]
-        x, y = position
-        # 坐标为零则不发送
-        if np.isclose(position, 0).all():
-            flag = False
-        else:
-            flag = True
-        # 敌方判断
-        if enemy_color == 0:
-            # 敌方为红方
-            if flag:
-                Port_operate.Map(Port_operate.Map_Transmit.r_id, np.float32(x), np.float32(y), ser)
-                time.sleep(0.1)
-                if Port_operate.Map_Transmit.r_id == 5:
-                    Port_operate.Map_Transmit.r_id = 1
-                else:
-                    Port_operate.Map_Transmit.r_id += 1
-        if enemy_color == 1:
-            # 敌方为蓝方
-            if flag:
-                Port_operate.Map(Port_operate.Map_Transmit.b_id, np.float32(x), np.float32(y), ser)
-                time.sleep(0.1)
-                if Port_operate.Map_Transmit.b_id == 105:
-                    Port_operate.Map_Transmit.b_id = 101
-                else:
-                    Port_operate.Map_Transmit.b_id += 1
+        if time.time() - Port_operate.positions()[Port_operate.Map_Transmit.nID][3] < 2:
+            position = Port_operate.positions()[Port_operate.Map_Transmit.nID][0, 1]
+            x, y = position
+            # 坐标为零则不发送
+            if np.isclose(position, 0).all():
+                flag = False
+            else:
+                flag = True
+            # 敌方判断
+            if enemy_color == 0:
+                # 敌方为红方
+                if flag:
+                    Port_operate.Map(Port_operate.Map_Transmit.r_id, np.float32(x), np.float32(y), ser)
+                    time.sleep(0.1)
+                    if Port_operate.Map_Transmit.r_id == 5:
+                        Port_operate.Map_Transmit.r_id = 1
+                    else:
+                        Port_operate.Map_Transmit.r_id += 1
+            if enemy_color == 1:
+                # 敌方为蓝方
+                if flag:
+                    Port_operate.Map(Port_operate.Map_Transmit.b_id, np.float32(x), np.float32(y), ser)
+                    time.sleep(0.1)
+                    if Port_operate.Map_Transmit.b_id == 105:
+                        Port_operate.Map_Transmit.b_id = 101
+                    else:
+                        Port_operate.Map_Transmit.b_id += 1
         Port_operate.Map_Transmit.nID = (Port_operate.Map_Transmit.nID + 1) % 5
 
     @staticmethod
@@ -343,8 +344,10 @@ class Port_operate(object):
             time.sleep(0.1)
             if Port_operate.port_manager.b_id == 107:
                 Port_operate.port_manager.b_id = 101
+            elif Port_operate.port_manager.b_id == 105:
+                Port_operate.port_manager.b_id += 2
             else:
-                Port_operate.port_manager.b_id += 1
+                Port_operate.port_manager.b_id += 2
         if enemy_color == 1:
             # 敌方为蓝方
             my_id = 9
@@ -353,6 +356,8 @@ class Port_operate(object):
             time.sleep(0.1)
             if Port_operate.port_manager.r_id == 7:
                 Port_operate.port_manager.r_id = 1
+            elif Port_operate.port_manager.r_id == 5:
+                Port_operate.port_manager.r_id += 2
             else:
                 Port_operate.port_manager.r_id += 1
         Port_operate.port_manager.nID = (Port_operate.port_manager.nID + 1) % 5
