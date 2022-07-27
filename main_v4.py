@@ -53,7 +53,7 @@ def process_detect(event, que, Event_Close, record, name):
                 t3 = time.time()
                 res = predictor.detect_cars(frame)
                 pub(event, que, res)
-                time.sleep(0.03)
+                # time.sleep(0.04)
                 t1 = t1 + time.time() - t3
                 count += 1
                 if count == 100:
@@ -145,7 +145,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.decision_tree = decision_tree(self.text_api)
         self.repo_left = Reproject('cam_left', self.text_api)  # 左相机反投影
         self.loc_alarm = Alarm(enemy=enemy_color, api=self.show_map, touch_api=self.text_api,
-                               state_=USEABLE['locate_state'], debug=False)  # 绘图及信息管理类
+                               state_=USEABLE['locate_state'], _save_data=True, debug=False)  # 绘图及信息管理类
         self.decision_tree = decision_tree(self.text_api)  # 决策树
         self.supply_detector = eco_forecast(self.text_api)  # 经济预测(判断敌方哪个加弹了)
 
@@ -624,6 +624,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
 
         # if close the program
         if self.terminate:
+            self.loc_alarm.close_data()
             self._event_close.set()
             if self.__cam_left:
                 self.PRE_left.join(timeout=0.5)

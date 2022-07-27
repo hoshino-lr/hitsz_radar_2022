@@ -3,11 +3,12 @@
 created by 黄继凡 2021/12
 最新修改 by 黄继凡 2022/7/10
 """
+import pickle
 
 import cv2 as cv
 import numpy as np
 import time
-
+import pickle as pkl
 from radar_detect.common import is_inside_polygon
 import mapping.draw_map as draw_map  # 引入draw_map模块，使用其中的CompeteMap类
 from config import armor_list, color2enemy, enemy_color, cam_config, real_size, region, test_region, choose
@@ -38,7 +39,7 @@ class Alarm(draw_map.CompeteMap):
     state_name = ['雷达点云定位', '德劳内三角定位', 'kd_tree定位', '禁用定位']
     state = [3, 3]
 
-    def __init__(self, api, touch_api, enemy, state_: list, debug=False):
+    def __init__(self, api, touch_api, enemy, state_: list, _save_data: bool, debug=False):
         """
         :param api:主程序显示api，传入画图程序进行调用（不跨线程使用,特别是Qt）
         :param touch_api:log api
@@ -46,6 +47,7 @@ class Alarm(draw_map.CompeteMap):
         :param debug:debug模式
         """
         self._debug = debug
+        self._save_data = _save_data
         # 敌人颜色
         self._enemy = enemy
         # 显示api
@@ -110,6 +112,13 @@ class Alarm(draw_map.CompeteMap):
         self._locations = [np.zeros((5, 3)), np.zeros((5, 3))]
         self._location_cache = self._location.copy()
         self._last_location = self._location.copy()
+
+        if self._save_data:
+            self._f = open("resources/location_data.dat", "wb")
+
+    def close_data(self):
+        if self._save_data:
+            self._f.close()
 
     def push_T(self, rvec, tvec, camera_type):
         """
@@ -265,6 +274,8 @@ class Alarm(draw_map.CompeteMap):
         Args:
             rp_alarming:
         """
+        if self._save_data:
+            pickle.dump([t_locations_left, t_locations_right, rp_alarming], self._f)
         # init location
         for i in range(1, 6):
             self._location[str(i)][0:2] = [0, 0]
