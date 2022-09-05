@@ -20,12 +20,12 @@ class Predictor(object):
     # 输入图片与输出结果
     output = []
     name = ""
-    img_show = False
+    img_show = True
     record_state = False
 
     # net1参数
-    net1_confThreshold = 0.5
-    net1_nmsThreshold = 0.45
+    net1_confThreshold = 0.4
+    net1_nmsThreshold = 0.4
     net1_inpHeight = 640
     net1_inpWidth = 640
     net1_trt_file = net1_engine
@@ -37,8 +37,8 @@ class Predictor(object):
     net1_strides = [8, 16, 32]
 
     # net2参数
-    net2_confThreshold = 0.6
-    net2_nmsThreshold = 0.45
+    net2_confThreshold = 0.7
+    net2_nmsThreshold = 0.3
     net2_inpHeight = 640
     net2_inpWidth = 640
     net2_box_num = 25200
@@ -187,6 +187,7 @@ class Predictor(object):
         res = []
 
         if len(indices):
+            indices = indices.reshape(-1, 1)
             for i in indices:
                 # 暂时为完成 boxes 转 numpy 
                 bbox = [float(x) for x in bboxes[i[0]]]
@@ -416,7 +417,7 @@ class Predictor(object):
 
     def stop(self):
         """
-        停止ternsorrt线程，在关闭之前必须做这个操作，不然tensorrt的stramer可能无法释放
+        停止tensorrt线程，在关闭之前必须做这个操作，不然tensorrt的streamer可能无法释放
         """
         if self.using_net:
             self._net1.destroy()
@@ -457,7 +458,7 @@ class Predictor(object):
             self.record_object = cv.VideoWriter(save_title + "_" + cam + ".avi", fourcc, 10,
                                                 cam_config[self.name]['size'])
             self._record_thr = threading.Thread(target=self.mul_record)
-            self._record_thr.setDaemon(True)
+            self._record_thr.daemon = True
             self.record_state = True
             self._record_thr.start()
         else:
@@ -480,7 +481,7 @@ if __name__ == '__main__':
     import sys
 
     sys.path.append("..")  # 单独跑int的时候需要
-    cap = cv.VideoCapture("/home/hoshino/视频/11_19_42_left.avi")
+    cap = cv.VideoCapture("/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_data/19_13_36_left.avi")
 
     count = 0
     t2 = time.time()

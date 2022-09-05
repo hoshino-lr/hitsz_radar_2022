@@ -50,6 +50,7 @@ class decision_tree(object):
         # abandon
         if self.init_flag:
             self.tt = time.time()
+            self._tou_flag = False
             self._engineer_alarm()
             self._tou_alarm()
             self._blood_alarm()
@@ -63,14 +64,18 @@ class decision_tree(object):
         eng_pos = self._enemy_position[1]
         if eng_pos.all():
             x_abs = abs(eng_pos[0] - self.start_x)
-            if x_abs < 10:
+            if x_abs < 8 and eng_pos[3] < 0.1:
                 flag = True
         for r in self._rp_alarming.keys():
             # 格式解析
             _, _, location, _ = r.split('_')
-            if location in ["3号高地下我方盲道及公路区", "前哨站我方盲道"]:
+            if location in ["我方3号高地", "前哨站我方盲道", "3号高地下我方盲道及公路区", "tou"]:
+                sz = self._rp_alarming[r].shape[0]
                 if 2 in self._rp_alarming[r]:
                     flag = True
+                    sz -= 1
+                if sz > 0:
+                    self._tou_flag = True
         self._engineer_flag = flag
 
     def _run_alarm(self, valid: np.ndarray):
@@ -84,7 +89,6 @@ class decision_tree(object):
             self._car_decision[decision, 0] = 2
 
     def _tou_alarm(self):
-        self._tou_flag = False
         # car_flag = False
         # for i in range(5):
         #     if self._our_position[i][0] != 0:
@@ -94,7 +98,7 @@ class decision_tree(object):
         #             break
         # if not car_flag:
         result = np.bitwise_and(self._enemy_position[:, 0] != 0,
-                                abs(self._enemy_position[:, 0] - self.start_x) <= 10)
+                                abs(self._enemy_position[:, 0] - self.start_x) <= 8.5)
         result[1] = False
         if result.any():
             self._tou_flag = True
@@ -115,8 +119,8 @@ class decision_tree(object):
         self._car_decision[5][2:4] = [0, 0]
         for r in self._rp_alarming.keys():
             # 格式解析
-            _, _, _, location, _ = r.split('_')
-            if location in ["我方3号高地", "3号高地下我方盲道及公路区", "前哨站我方盲道"]:
+            _, _, location, _ = r.split('_')
+            if location in ["我方3号高地", "3号高地下我方盲道及公路区", "前哨站我方盲道", "环形高地1"]:
                 if self._rp_alarming[r].shape[0] != 0:
                     if location == "我方3号高地":
                         self._car_decision[5][2:4] = [1, 1]
@@ -182,6 +186,9 @@ class decision_tree(object):
                                    ("{0}  {1}".format(text, remain_time), (1600, 120)),
                                    level))
 
+    def get_flag(self):
+        return self._tou_flag or self._engineer_flag
+
     def clear_state(self):
         self._enemy_position = np.zeros((5, 2))  # 敌方位置
         self._our_position = np.zeros((5, 2))  # 我方位置
@@ -236,14 +243,15 @@ class decision_tree(object):
                 #         self.text_api(draw_message(f"{i[11]}", 2, i[0:4].astype(int).tolist(), "warning"))
 
     def update_information(self, enemy_position: np.ndarray, fly_flag: bool, fly_numbers: np.ndarray, hero_r3: bool,
-                           position_2d):
+                           position_2d, rp_alarming: dict):
         self._enemy_position = enemy_position
         self._hero_r3 = hero_r3
         self._fly_flag = fly_flag
+        self._rp_alarming = rp_alarming
         self._fly_numbers = fly_numbers
         self._position_2d = position_2d
         self.init_flag = True
 
     def get_decision(self) -> np.ndarray:
-        print(self._car_decision)
+        # print(self._car_decision)
         return self._car_decision

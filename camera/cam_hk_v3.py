@@ -200,8 +200,8 @@ class Camera_HK(Camera):
             else:
                 img_buff = (c_ubyte * stConvertParam.nDstLen)()
                 memmove(byref(img_buff), stConvertParam.pDstBuffer, stConvertParam.nDstLen)
-                self.__img = np.asarray(img_buff)
-                self.__img = cv.copyMakeBorder(self.__img, 0, self.__roi[1], 0, 0, np.uint8, value=(0, 0, 0))
+                self.__img = np.asarray(img_buff).reshape(self.__roi[3], self.__roi[2], 3)
+                self.__img = cv.copyMakeBorder(self.__img, 0, self.__roi[1], 0, 0, cv.BORDER_CONSTANT, value=(0, 0, 0))
                 return True
         else:
             print("get one frame fail, ret[0x%x]" % ret)

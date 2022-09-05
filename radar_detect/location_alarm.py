@@ -238,7 +238,6 @@ class Alarm(draw_map.CompeteMap):
         # 预测填入
         if self._z_a:
             self._adjust_z(0)
-
         for i in range(1, 6):
             if self._confidence[i] >= self.con_thre and self._location[str(i)][0] > 0:
                 if self._last_location[str(i)][0] > 0:
@@ -308,14 +307,14 @@ class Alarm(draw_map.CompeteMap):
         if self._lp:
             self._location_prediction()
 
-        if self.reset_count == self.reset_thre:
-            self.reset_count = 0
-            for i in range(1, 6):  # 初始化位置为全零
-                self._location[str(i)][0:3] = [0, 0, 0]
-            # 前一帧位置为全零
-            self._location_cache = self._location.copy()
-        else:
-            self.reset_count += 1
+        # if self.reset_count == self.reset_thre:
+        #     self.reset_count = 0
+        #     for i in range(1, 6):  # 初始化位置为全零
+        #         self._location[str(i)][0:3] = [0, 0, 0]
+        #     # 前一帧位置为全零
+        #     self._location_cache = self._location.copy()
+        # else:
+        #     self.reset_count += 1
 
     def _update_position(self, t_location, camera_type, detection_type, rp_alarming: dict):
         """
@@ -350,6 +349,8 @@ class Alarm(draw_map.CompeteMap):
                         l1[1:] = (self._T[0] @ B)[:3] / 1000
                         # 结合反投影模块信息判断车辆位置是否在指定区域内
                         for i in rp_alarming.keys():
+                            if i == 'a_xxx_tou_a':
+                                continue
                             # 反投影模块信息表明当前区域有对应编号车辆
                             if (rp_alarming[i] == armor).any():
                                 if is_inside_polygon(np.array(self._region[i])[:, :2], l1[1:3]):

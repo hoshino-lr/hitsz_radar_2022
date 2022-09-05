@@ -121,7 +121,7 @@ class eco_forecast(object):
         if detect_flag:
             result = self._guess(detect_message, hero_api)
 
-    def update_ori(self, pic: np.ndarray, cut: list, num: bool):
+    def update_ori(self, pic: np.ndarray, cut: list, num: int):
         """
         Args:
             num:

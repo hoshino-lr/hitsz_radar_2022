@@ -1,11 +1,10 @@
-'''
+"""
 雷达监测类
 Linar.py
 用于生成激光雷达云图
 根据上交代码做出了一些简单的修改
 最终修改 by 李龙 2021/1/15
-'''
-import numpy
+"""
 import cv2
 import os
 import numpy as np
@@ -16,7 +15,8 @@ import inspect
 import time
 from datetime import datetime
 import pickle as pkl
-from config import PC_STORE_DIR, LIDAR_TOPIC_NAME, BAG_FIRE
+from config import PC_STORE_DIR, BAG_FIRE
+from pyrdr.client import LiDARClient
 
 
 class DepthQueue(object):
@@ -38,7 +38,7 @@ class DepthQueue(object):
         self.E_0 = E_0
         self.init_flag = False
 
-    def push_back(self, entry):
+    def push_back_pc(self, entry):
 
         # 当队列为空时，说明该类正在被初始化，置位初始化置位符
         if self.queue.empty():
@@ -55,6 +55,26 @@ class DepthQueue(object):
                                 np.logical_and(ip[:, 1] >= 0, ip[:, 1] < self.size[1]))
         ip = ip[inside]
         dpt = np.array(dpt[inside]).flatten()
+        # 将各个点的位置[N,2]加入队列
+        self.queue.put(ip)
+        if self.queue.full():
+            # 队满，执行出队操作，将出队的点云中所有点对应的投影位置的值置为nan
+            ip_d = self.queue.get()
+            self.depth[ip_d[:, 1], ip_d[:, 0]] = np.nan
+        # TODO: 如果点云有遮挡关系，则测距测到前或后不确定  其实我也遇到了这个问题
+        # 更新策略，将进队点云投影点的z值与原来做比较，取均值
+        s = np.stack([self.depth[ip[:, 1], ip[:, 0]], dpt], axis=1)
+        s = np.nanmedian(s, axis=1)
+        self.depth[ip[:, 1], ip[:, 0]] = s
+
+    def push_back_depth(self, entry):
+
+        # 当队列为空时，说明该类正在被初始化，置位初始化置位符
+        if self.queue.empty():
+            self.init_flag = True
+
+        ip = entry[:, 0:2].copy().astype(np.int)
+        dpt = entry[:, 2] / 1000
         # 将各个点的位置[N,2]加入队列
         self.queue.put(ip)
         if self.queue.full():
@@ -127,12 +147,12 @@ class Radar(object):
     __threading = None  # 雷达接收子线程
     __lock = threading.Lock()  # 线程锁
     __queue = []  # 一个列表，存放雷达类各个对象的Depth Queue
-
+    lc = None
     __record_times = 0  # 已存点云的数量
 
     __record_list = []
 
-    __record_max_times = 100  # 最大存点云数量
+    __record_max_times = 300  # 最大存点云数量
 
     def __init__(self, name, text_api, queue_size=200, imgsz=(1024, 1024)):
         """
@@ -145,7 +165,7 @@ class Radar(object):
         from config import cam_config
         if not Radar.__init_flag:
             # 当雷达还未有一个对象时，初始化接收节点
-            Radar.__laser_listener_begin(LIDAR_TOPIC_NAME)
+            Radar.__laser_listener_begin()
             Radar.__init_flag = True
             Radar.__threading = threading.Thread(target=Radar.__main_loop, daemon=True)
         self._no = len(Radar.__queue)  # 该对象对应于整个雷达对象列表的序号
@@ -157,40 +177,34 @@ class Radar(object):
 
     @staticmethod
     def start():
-        '''
+        """
         开始子线程，即开始spin
-        '''
+        """
         if not Radar.__working_flag:
             Radar.__threading.start()
             Radar.__working_flag = True
 
     @staticmethod
     def stop():
-        '''
+        """
         结束子线程
-        '''
+        """
         if Radar.__working_flag:
             stop_thread(Radar.__threading)
             Radar.__working_flag = False
 
     @staticmethod
     def __callback(data):
-        '''
+        """
         子线程函数，对于/livox/lidar topic数据的处理
-        '''
+        """
         if Radar.__working_flag:
             Radar.__lock.acquire()
 
-            # pc = np.float32(point_cloud2.read_points_list(data, field_names=("x", "y", "z"), skip_nans=True)).reshape(
-            #     -1, 3)
-            pc = data
-            dist = np.linalg.norm(pc, axis=1)
-
-            pc = pc[dist > 0.4]  # 雷达近距离滤除
             # do record
             if Radar.__record_times > 0:
 
-                Radar.__record_list.append(pc)
+                Radar.__record_list.append(data)
                 print("[INFO] recording point cloud {0}/{1}".format(Radar.__record_max_times - Radar.__record_times,
                                                                     Radar.__record_max_times))
                 if Radar.__record_times == 1:
@@ -209,38 +223,36 @@ class Radar(object):
                 Radar.__record_times -= 1
             # update every class object's queue
             for q in Radar.__queue:
-                q.push_back(pc)
+                q.push_back_depth(data)
 
             Radar.__lock.release()
-
     @staticmethod
-    def __laser_listener_begin(laser_node_name="/livox/lidar"):
-        pass
-        # rospy.init_node('laser_listener', anonymous=True)
-        # rospy.Subscriber(laser_node_name, PointCloud2, Radar.__callback)
+    def __laser_listener_begin():
+        # 初始化
+        Radar.lc = LiDARClient('tcp://127.0.0.1:8200')
 
     @staticmethod
     def __main_loop():
-        pass
-        # 通过将spin放入子线程来防止其对主线程的阻塞
-        # rospy.spin()
-        # 当spin调用时，subscriber就会开始轮询接收所订阅的节点数据，即不断调用callback函数
+        while True:
+            recv = np.array(Radar.lc.recv())
+            if recv.shape[0] > 50:
+                Radar.__callback(recv)
 
     @staticmethod
     def start_record():
-        '''
+        """
         开始录制点云
-        '''
+        """
         if Radar.__record_times == 0:
             Radar.__record_times = Radar.__record_max_times
 
     def detect_depth(self, rects):
-        '''
+        """
         接口函数，传入装甲板bounding box返回对应（x0,y0,z_c)值
         ps:这个x0,y0是归一化相机坐标系中值，与下参数中指代bounding box左上方点坐标不同
 
         :param rects: armor bounding box, format: (x0,y0,w,h)
-        '''
+        """
         Radar.__lock.acquire()
         # 通过self.no来指定该对象对应的深度队列
         results = Radar.__queue[self._no].detect_depth(rects)
@@ -267,26 +279,18 @@ class Radar(object):
             return False
 
     def preload(self):
-        '''
+        """
         预加载雷达点云，debug用
-        '''
-        pass
-        # lidar_bag = rosbag.Bag(BAG_FIRE, "r")
-        # topic = '/livox/lidar'
-        # bag_data = lidar_bag.read_messages(topic)
-        # for topic, msg, t in bag_data:
-            # pc = np.float32(point_cloud2.read_points_list(msg, field_names=("x", "y", "z"), skip_nans=True)).reshape(
-            #     -1, 3)
-            # dist = np.linalg.norm(pc, axis=1)
-            # pc = pc[dist > 0.4]  # 雷达近距离滤除
-            # self.__queue[self._no].push_back(pc)
+        """
+        with open(BAG_FIRE, 'rb') as f:
+            try:
+                while True:
+                    pc = pkl.load(f)
+                    dist = np.linalg.norm(pc, axis=1)
+                    pc = pc[dist > 0.4]  # 雷达近距离滤除
+                    self.__queue[self._no].push_back_pc(pc)
+            except Exception as e:
+                print(e)
 
     def __del__(self):
         Radar.stop()
-
-
-if __name__ == '__main__':
-    # 测试demo 同时也是非常好的测距测试脚本
-    # 还没改
-    pass
-

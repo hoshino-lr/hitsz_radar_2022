@@ -7,9 +7,11 @@ from .official import Game_data_define, official_Judge_Handler
 from config import enemy_color, BO
 
 
+
+
 class Port_operate(object):
     _bytes2int = lambda x: (0x0000 | x[0]) | (x[1] << 8)
-
+    poi_num = 1
     _Robot_positions = np.zeros((5, 4), dtype=np.float32)  # 敌方所有机器人坐标
     _Robot_positions_us = np.zeros((5, 2), dtype=np.float32)  # 我方所有机器人坐标
     _Robot_decisions = np.zeros((6, 4), dtype=np.uint8)  # 我方所有机器人状态
@@ -21,8 +23,7 @@ class Port_operate(object):
     Remain_time = 0  # 剩余时间
     start_time = time.time()
     change_view = -1
-    highlight = False
-    missile_bit = False
+    energy_bit = False
 
     _init_hp = np.ones(10, dtype=int) * 500  # 初始血量
     _HP = np.ones(16, dtype=int) * 50  # 血量
@@ -199,16 +200,15 @@ class Port_operate(object):
         if Port_operate._Game_Start_Flag:
             sender_id = (buffer[10] << 8) | buffer[9]
             if sender_id == 106 or sender_id == 6:
-                Port_operate.change_view = buffer[13]
-                Port_operate.highlight = buffer[14]
-                if Port_operate.missile_bit != buffer[15]:
+
+                if Port_operate.energy_bit != buffer[16]:
                     Port_operate._energy_time = time.time()
                     if Port_operate.Remain_time < 240:
                         Port_operate._Now_state = 4
                     else:
                         Port_operate._Now_state = 3
                     Port_operate._last_state = Port_operate._Now_state
-                    Port_operate.missile_bit = buffer[15]
+                    Port_operate.energy_bit = buffer[15]
 
             elif sender_id >= 100:
                 Port_operate._Robot_positions_us[sender_id - 100] = np.array([buffer[13], buffer[14]])
@@ -281,7 +281,7 @@ class Port_operate(object):
     def Map_Transmit(ser):
         # 画小地图
         if time.time() - Port_operate.positions()[Port_operate.Map_Transmit.nID][3] < 2:
-            position = Port_operate.positions()[Port_operate.Map_Transmit.nID][0, 1]
+            position = Port_operate.positions()[Port_operate.Map_Transmit.nID, [0, 1]]
             x, y = position
             # 坐标为零则不发送
             if np.isclose(position, 0).all():
@@ -331,16 +331,21 @@ class Port_operate(object):
 
     @staticmethod
     def port_manager(ser):
-        alarm_type = int(Port_operate.decisions()[Port_operate.port_manager.nID][0])
-        attack_target = int(Port_operate.decisions()[Port_operate.port_manager.nID][1])
-        cradle_head = int(Port_operate.decisions()[Port_operate.port_manager.nID][2])
-        direction = int(Port_operate.decisions()[Port_operate.port_manager.nID][3])
+        cmd = Port_operate.decisions()[Port_operate.port_manager.nID]
+        alarm_type, attack_target, cradle_head, direction = cmd.astype(int)
         # 敌方判断
         if enemy_color == 0:
             # 敌方为红方
             my_id = 109
-            Port_operate.robo_alarm(Port_operate.port_manager.b_id, my_id, alarm_type, attack_target, cradle_head,
-                                    direction, ser)
+            if Port_operate.port_manager.b_id == 107:
+                Port_operate.robo_alarm(Port_operate.port_manager.b_id, my_id, Port_operate.poi_num, 2, 3,
+                                        4, ser)
+                Port_operate.poi_num += 1
+                if Port_operate.poi_num == 11:
+                    Port_operate.poi_num = 1
+            else:
+                Port_operate.robo_alarm(Port_operate.port_manager.b_id, my_id, alarm_type, attack_target, cradle_head,
+                                        direction, ser)
             time.sleep(0.1)
             if Port_operate.port_manager.b_id == 107:
                 Port_operate.port_manager.b_id = 101

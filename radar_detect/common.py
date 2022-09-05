@@ -62,14 +62,40 @@ def is_inside_polygon(polygon: np.ndarray, point: np.ndarray) -> bool:
     return is_in
 
 
+def res_decode(data: list) -> np.ndarray:
+    R = np.ones((len(data), 14)) * np.nan
+    for i in range(len(data)):
+        Car = data[i].car
+        R[i, 0] = Car.x
+        R[i, 1] = Car.y
+        R[i, 2] = Car.width
+        R[i, 3] = Car.height
+        R[i, 4] = Car.confidence
+        R[i, 5] = Car.type
+        Armor = data[i].armor
+        if Armor.type != 9:
+            R[i, 6] = Armor.x
+            R[i, 7] = Armor.y
+            R[i, 8] = Armor.width
+            R[i, 9] = Armor.height
+            R[i, 10] = Armor.confidence
+            R[i, 11] = Armor.type
+            R[i, 12] = Armor.color
+            R[i, 13] = i
+    R[:, 2] = R[:, 2] + R[:, 0]
+    R[:, 3] = R[:, 3] + R[:, 1]
+    return R
+
+
 def armor_filter(armors: np.ndarray):
     """
     装甲板去重
 
-    :param armors 格式定义： [N,bbox(xyxy),conf,cls,bbox(xyxy),conf,cls,col, N]
+    :param armors 格式定义： [N,[bbox(xyxy),conf,cls,bbox(xyxy),conf,cls,col, N]]
 
     :return: armors np.ndarray 每个id都最多有一个装甲板
     """
+
     # 直接取最高置信度
     ids = [1, 2, 3, 4, 5]
     if armors.shape[0] != 0:

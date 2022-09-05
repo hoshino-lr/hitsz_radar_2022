@@ -49,7 +49,7 @@ cam_config = {
         "size": (3072, 2048),
         "roi": (0, 200, 3072, 1848),
         "using_net": True,
-        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_data/内录/19_13_36_left.avi",
+        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_data/19_13_36_left.avi",
         "K_0": np.mat([[2580.7380664637653, 0.0, 1535.9830165125002],
                        [0.0, 2582.8839945792183, 1008.784910706948],
                        [0.0, 0.0, 1.0]]),
@@ -67,20 +67,15 @@ cam_config = {
         ])},
 }
 net1_engine = os.path.dirname(os.path.abspath(__file__)) + "/resources/net_onnx/net1_sjtu.engine"
-net2_engine = os.path.dirname(os.path.abspath(__file__)) + "/resources/net_onnx/net2.engine"
+net2_engine = os.path.dirname(os.path.abspath(__file__)) + "/resources/net_onnx/net2_last.engine"
 
 net1_cls = ['car', 'watcher', 'base']
 net2_cls_names = ["0", "1", "2", "3", "4",
                   "5", "O", "Bs", "Bb"]
 net2_col_names = ["B", "R", "N", "P"]
-
 color2enemy = {"red": 0, "blue": 1}
 enemy2color = ['red', 'blue']
 num2cam = ['左', '右']
-
-enemy_case = ["环形高地1", "环形高地2", "打符", "前哨站", "飞坡", "3号高地"]  # 这些区域在预警时只考虑敌方的该区域
-
-our_case = ["missle_launch1", "missle_lauch2", "danger"]
 
 armor_list = ['R1', 'R2', 'R3', 'R4', 'R5', 'B1', 'B2', 'B3', 'B4', 'B5']  # 雷达站实际考虑的各个装甲板类
 unit_list = ['R1', 'R2', 'R3', 'R4', 'R5', 'RG', 'RO', 'RB', 'B1', 'B2', 'B3', 'B4', 'B5', 'BG', 'BO',
@@ -88,14 +83,11 @@ unit_list = ['R1', 'R2', 'R3', 'R4', 'R5', 'RG', 'RO', 'RB', 'B1', 'B2', 'B3', '
 
 # 小地图图片路径
 MAP_PATH = os.path.dirname(os.path.abspath(__file__)) + "/resources/map.jpg"
-BAG_FIRE = "/home/hoshino/CLionProjects/hitsz_radar/resources/2022-06-15-10-11-01.bag"
+BAG_FIRE = "/home/hoshino/CLionProjects/hitsz_radar/resources/2022_06_15_10_11_01.dat"
 
 # 小地图设定大小
 map_size = (716, 384)
 real_size = (28., 15.)
-# UI中主视频源初始图像路径
-
-INIT_FRAME_PATH = os.path.dirname(os.path.abspath(__file__)) + "/beijing.png"
 
 region = \
     {

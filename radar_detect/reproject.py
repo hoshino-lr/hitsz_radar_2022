@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import time
 from radar_detect.common import is_inside_polygon
-from config import color2enemy, enemy_case, enemy_color, cam_config, \
+from config import color2enemy, enemy_color, cam_config, \
     DEBUG, test_region, region, real_size
 
 
@@ -48,7 +48,6 @@ class Reproject(object):
         self._time = {}  # 时间间隔
         self._start = {}  # 开始时间
         self._end = {}  # 结束时间
-
         self._plot_region()  # 预警区域坐标初始化
 
     def _plot_region(self) -> None:
@@ -154,6 +153,13 @@ class Reproject(object):
             #     points = np.concatenate([points, color_fp], axis=0)
             #     cls = np.concatenate([cls, color_cls], axis=0)
             points = points.reshape((-1, 4, 2))
+            home = np.array(
+                [[is_inside_polygon(np.array([[0, 1365], [3072, 1365], [0, 2048], [3072, 2048]]), p) for p in cor] for
+                 cor in points])
+            home = np.sum(home, axis=1) > 0
+            alarm_home = cls[home]
+            # if len(alarm_home):
+            #     self.rp_alarming['a_xxx_tou_a'] = alarm_home.reshape(-1, 1)
             for r in self._scene_region.keys():
                 # 判断对于各个预测框，是否有点在该区域内
                 mask = np.array([[is_inside_polygon(self._scene_region[r][:, :2], p) for p in cor] for cor in points])
@@ -170,6 +176,8 @@ class Reproject(object):
             for r in self.rp_alarming.keys():
                 # 格式解析
                 _, _, location, _ = r.split('_')
+                if location == "tou":
+                    continue
                 if location == "敌方3号高地":
                     result = self.rp_alarming[r] == 1
                     if result.any():

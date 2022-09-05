@@ -5,10 +5,13 @@ mul_manager.py
 created by 李龙 in 2022/1
 最终修改 by 李龙 in 2022/1/15
 """
-from os import wait
 from multiprocessing import Queue, Process, Event
 import cv2 as cv
 import time
+import sys
+from pyrdr.client import ImageAndArmorClient
+from radar_detect.common import res_decode
+
 
 def thread_detect(event, que, name):
     """
@@ -79,3 +82,72 @@ def sub(event, que):
         return False, None
 
 
+def process_detect(event, que, event_close, record, name):
+    # 多线程接收写法
+    from camera.cam_hk_v3 import Camera_HK
+    from net.network_pro import Predictor
+    from config import using_video
+    print(f"子进程开始: {name}")
+    predictor = Predictor(name)
+    cam = Camera_HK(name, using_video)
+    count = 0
+    count_error = 0
+    t1 = 0
+    try:
+        while not event_close.is_set():
+            if record.is_set():
+                predictor.record_on_clicked()
+                record.clear()
+            result, frame = cam.get_img()
+            if result and frame is not None:
+                t3 = time.time()
+                res = predictor.detect_cars(frame)
+                pub(event, que, res)
+                # time.sleep(0.04)
+                t1 = t1 + time.time() - t3
+                count += 1
+                if count == 100:
+                    fps = float(count) / t1
+                    print(f'{name} count:{count} fps: {int(fps)}')
+                    count = 0
+                    t1 = 0
+            else:
+                count_error += 1
+                pub(event, que, [result, frame])
+                if count_error == 10:
+                    cam.destroy()
+                    del cam
+                    cam = Camera_HK(name, using_video)
+                    count_error = 0
+        predictor.stop()
+        cam.destroy()
+        print(f"相机网络子进程:{name} 退出")
+    except Exception as e:
+        print(f"相机网络子进程:{name} 寄了\n {e}")
+    sys.exit()
+
+
+def process_detect_rs(event, que, event_close, record, name):
+    # 多线程接收写法
+    print(f"子进程开始: {name}")
+    receiver = ImageAndArmorClient('tcp://127.0.0.1:5555')
+    count = 0
+    t1 = 0
+    try:
+        while not event_close.is_set():
+            t3 = time.time()
+            frame, result = receiver.recv()
+            frame = cv.resize(frame, (3072, 2048))
+            frame[1848:, :, :] = 0
+            if frame is not None:
+                pub(event, que, [res_decode(result), frame])
+                t1 = t1 + time.time() - t3
+                count += 1
+                if count == 100:
+                    fps = float(count) / t1
+                    print(f'{name} count:{count} fps: {int(fps)}')
+                    count = 0
+                    t1 = 0
+    except Exception as e:
+        print(f"相机网络子进程:{name} 寄了\n {e}")
+    sys.exit()

@@ -341,8 +341,8 @@ class drawing(object):
         if not src.shape[0]:
             return
         else:
-            for i in range(roi[1], depth.shape[0] - 1, 15):
-                for j in range(0, depth.shape[1] - 1, 15):
+            for i in range(roi[1], depth.shape[0] - 1, 1):
+                for j in range(0, depth.shape[1] - 1, 1):
                     v = depth[i][j]
                     if math.isnan(depth[i][j]):
                         continue

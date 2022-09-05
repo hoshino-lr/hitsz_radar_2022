@@ -19,8 +19,8 @@ class YoLov5TRT(object):
     def __init__(self, engine_file_path):
         # Create a Context on this device,
         self.ctx = cuda.Device(0).make_context()
-        stream = cuda.Stream()
-        TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+        stream = cuda.Stream(0)
+        TRT_LOGGER = trt.Logger(trt.Logger.ERROR)
         runtime = trt.Runtime(TRT_LOGGER)
 
         # Deserialize the engine from file
@@ -70,16 +70,12 @@ class YoLov5TRT(object):
         # Restore
         stream = self.stream
         context = self.context
-        engine = self.engine
         host_inputs = self.host_inputs
         cuda_inputs = self.cuda_inputs
         host_outputs = self.host_outputs
         cuda_outputs = self.cuda_outputs
         bindings = self.bindings
         # Do image preprocess
-        batch_image_raw = []
-        batch_origin_h = []
-        batch_origin_w = []
 
         # Copy input image to host buffer
         np.copyto(host_inputs[0], batch_input_image.ravel())

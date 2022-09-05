@@ -15,7 +15,7 @@ from PyQt5 import QtWidgets
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import QTimer, Qt, QRect
 
-from config import INIT_FRAME_PATH, \
+from config import  \
     MAP_PATH, map_size, USEABLE, \
     enemy_color, cam_config, using_video, enemy2color
 
@@ -170,7 +170,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.start()
 
     def __ui_init(self):
-        frame = cv.imread(INIT_FRAME_PATH)
         frame_m = cv.imread(MAP_PATH)
         # 小地图翻转
         if enemy_color:
@@ -178,11 +177,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         else:
             frame_m = cv.rotate(frame_m, cv.ROTATE_90_CLOCKWISE)
         frame_m = cv.resize(frame_m, map_size)
-        self.set_image(frame, "base_demo")
-        self.set_image(frame, "far_demo")
-        self.set_image(frame, "main_demo")
         self.set_image(frame_m, "map")
-        del frame, frame_m
+        del frame_m
         frame = np.zeros((162, 716, 3)).astype(np.uint8)
         self.set_image(frame, "left_demo")
         self.set_image(frame, "right_demo")
@@ -427,7 +423,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         # allocate the space of QPixmap
         temp_image = QImage(rgb, rgb.shape[1], rgb.shape[0], QImage.Format_RGB888)
 
-        temp_pixmap = QPixmap(temp_image).scaled(width, height)
+        temp_pixmap = QPixmap(temp_image).scaled(width, height, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
 
         # set the image to the QPixmap location to show the image on the UI
         if position == "main_demo":
@@ -603,21 +599,20 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             Port_operate.gain_decisions(self.decision_tree.get_decision())
             if Port_operate.change_view != -1:
                 self.view_change = Port_operate.change_view
-            # Port_operate.Receive_State_Data(self.energy_info)
-            # Port_operate.Receive_State_Data(Port_operate.get)
-            self.decision_tree.update_serial(Port_operate.positions_us(),
-                                             Port_operate.HP()[8 * (1 - enemy_color):8 * (1 - enemy_color) + 8],
-                                             Port_operate.HP()[8 * enemy_color:8 * enemy_color + 8],
-                                             Port_operate.get_state(),
-                                             int(420 - time.time() + Port_operate.start_time),
-                                             Port_operate.highlight)
+        self.decision_tree.update_serial(Port_operate.positions_us(),
+                                         Port_operate.HP()[8 * (1 - enemy_color):8 * (1 - enemy_color) + 8],
+                                         Port_operate.HP()[8 * enemy_color:8 * enemy_color + 8],
+                                         Port_operate.get_state(),
+                                         int(420 - time.time() + Port_operate.start_time),
+                                         Port_operate.highlight)
+
         self.supply_detector.eco_detect(self.__pic_left, self.loc_alarm.get_last_loc(),
                                         lambda x: self.set_image(x, "hero_demo"))
         Port_operate.get_message(self.hp_scene)
         self.hp_scene.show()
         self.decision_tree.update_information(self.loc_alarm.get_last_loc(), self.repo_left.fly,
                                               self.repo_left.fly_result, self.repo_left.hero_r3,
-                                              self.__res_left)
+                                              self.__res_left, self.repo_left.rp_alarming.copy())
         self.decision_tree.decision_alarm()
         self.update_image()
         self.update_state()
