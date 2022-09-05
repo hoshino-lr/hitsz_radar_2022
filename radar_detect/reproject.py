@@ -1,7 +1,7 @@
 """
 反投影预警
-created by 牟俊宇 2020/12
-最新修改 by 李龙 2022/7/08
+created by 牟俊宇 2021/12
+最新修改 by 牟俊宇 2022/7/18
 """
 import cv2
 import numpy as np
@@ -43,6 +43,7 @@ class Reproject(object):
         self.hero_r3 = False
         self._text_api = text_api  # 发送text的api
         self.rp_alarming = {}
+        self._filter_alarming = {}
         self.fly_result = np.array([])
         self._region_count = {}  # 检测区域计数
         self._time = {}  # 时间间隔
@@ -172,6 +173,7 @@ class Reproject(object):
         """
         发送信息
         """
+        self._filter_alarming = {}
         if self._scene_init:
             for r in self.rp_alarming.keys():
                 # 格式解析
@@ -186,6 +188,7 @@ class Reproject(object):
                 if location == "飞坡":
                     self.fly = True
                     self.fly_result = int(self.rp_alarming[r][0][0])
+                    continue
                 if self._time[f'{location}'] == 0:
                     self._start[f'{location}'] = time.time()
                     self._region_count[f'{location}'] += 1
@@ -198,12 +201,13 @@ class Reproject(object):
                         self._region_count[f'{location}'] += 1
                     if self._time[f'{location}'] >= self._clock:
                         if self._region_count[f'{location}'] >= self._frame:
+                            self._filter_alarming[r] = self.rp_alarming[r].copy()
                             print(f"[ERROR] 反投影{location}", f"在{location}处有敌人！！！")
                             self._region_count[f'{location}'] = 0
                         self._time[f'{location}'] = 0
 
     def get_rp_alarming(self):
-        return self.rp_alarming
+        return self._filter_alarming
 
     def get_scene_region(self):
         return self._scene_region
