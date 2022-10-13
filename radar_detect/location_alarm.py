@@ -210,8 +210,7 @@ class Alarm(draw_map.CompeteMap):
         t = time.time()
         for i in range(1, 6):
             if self._location[str(i)][2] >= 1.2 and (t - self._last_location[str(i)][3]) < 1:
-                z_ratio = (position[2] - self._location[str(i)][2]) / (
-                        self._location[str(i)][2] - self._last_location[str(i)][2])
+                z_ratio = (self._location[str(i)][2] - self._last_location[str(i)][2]) / (position[2] - self._location[str(i)][2])
                 self._location[str(i)][2] = self._last_location[str(i)][2]
                 self._location[str(i)][0] = self._location[str(i)][0] - z_ratio * (
                         position[0] - self._location[str(i)][0])
