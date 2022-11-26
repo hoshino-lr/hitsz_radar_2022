@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1857</width>
-    <height>1037</height>
+    <width>1881</width>
+    <height>1060</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,8 +19,8 @@
      <rect>
       <x>0</x>
       <y>0</y>
-      <width>1851</width>
-      <height>1021</height>
+      <width>1869</width>
+      <height>1048</height>
      </rect>
     </property>
     <property name="currentIndex">
@@ -227,7 +227,7 @@
         </layout>
        </item>
        <item>
-        <layout class="QVBoxLayout" name="right" stretch="1,1,1,1,1,1">
+        <layout class="QVBoxLayout" name="right" stretch="0,0,0,0,0,0">
          <property name="spacing">
           <number>5</number>
          </property>
@@ -246,7 +246,7 @@
          <property name="bottomMargin">
           <number>5</number>
          </property>
-         <item alignment="Qt::AlignHCenter">
+         <item>
           <widget class="QLabel" name="map">
            <property name="enabled">
             <bool>true</bool>
@@ -308,7 +308,7 @@
             </size>
            </property>
            <property name="text">
-            <string>ChangeView</string>
+            <string>改变视角</string>
            </property>
           </widget>
          </item>
@@ -321,7 +321,7 @@
             </size>
            </property>
            <property name="text">
-            <string>ShowLidar</string>
+            <string>显示激光雷达</string>
            </property>
           </widget>
          </item>
@@ -334,7 +334,7 @@
             </size>
            </property>
            <property name="text">
-            <string>record</string>
+            <string>录像</string>
            </property>
           </widget>
          </item>
@@ -347,7 +347,7 @@
             </size>
            </property>
            <property name="text">
-            <string>close</string>
+            <string>退出</string>
            </property>
           </widget>
          </item>

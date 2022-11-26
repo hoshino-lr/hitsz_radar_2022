@@ -26,7 +26,7 @@ cam_config = {
         "size": (3072, 2048),
         "roi": (0, 0, 3072, 1648),
         "using_net": False,
-        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_video/20_16_34_right.avi",
+        "video_path": os.path.dirname(os.path.abspath(__file__)) + "/resources/two_cam/1.mp4",
         "K_0": np.mat([[2505.2629026927225, 0.0, 1529.4286325395244],
                        [0.0, 2505.5722700649067, 1026.1378217662113],
                        [0.0, 0.0, 1.0]]),
@@ -49,7 +49,7 @@ cam_config = {
         "size": (3072, 2048),
         "roi": (0, 200, 3072, 1848),
         "using_net": True,
-        "video_path": "/home/hoshino/CLionProjects/hitsz_radar/resources/records/radar_data/19_13_36_left.avi",
+        "video_path": os.path.dirname(os.path.abspath(__file__)) + "/resources/two_cam/2.mp4",
         "K_0": np.mat([[2580.7380664637653, 0.0, 1535.9830165125002],
                        [0.0, 2582.8839945792183, 1008.784910706948],
                        [0.0, 0.0, 1.0]]),
@@ -66,8 +66,8 @@ cam_config = {
             [0, 0, 0, 1]
         ])},
 }
-net1_engine = os.path.dirname(os.path.abspath(__file__)) + "/resources/net_onnx/net1_sjtu.engine"
-net2_engine = os.path.dirname(os.path.abspath(__file__)) + "/resources/net_onnx/net2_last.engine"
+net1_engine = os.path.dirname(os.path.abspath(__file__)) + "/resources/net_onnx/net1.engine"
+net2_engine = os.path.dirname(os.path.abspath(__file__)) + "/resources/net_onnx/net2.engine"
 
 net1_cls = ['car', 'watcher', 'base']
 net2_cls_names = ["0", "1", "2", "3", "4",
@@ -83,7 +83,7 @@ unit_list = ['R1', 'R2', 'R3', 'R4', 'R5', 'RG', 'RO', 'RB', 'B1', 'B2', 'B3', '
 
 # 小地图图片路径
 MAP_PATH = os.path.dirname(os.path.abspath(__file__)) + "/resources/map.jpg"
-BAG_FIRE = "/home/hoshino/CLionProjects/hitsz_radar/resources/2022_06_15_10_11_01.dat"
+BAG_FIRE = os.path.dirname(os.path.abspath(__file__)) + "/resources/2022_06_15_10_11_01.dat"
 
 # 小地图设定大小
 map_size = (716, 384)
