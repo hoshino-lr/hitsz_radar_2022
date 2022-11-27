@@ -100,6 +100,7 @@ class YoLov5TRT(object):
         # Remove any context from the top of the context stack, deactivating it.
         self.ctx.pop()
         self.stream.is_done()
+        self.ctx.detach()
 
 
 

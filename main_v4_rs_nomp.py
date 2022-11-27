@@ -15,6 +15,7 @@ from PyQt5 import QtWidgets
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import QTimer, Qt, QRect
 
+import config
 from config import USEABLE, enemy_color, cam_config, using_video, enemy2color
 from mapping.ui_v4 import Ui_MainWindow
 from radar_detect.Linar_rs import Radar
@@ -43,6 +44,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
     _que_right = _create_queue()
     _event_left = _create_event()
     _event_close = _create_event()
+    _event_speed = _create_event()
 
     def __init__(self):
         super(Mywindow, self).__init__()
@@ -68,14 +70,14 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
 
         if self.__cam_left:
             self.PRE_left = threading.Thread(target=process_detect, args=(
-                self._event_left, self._que_left, self._event_close, self._left_record,
-                'cam_left'))
+                self._event_left, self._que_left, 'cam_left',
+                {'close': self._event_close, 'record': self._left_record, 'speed': self._event_speed}))
             self.PRE_left.daemon = True
 
         if self.__cam_right:
             self.PRE_right = threading.Thread(target=process_detect, args=(
-                self._event_right, self._que_right, self._event_close, self._right_record,
-                'cam_right'))
+                self._event_right, self._que_right, 'cam_right',
+                {'close': self._event_close, 'record': self._right_record, 'speed': self._event_speed}))
             self.PRE_right.daemon = True
 
         if self.__serial:
@@ -141,7 +143,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.terminate = False
         self.record_state = False  # 0:停止 1:开始
         self.epnp_mode = False  # 0:停止 1:开始
-        self.terminate = False
         self.show_pc_state = False
         self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
         self._Eco_point = [0, 0, 0, 0]
@@ -206,6 +207,25 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         关闭程序
         """
         self.terminate = True
+
+    def SpeedUp_on_clicked(self) -> None:
+        config.global_speed += 0.25
+        self._event_speed.set()
+        self.CurrentSpeed.setText(f"x{config.global_speed}")
+
+    def SlowDown_on_clicked(self) -> None:
+        if(config.global_speed <= 0.25):
+            return
+        config.global_speed -= 0.25
+        self._event_speed.set()
+        self.CurrentSpeed.setText(f"x{config.global_speed}")
+
+    def Pause_on_clicked(self) -> None:
+        config.global_pause = not config.global_pause
+        if config.global_pause:
+            self.Pause.setText("继续")
+        else:
+            self.Pause.setText("暂停")
 
     def epnp_on_clicked(self) -> None:
         if self.tabWidget.currentIndex() == 1:
@@ -527,11 +547,16 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.loc_alarm.close_data()
             self._event_close.set()
             if self.__cam_left:
-                self.PRE_left.join(timeout=0.5)
+                # self.PRE_left.join(timeout=0.5)
+                self.PRE_left.join()
             if self.__cam_right:
-                self.PRE_right.join(timeout=0.5)
+                # self.PRE_right.join(timeout=0.5)
+                self.PRE_right.join()
             sys.exit()
 
+    # def closeEvent(self, event) -> None:
+    #     self.terminate = True
+    #     event.ignore()
 
 class LOGGER(object):
     """
@@ -562,6 +587,7 @@ class LOGGER(object):
 
     def write(self, message):
         # self.terminal.write(message)
+        _stdout.write(message)
         if message == '\n':
             return
         if "[ERROR]" in message:
@@ -572,6 +598,7 @@ class LOGGER(object):
             self.logger.info(message)
 
     def flush(self):
+        _stdout.flush()
         pass
 
     def __del__(self):
@@ -582,6 +609,7 @@ if __name__ == "__main__":
     # multiprocessing.set_start_method('spawn')
     # ui
     app = QtWidgets.QApplication(sys.argv)
+    _stdout = sys.stdout
     sys.stdout = LOGGER()
     MyShow = Mywindow()
     MyShow.show()

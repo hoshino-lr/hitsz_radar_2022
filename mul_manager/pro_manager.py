@@ -22,7 +22,6 @@ def thread_detect(event, que, name):
     import time
     # 多线程接收写法
     predictor1 = Predictor(name)
-    cap = cv2.VideoCapture("/home/hoshino/CLionProjects/hitsz_radar/resources/two_cam/1.mp4")
     count = 0
     t1 = time.time()
     t3 = time.time()
@@ -82,38 +81,38 @@ def sub(event, que):
         return False, None
 
 
-def process_detect(event, que, event_close, record, name):
+def process_detect(main_event, que, name, event_list):
     # 多线程接收写法
     from camera.cam_hk_v3 import Camera_HK
     from net.network_pro import Predictor
     from config import using_video
-    print(f"子进程开始: {name}")
+    print(f"子线程开始: {name}")
     predictor = Predictor(name)
-    cam = Camera_HK(name, using_video)
+    cam = Camera_HK(name, using_video, event_list)
     count = 0
     count_error = 0
     t1 = 0
     try:
-        while not event_close.is_set():
-            if record.is_set():
+        while not event_list['close'].is_set():
+            if event_list['record'].is_set():
                 predictor.record_on_clicked()
-                record.clear()
+                event_list['record'].clear()
             result, frame = cam.get_img()
             if result and frame is not None:
                 t3 = time.time()
                 res = predictor.detect_cars(frame)
-                pub(event, que, res)
+                pub(main_event, que, res)
                 # time.sleep(0.04)
                 t1 = t1 + time.time() - t3
                 count += 1
                 if count == 100:
                     fps = float(count) / t1
-                    print(f'{name} count:{count} fps: {int(fps)}')
+                    print(f'{name} count:{count} fps: {int(fps)} with queue size: {que.qsize()}')
                     count = 0
                     t1 = 0
             else:
                 count_error += 1
-                pub(event, que, [result, frame])
+                pub(main_event, que, [result, frame])
                 if count_error == 10:
                     cam.destroy()
                     del cam
@@ -124,7 +123,8 @@ def process_detect(event, que, event_close, record, name):
         print(f"相机网络子进程:{name} 退出")
     except Exception as e:
         print(f"相机网络子进程:{name} 寄了\n {e}")
-    sys.exit()
+        raise e
+    # sys.exit()
 
 
 def process_detect_rs(event, que, event_close, record, name):

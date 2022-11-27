@@ -9,6 +9,11 @@ import os
 import numpy as np
 from real_points import real_points
 
+global global_speed
+global global_pause
+global_speed= 1.0
+global_pause = False
+
 enemy_color = 0  # 0：敌方为红色；1：敌方为蓝色
 USEABLE = {
     "cam_left": True,

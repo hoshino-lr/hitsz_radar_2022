@@ -2,7 +2,7 @@
 相机类
 用于打开相机并且输出图像
 created by 李龙 2021/11
-最终修改 by 李龙 2021/7/1
+最终修改 by 陈希峻 2022/11
 """
 import re
 import time
@@ -15,6 +15,7 @@ import numpy as np
 from camera.MvImport.MvCameraControl_class import *
 from config import cam_config
 from camera.cam import Camera
+from camera.video import VideoCap
 
 
 class Camera_HK(Camera):
@@ -22,12 +23,12 @@ class Camera_HK(Camera):
     相机类
     """
 
-    def __init__(self, type_, debug=False):
+    def __init__(self, type_, use_video=False, event_list=None):
         """
-        @param debug:使用视频或者是相机
+        @param use_video:使用视频否则相机
         @param type:相机左右类型
         """
-        self.__debug = debug
+        self.__use_video = use_video
         self.__type = type_
         self.__camera_config = cam_config[self.__type]
         self.__id = self.__camera_config['id']
@@ -36,7 +37,7 @@ class Camera_HK(Camera):
         self.__img = np.ndarray((self.__size[1], self.__size[0], 3), dtype="uint8")
         self.__exposure = self.__camera_config['exposure']
         self.__gain = self.__camera_config['gain']
-        if not self.__debug:
+        if not self.__use_video:
             # ch:创建相机实例 | en:Creat Camera Object
             self.cam = MvCamera()
 
@@ -172,7 +173,7 @@ class Camera_HK(Camera):
                 self.init_ok = False
 
         else:
-            self.cap = cv.VideoCapture(self.__camera_config["video_path"])
+            self.cap = VideoCap(self.__camera_config["video_path"], self.__size, self.__roi, event_list)
             self.init_ok = True
 
     def work_thread(self) -> bool:
@@ -210,24 +211,19 @@ class Camera_HK(Camera):
 
     def get_img(self) -> [bool, np.ndarray]:
         if self.init_ok:
-            if not self.__debug:
+            if not self.__use_video:
                 result = self.work_thread()
                 return result, self.__img
             else:
-                result, self.__img = self.cap.read()
-                if result:
-                    return bool(result), cv.copyMakeBorder(
-                        self.__img[self.__roi[1]:self.__roi[3] + self.__roi[1], :, :], 0,
-                        self.__roi[1],
-                        0, 0, cv.BORDER_CONSTANT, value=(0, 0, 0))
-                else:
-                    return bool(result), self.__img
+                self.cap.update()
+                result, self.__img = self.cap.get_frame()
+                return result, self.__img
         else:
             # print("init is failed dangerous!!!")
             return False, self.__img
 
     def destroy(self) -> None:
-        if not self.__debug:
+        if not self.__use_video:
             # ch:停止取流 | en:Stop grab image
             try:
                 ret = self.cam.MV_CC_StopGrabbing()
@@ -247,7 +243,7 @@ class Camera_HK(Camera):
                 print(e)
             self.init_ok = False
         else:
-            self.cap.release()
+            del self.cap
             self.init_ok = False
 
 
