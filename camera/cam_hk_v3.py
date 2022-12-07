@@ -12,7 +12,8 @@ import termios
 from ctypes import *
 import cv2 as cv
 import numpy as np
-from camera.MvImport.MvCameraControl_class import *
+# TODO:
+# from camera.MvImport.MvCameraControl_class import *
 from config import cam_config
 from camera.cam import Camera
 from camera.video import VideoCap
