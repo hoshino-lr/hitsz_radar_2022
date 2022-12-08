@@ -87,7 +87,7 @@ def res_decode(data: list) -> np.ndarray:
     return R
 
 
-def armor_filter(armors: np.ndarray):
+def armor_filter(armors: np.ndarray) -> np.ndarray:
     """
     装甲板去重
 

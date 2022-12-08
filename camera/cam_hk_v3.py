@@ -12,11 +12,9 @@ import termios
 from ctypes import *
 import cv2 as cv
 import numpy as np
-# TODO:
-# from camera.MvImport.MvCameraControl_class import *
+from camera.MvImport.MvCameraControl_class import *
 from config import cam_config
 from camera.cam import Camera
-from camera.video import VideoCap
 
 
 class Camera_HK(Camera):
@@ -24,12 +22,11 @@ class Camera_HK(Camera):
     相机类
     """
 
-    def __init__(self, type_, use_video=False, event_list=None):
+    def __init__(self, type_, event_list=None):
         """
-        @param use_video:使用视频否则相机
-        @param type:相机左右类型
+        @param type: 相机左右类型
+        @param event_list: 事件列表
         """
-        self.__use_video = use_video
         self.__type = type_
         self.__camera_config = cam_config[self.__type]
         self.__id = self.__camera_config['id']
@@ -38,144 +35,139 @@ class Camera_HK(Camera):
         self.__img = np.ndarray((self.__size[1], self.__size[0], 3), dtype="uint8")
         self.__exposure = self.__camera_config['exposure']
         self.__gain = self.__camera_config['gain']
-        if not self.__use_video:
-            # ch:创建相机实例 | en:Creat Camera Object
-            self.cam = MvCamera()
+        # ch:创建相机实例 | en:Creat Camera Object
+        self.cam = MvCamera()
 
-            SDKVersion = MvCamera.MV_CC_GetSDKVersion()
-            print("SDKVersion[0x%x]" % SDKVersion)
+        SDKVersion = MvCamera.MV_CC_GetSDKVersion()
+        print("SDKVersion[0x%x]" % SDKVersion)
 
-            deviceList = MV_CC_DEVICE_INFO_LIST()
-            tlayerType = MV_USB_DEVICE
+        deviceList = MV_CC_DEVICE_INFO_LIST()
+        tlayerType = MV_USB_DEVICE
 
-            # ch:枚举设备 | en:Enum device
-            ret = MvCamera.MV_CC_EnumDevices(tlayerType, deviceList)
+        # ch:枚举设备 | en:Enum device
+        ret = MvCamera.MV_CC_EnumDevices(tlayerType, deviceList)
+        if ret != 0:
+            print("enum devices fail! ret[0x%x]" % ret)
+            self.init_ok = False
+            return
+
+        if deviceList.nDeviceNum == 0:
+            print("find no device!")
+            self.init_ok = False
+
+        Find = False
+
+        for i in range(0, deviceList.nDeviceNum):
+            mvcc_dev_info = cast(deviceList.pDeviceInfo[i], POINTER(MV_CC_DEVICE_INFO)).contents
+            if mvcc_dev_info.nTLayerType == MV_USB_DEVICE:
+                strSerialNumber = ""
+                for per in mvcc_dev_info.SpecialInfo.stUsb3VInfo.chSerialNumber:
+                    if per == 0:
+                        break
+                    strSerialNumber = strSerialNumber + chr(per)
+                if self.__id == strSerialNumber:
+                    nConnectionNum = i
+                    Find = True
+                print("user serial number: %s" % strSerialNumber)
+        if Find:
+            # ch:选择设备并创建句柄 | en:Select device and create handle
+            self.__stDeviceList = cast(deviceList.pDeviceInfo[int(nConnectionNum)],
+                                       POINTER(MV_CC_DEVICE_INFO)).contents
+
+            ret = self.cam.MV_CC_CreateHandle(self.__stDeviceList)
             if ret != 0:
-                print("enum devices fail! ret[0x%x]" % ret)
-                self.init_ok = False
-                return
-
-            if deviceList.nDeviceNum == 0:
-                print("find no device!")
+                print("create handle fail! ret[0x%x]" % ret)
                 self.init_ok = False
 
-            Find = False
-
-            for i in range(0, deviceList.nDeviceNum):
-                mvcc_dev_info = cast(deviceList.pDeviceInfo[i], POINTER(MV_CC_DEVICE_INFO)).contents
-                if mvcc_dev_info.nTLayerType == MV_USB_DEVICE:
-                    strSerialNumber = ""
-                    for per in mvcc_dev_info.SpecialInfo.stUsb3VInfo.chSerialNumber:
-                        if per == 0:
-                            break
-                        strSerialNumber = strSerialNumber + chr(per)
-                    if self.__id == strSerialNumber:
-                        nConnectionNum = i
-                        Find = True
-                    print("user serial number: %s" % strSerialNumber)
-            if Find:
-                # ch:选择设备并创建句柄 | en:Select device and create handle
-                self.__stDeviceList = cast(deviceList.pDeviceInfo[int(nConnectionNum)],
-                                           POINTER(MV_CC_DEVICE_INFO)).contents
-
-                ret = self.cam.MV_CC_CreateHandle(self.__stDeviceList)
-                if ret != 0:
-                    print("create handle fail! ret[0x%x]" % ret)
-                    self.init_ok = False
-
-                # ch:打开设备 | en:Open device
-                ret = self.cam.MV_CC_OpenDevice(MV_ACCESS_Exclusive, 0)
-                if ret != 0:
-                    print("open device fail! ret[0x%x]" % ret)
-                    self.init_ok = False
-
-                ret = self.cam.MV_CC_SetEnumValue("TriggerMode", MV_TRIGGER_MODE_OFF)
-                if ret != 0:
-                    print("set TriggerMode failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-
-                ret = self.cam.MV_CC_SetEnumValue("ExposureMode", MV_EXPOSURE_AUTO_MODE_OFF)
-                if ret != 0:
-                    print("set height failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-
-                ret = self.cam.MV_CC_SetEnumValue("GainAuto", MV_GAIN_MODE_OFF)
-                if ret != 0:
-                    print("set GainAuto failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-                ret = self.cam.MV_CC_SetEnumValue("PixelFormat", PixelType_Gvsp_BayerRG8)
-                if ret != 0:
-                    print("set PixelFormat failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-                ret = self.cam.MV_CC_SetBoolValue("BlackLevelEnable", False)
-                if ret != 0:
-                    print("set BlackLevelEnable failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-
-                ret = self.cam.MV_CC_SetEnumValue("BalanceWhiteAuto", MV_BALANCEWHITE_AUTO_CONTINUOUS)
-                if ret != 0:
-                    print("set BalanceWhiteAuto failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-
-                ret = self.cam.MV_CC_SetEnumValue("AcquisitionMode", MV_ACQ_MODE_CONTINUOUS)
-                if ret != 0:
-                    print("set AcquisitionMode failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-
-                ret = self.cam.MV_CC_SetBoolValue("AcquisitionFrameRateEnable", False)
-                if ret != 0:
-                    print("set AcquisitionFrameRateEnable failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-
-                ret = self.cam.MV_CC_SetIntValue("Height", int(self.__roi[3]))
-                if ret != 0:
-                    print("set height failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-
-                ret = self.cam.MV_CC_SetIntValue("Width", int(self.__roi[2]))
-                if ret != 0:
-                    print("set width failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-                ret = self.cam.MV_CC_SetIntValue("OffsetX", int(self.__roi[0]))
-                if ret != 0:
-                    print("set width failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-                ret = self.cam.MV_CC_SetIntValue("OffsetY", int(self.__roi[1]))
-                if ret != 0:
-                    print("set OffsetY failed! ret [0x%x]" % ret)
-                    self.init_ok = False
-                ret = self.cam.MV_CC_SetFloatValue("ExposureTime", self.__exposure)
-                if ret != 0:
-                    print("start grabbing fail! ret[0x%x]" % ret)
-                    self.init_ok = False
-
-                ret = self.cam.MV_CC_SetFloatValue("Gain", float(self.__gain))
-                if ret != 0:
-                    print("start grabbing fail! ret[0x%x]" % ret)
-                    self.init_ok = False
-
-                # ch:获取数据包大小 | en:Get payload size
-                stParam = MVCC_INTVALUE()
-                memset(byref(stParam), 0, sizeof(MVCC_INTVALUE))
-                ret = self.cam.MV_CC_GetIntValue("PayloadSize", stParam)
-                if ret != 0:
-                    print("get payload size fail! ret[0x%x]" % ret)
-                    self.init_ok = False
-                self.__nPayloadSize = stParam.nCurValue
-                self.__data_buf = (c_ubyte * self.__nPayloadSize)()
-                # ch:开始取流 | en:Start grab image
-                ret = self.cam.MV_CC_StartGrabbing()
-                if ret != 0:
-                    print("start grabbing fail! ret[0x%x]" % ret)
-                    self.init_ok = False
-                self.__stDeviceList = MV_FRAME_OUT_INFO_EX()
-                memset(byref(self.__stDeviceList), 0, sizeof(self.__stDeviceList))
-            else:
+            # ch:打开设备 | en:Open device
+            ret = self.cam.MV_CC_OpenDevice(MV_ACCESS_Exclusive, 0)
+            if ret != 0:
+                print("open device fail! ret[0x%x]" % ret)
                 self.init_ok = False
 
+            ret = self.cam.MV_CC_SetEnumValue("TriggerMode", MV_TRIGGER_MODE_OFF)
+            if ret != 0:
+                print("set TriggerMode failed! ret [0x%x]" % ret)
+                self.init_ok = False
+
+            ret = self.cam.MV_CC_SetEnumValue("ExposureMode", MV_EXPOSURE_AUTO_MODE_OFF)
+            if ret != 0:
+                print("set height failed! ret [0x%x]" % ret)
+                self.init_ok = False
+
+            ret = self.cam.MV_CC_SetEnumValue("GainAuto", MV_GAIN_MODE_OFF)
+            if ret != 0:
+                print("set GainAuto failed! ret [0x%x]" % ret)
+                self.init_ok = False
+            ret = self.cam.MV_CC_SetEnumValue("PixelFormat", PixelType_Gvsp_BayerRG8)
+            if ret != 0:
+                print("set PixelFormat failed! ret [0x%x]" % ret)
+                self.init_ok = False
+            ret = self.cam.MV_CC_SetBoolValue("BlackLevelEnable", False)
+            if ret != 0:
+                print("set BlackLevelEnable failed! ret [0x%x]" % ret)
+                self.init_ok = False
+
+            ret = self.cam.MV_CC_SetEnumValue("BalanceWhiteAuto", MV_BALANCEWHITE_AUTO_CONTINUOUS)
+            if ret != 0:
+                print("set BalanceWhiteAuto failed! ret [0x%x]" % ret)
+                self.init_ok = False
+
+            ret = self.cam.MV_CC_SetEnumValue("AcquisitionMode", MV_ACQ_MODE_CONTINUOUS)
+            if ret != 0:
+                print("set AcquisitionMode failed! ret [0x%x]" % ret)
+                self.init_ok = False
+
+            ret = self.cam.MV_CC_SetBoolValue("AcquisitionFrameRateEnable", False)
+            if ret != 0:
+                print("set AcquisitionFrameRateEnable failed! ret [0x%x]" % ret)
+                self.init_ok = False
+
+            ret = self.cam.MV_CC_SetIntValue("Height", int(self.__roi[3]))
+            if ret != 0:
+                print("set height failed! ret [0x%x]" % ret)
+                self.init_ok = False
+
+            ret = self.cam.MV_CC_SetIntValue("Width", int(self.__roi[2]))
+            if ret != 0:
+                print("set width failed! ret [0x%x]" % ret)
+                self.init_ok = False
+            ret = self.cam.MV_CC_SetIntValue("OffsetX", int(self.__roi[0]))
+            if ret != 0:
+                print("set width failed! ret [0x%x]" % ret)
+                self.init_ok = False
+            ret = self.cam.MV_CC_SetIntValue("OffsetY", int(self.__roi[1]))
+            if ret != 0:
+                print("set OffsetY failed! ret [0x%x]" % ret)
+                self.init_ok = False
+            ret = self.cam.MV_CC_SetFloatValue("ExposureTime", self.__exposure)
+            if ret != 0:
+                print("start grabbing fail! ret[0x%x]" % ret)
+                self.init_ok = False
+
+            ret = self.cam.MV_CC_SetFloatValue("Gain", float(self.__gain))
+            if ret != 0:
+                print("start grabbing fail! ret[0x%x]" % ret)
+                self.init_ok = False
+
+            # ch:获取数据包大小 | en:Get payload size
+            stParam = MVCC_INTVALUE()
+            memset(byref(stParam), 0, sizeof(MVCC_INTVALUE))
+            ret = self.cam.MV_CC_GetIntValue("PayloadSize", stParam)
+            if ret != 0:
+                print("get payload size fail! ret[0x%x]" % ret)
+                self.init_ok = False
+            self.__nPayloadSize = stParam.nCurValue
+            self.__data_buf = (c_ubyte * self.__nPayloadSize)()
+            # ch:开始取流 | en:Start grab image
+            ret = self.cam.MV_CC_StartGrabbing()
+            if ret != 0:
+                print("start grabbing fail! ret[0x%x]" % ret)
+                self.init_ok = False
+            self.__stDeviceList = MV_FRAME_OUT_INFO_EX()
+            memset(byref(self.__stDeviceList), 0, sizeof(self.__stDeviceList))
         else:
-            self.cap = VideoCap(self.__camera_config["video_path"], self.__size, self.__roi, event_list)
-            self.init_ok = True
+            self.init_ok = False
 
     def work_thread(self) -> bool:
         ret = self.cam.MV_CC_GetOneFrameTimeout(self.__data_buf, self.__nPayloadSize, self.__stDeviceList, 100)
@@ -210,42 +202,33 @@ class Camera_HK(Camera):
             return False
             # return True
 
-    def get_img(self) -> [bool, np.ndarray]:
+    def get_img(self) -> (bool, np.ndarray):
         if self.init_ok:
-            if not self.__use_video:
-                result = self.work_thread()
-                return result, self.__img
-            else:
-                self.cap.update()
-                result, self.__img = self.cap.get_frame()
-                return result, self.__img
+            result = self.work_thread()
+            return result, self.__img
         else:
             # print("init is failed dangerous!!!")
             return False, self.__img
 
     def destroy(self) -> None:
-        if not self.__use_video:
-            # ch:停止取流 | en:Stop grab image
-            try:
-                ret = self.cam.MV_CC_StopGrabbing()
-                if ret != 0:
-                    print("stop grabbing fail! ret[0x%x]" % ret)
+        # ch:停止取流 | en:Stop grab image
+        try:
+            ret = self.cam.MV_CC_StopGrabbing()
+            if ret != 0:
+                print("stop grabbing fail! ret[0x%x]" % ret)
 
-                # ch:关闭设备 | Close device
-                ret = self.cam.MV_CC_CloseDevice()
-                if ret != 0:
-                    print("close deivce fail! ret[0x%x]" % ret)
+            # ch:关闭设备 | Close device
+            ret = self.cam.MV_CC_CloseDevice()
+            if ret != 0:
+                print("close deivce fail! ret[0x%x]" % ret)
 
-                # ch:销毁句柄 | Destroy handle
-                ret = self.cam.MV_CC_DestroyHandle()
-                if ret != 0:
-                    print("destroy handle fail! ret[0x%x]" % ret)
-            except Exception as e:
-                print(e)
-            self.init_ok = False
-        else:
-            del self.cap
-            self.init_ok = False
+            # ch:销毁句柄 | Destroy handle
+            ret = self.cam.MV_CC_DestroyHandle()
+            if ret != 0:
+                print("destroy handle fail! ret[0x%x]" % ret)
+        except Exception as e:
+            print(e)
+        self.init_ok = False
 
 
 if __name__ == "__main__":
