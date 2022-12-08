@@ -419,8 +419,8 @@ class Predictor(object):
         停止tensorrt线程，在关闭之前必须做这个操作，不然tensorrt的streamer可能无法释放
         """
         if self.using_net:
-            self._net1.destroy()
-            self._net2.destroy()
+            del self._net1
+            del self._net2
 
     def net_show(self, res):
         # 绘制函数

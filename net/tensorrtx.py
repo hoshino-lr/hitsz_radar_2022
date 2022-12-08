@@ -96,7 +96,7 @@ class YoLov5TRT(object):
         output = host_outputs
         return output
 
-    def destroy(self):
+    def __del__(self):
         # Remove any context from the top of the context stack, deactivating it.
         self.ctx.pop()
         self.stream.is_done()
