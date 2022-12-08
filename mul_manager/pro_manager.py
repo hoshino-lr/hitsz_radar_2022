@@ -122,7 +122,7 @@ def process_detect(tx_event, que, name, event_list):
             result, frame = cam.get_img()
             if result and frame is not None:
                 t3 = time.time()
-                res = predictor.detect_cars(frame)  # 网络处理
+                res, frame = predictor.detect_cars(frame)  # 网络处理
                 if is_record:
                     record.write(video_data=frame, net_data=res)
                 pub(tx_event, que, (res, frame))

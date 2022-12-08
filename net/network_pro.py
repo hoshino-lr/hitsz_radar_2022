@@ -80,7 +80,7 @@ class Predictor(object):
         self.pub = pub
         self.sub = cam
 
-    def detect_cars(self, src) -> np.ndarray:
+    def detect_cars(self, src):
         """
         检测函数
         :param src 3072x2048
@@ -114,7 +114,7 @@ class Predictor(object):
             if self.img_show and res.shape != 0:  # 画图
                 self.net_show(res)
             res = armor_filter(res)
-            return res
+            return res, self.img_src
 
     def detect_armor(self, src):
         """
