@@ -1,9 +1,13 @@
 syntax = "proto3";
 
 message Record {
-  uint64 frame_num = 1;
-  NpArray net_data = 2;
-  NpArray lidar_data = 3;
+  double realtime = 1;
+  optional NpArray net_data = 2;
+  optional NpArray lidar_data = 3;
+}
+
+message RecordSequence {
+  repeated Record records = 1;
 }
 
 message NpArray {

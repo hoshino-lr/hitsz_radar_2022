@@ -15,7 +15,7 @@ class RecordWriteManager:
         self._record_file = open(basic_path + '.pb', 'ab')
         self._video_file = cv2.VideoWriter(basic_path + '.avi', cv2.VideoWriter_fourcc(*'MP42'),
                                            record_fps, cam_config[cam_name]['size'])
-        self.frame_count = 0
+        self._start_time = time.time()
 
     def __del__(self):
         self._record_file.close()
@@ -26,8 +26,8 @@ class RecordWriteManager:
         # print("执行写入")
         self._video_file.write(video_data)
         # cv2.imwrite(resource_prefix + 'record/' + str(self.frame_count) + '.jpg', video_data)
-        record_str = Record(frame_num=self.frame_count, net_data=RecordWriteManager.serialize_ndarray(net_data))\
-            .SerializeToString()
+        record_str = Record(real_time=time.time() - self._start_time,
+                            net_data=RecordWriteManager.serialize_ndarray(net_data)).SerializeToString()
         self.frame_count += 1
         self._record_file.write(record_str)
 
@@ -41,7 +41,3 @@ class RecordWriteManager:
             return NpArray()
         else:
             return NpArray(dtype=str(ndarr.dtype), shape=ndarr.shape, data=ndarr.tobytes())
-
-    @staticmethod
-    def deserialize_ndarray(nparr: NpArray) -> np.ndarray:
-        return np.frombuffer(nparr.data, dtype=np.dtype(nparr.dtype)).reshape(nparr.shape)

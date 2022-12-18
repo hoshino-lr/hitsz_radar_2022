@@ -95,6 +95,11 @@ def process_detect(tx_event, que, name, event_list):
     from record.record_frame import RecordWriteManager
     print(f"子线程开始: {name}")
     predictor = Predictor(name)
+    # TODO: 删除所有use_video的cam
+    # if using_video:
+    #     pass
+    # else:
+    #     cam = create_camera(name, using_video, event_list)
     cam = create_camera(name, using_video, event_list)
     count = 0
     count_error = 0
@@ -115,11 +120,9 @@ def process_detect(tx_event, que, name, event_list):
                 event_list['record'].clear()
 
             result, frame = cam.get_img()
-            # TODO: 记录图像数据
             if result and frame is not None:
                 t3 = time.time()
                 res = predictor.detect_cars(frame)  # 网络处理
-                # TODO: 记录网络数据
                 if is_record:
                     record.write(video_data=frame, net_data=res)
                 pub(tx_event, que, (res, frame))

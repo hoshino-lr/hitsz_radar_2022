@@ -448,6 +448,7 @@ class Predictor(object):
                            lineType=cv.LINE_AA)
 
 
+# TODO: 去掉无用的代码
 if __name__ == '__main__':
     import sys
 

@@ -1,6 +1,7 @@
-pycuda~=2022.1
-PyQt5~=5.15.7
-numpy~=1.21.5
+pycuda
+PyQt5
+numpy
 tensorrt
-opencv-python-headless~=4.6.0.66
-pyserial~=3.5
+opencv-python-headless
+pyserial
+pyrdr

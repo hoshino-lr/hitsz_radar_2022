@@ -282,8 +282,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
     def pc_mouseEvent(self, event) -> None:
         if self.show_pc_state:
             # TODO: 这里的3072是个常值，最好改了
-            x = int(event.x() / self.main_demo.width() * 3072)
-            y = int(event.y() / self.main_demo.height() * 2048) + cam_config['cam_left']['roi'][1]
+            x = int(event.x() / self.main_demo.width() * cam_config['cam_left']['size'][0])
+            y = int(event.y() / self.main_demo.height() * cam_config['cam_left']['size'][1]) + cam_config['cam_left']['roi'][1]
             w = 10
             h = 5
             # 格式定义： [N, [bbox(xyxy), conf, cls, bbox(xyxy), conf, cls, col, N]
