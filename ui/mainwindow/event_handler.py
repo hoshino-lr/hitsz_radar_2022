@@ -1,28 +1,15 @@
-import queue
-import sys
 import time
-import os
 import cv2 as cv
 import numpy as np
-import threading
-import logging
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtCore import QTimer, Qt, QRect
+from PyQt5.QtCore import Qt, QRect
 
 import config
-from config import USEABLE, enemy_color, cam_config, using_video, enemy2color
-from mapping.ui_v5 import Ui_MainWindow
-from radar_detect.Linar_rs import Radar
-from radar_detect.reproject import Reproject
-from radar_detect.location_alarm import Alarm
-from mul_manager.pro_manager import sub, process_detect, process_detect_rs
-from Serial.HP_show import HP_scene
+from config import cam_config
+from ui.mainwindow.mainwindow import Ui_MainWindow
 from Serial.port_operation import Port_operate
-from radar_detect.solve_pnp import SolvePnp
-from radar_detect.eco_forecast import eco_forecast
-from radar_detect.decision import decision_tree
-from mapping.drawing import drawing, draw_message
+from ui.map.drawing import draw_message
 
 
 class UI_MainWindows_EventHandler(Ui_MainWindow):

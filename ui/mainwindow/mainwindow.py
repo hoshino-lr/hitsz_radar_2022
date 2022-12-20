@@ -1,91 +1,49 @@
 """
-UI类
-created by 李龙 2022/6
+主窗口类
+搬迁自原来的main_v4.py
+copied by: 陈希峻 2022/12/20
 """
+
+import queue
 import sys
 import time
-import os
 import cv2 as cv
 import numpy as np
-import multiprocessing
 import threading
-import serial
-import logging
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import QTimer, Qt, QRect
 
-from config import  \
-    MAP_PATH, map_size, USEABLE, \
-    enemy_color, cam_config, using_video, enemy2color
-
-from mapping.ui_v4 import Ui_MainWindow
-from camera.cam_hk_v3 import Camera_HK
-from net.network_pro import Predictor
-from radar_detect.Linar import Radar
+import config
+from config import USEABLE, enemy_color, cam_config, enemy2color
+from ui.mainwindow.generated_ui import Ui_MainWindow
+from radar_detect.Linar_rs import Radar
 from radar_detect.reproject import Reproject
 from radar_detect.location_alarm import Alarm
-from mul_manager.pro_manager import sub, pub
-from Serial.UART import read, write
+from mul_manager.pro_manager import sub, process_detect
 from Serial.HP_show import HP_scene
 from Serial.port_operation import Port_operate
 from radar_detect.solve_pnp import SolvePnp
 from radar_detect.eco_forecast import eco_forecast
 from radar_detect.decision import decision_tree
-from mapping.drawing import drawing, draw_message
-
-
-def process_detect(event, que, Event_Close, record, name):
-    # 多线程接收写法
-    print(f"子线程开始: {name}")
-    predictor = Predictor(name)
-    cam = Camera_HK(name, using_video)
-    count = 0
-    count_error = 0
-    t1 = 0
-    try:
-        while not Event_Close.is_set():
-            if record.is_set():
-                predictor.record_on_clicked()
-                record.clear()
-            result, frame = cam.get_img()
-            if result and frame is not None:
-                t3 = time.time()
-                res = predictor.detect_cars(frame)
-                pub(event, que, res)
-                # time.sleep(0.04)
-                t1 = t1 + time.time() - t3
-                count += 1
-                if count == 100:
-                    fps = float(count) / t1
-                    # print(f'{name} count:{count} fps: {int(fps)}')
-                    count = 0
-                    t1 = 0
-            else:
-                count_error += 1
-                pub(event, que, [result, frame])
-                if count_error == 10:
-                    cam.destroy()
-                    del cam
-                    cam = Camera_HK(name, using_video)
-                    count_error = 0
-        predictor.stop()
-        cam.destroy()
-        print(f"相机网络子进程:{name} 退出")
-    except Exception as e:
-        print(f"相机网络子进程:{name} 寄了\n {e}")
-    sys.exit()
+from ui.map.drawing import drawing, draw_message
 
 
 class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui_MainWindow
 
-    _right_record = multiprocessing.get_context('spawn').Event()
-    _left_record = multiprocessing.get_context('spawn').Event()
-    _que_left = multiprocessing.get_context('spawn').Queue()
-    _event_right = multiprocessing.get_context('spawn').Event()
-    _que_right = multiprocessing.get_context('spawn').Queue()
-    _event_left = multiprocessing.get_context('spawn').Event()
-    _event_close = multiprocessing.get_context('spawn').Event()
+    # _create_event = multiprocessing.get_context('spawn').Event
+    # _create_queue = multiprocessing.get_context('spawn').Queue
+    _create_event = threading.Event
+    _create_queue = queue.Queue
+
+    _right_record = _create_event()
+    _left_record = _create_event()
+    _que_left = _create_queue()
+    _event_right = _create_event()
+    _que_right = _create_queue()
+    _event_left = _create_event()
+    _event_close = _create_event()
+    _event_speed = _create_event()
 
     def __init__(self):
         super(Mywindow, self).__init__()
@@ -110,23 +68,26 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.__serial = USEABLE['serial']
 
         if self.__cam_left:
-            self.PRE_left = multiprocessing.Process(target=process_detect, args=(
-                self._event_left, self._que_left, self._event_close, self._left_record,
-                'cam_left'))
+            self.PRE_left = threading.Thread(target=process_detect, args=(
+                self._event_left, self._que_left, 'cam_left',
+                {'close': self._event_close, 'record': self._left_record, 'speed': self._event_speed}))
             self.PRE_left.daemon = True
 
         if self.__cam_right:
-            self.PRE_right = multiprocessing.Process(target=process_detect, args=(
-                self._event_right, self._que_right, self._event_close, self._right_record,
-                'cam_right'))
+            self.PRE_right = threading.Thread(target=process_detect, args=(
+                self._event_right, self._que_right, 'cam_right',
+                {'close': self._event_close, 'record': self._right_record, 'speed': self._event_speed}))
             self.PRE_right.daemon = True
 
         if self.__serial:
+            # import threading
+            import serial
+            from Serial.UART import read, write
             ser = serial.Serial("/dev/ttyACM0", 115200, timeout=1)
             self.read_thr = threading.Thread(target=read, args=(ser,))
             self.write_thr = threading.Thread(target=write, args=(ser,))
-            self.read_thr.setDaemon(True)
-            self.write_thr.setDaemon(True)
+            self.read_thr.daemon = True
+            self.write_thr.daemon = True
             self.write_thr.start()
             self.read_thr.start()
 
@@ -170,36 +131,21 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.start()
 
     def __ui_init(self):
-        frame_m = cv.imread(MAP_PATH)
-        # 小地图翻转
-        if enemy_color:
-            frame_m = cv.rotate(frame_m, cv.ROTATE_90_COUNTERCLOCKWISE)
-        else:
-            frame_m = cv.rotate(frame_m, cv.ROTATE_90_CLOCKWISE)
-        frame_m = cv.resize(frame_m, map_size)
-        self.set_image(frame_m, "map")
-        del frame_m
         frame = np.zeros((162, 716, 3)).astype(np.uint8)
         self.set_image(frame, "left_demo")
         self.set_image(frame, "right_demo")
         del frame
         self.board_textBrowser = {}
         self.pnp_textBrowser = {}
-
-        # 雷达和位姿估计状态反馈栏，初始化为全False
+        # 状态反馈，初始化为全False
         self.view_change = 0  # 视角切换控制符
         self.terminate = False
         self.record_state = False  # 0:停止 1:开始
         self.epnp_mode = False  # 0:停止 1:开始
-        self.terminate = False
         self.show_pc_state = False
-        self.highlight = False
-        self.record.setText("录制")
-        self.ChangeView.setText("切换视角")
-        self.ShutDown.setText("终止程序")
         self.set_board_text("INFO", "定位状态", self.loc_alarm.get_mode())
-        self.Eco_point = [0, 0, 0, 0]
-        self.Eco_cut = [700, 1300, 400, 600]
+        self._Eco_point = [0, 0, 0, 0]
+        self._Eco_cut = [700, 1300, 400, 600]
         self._num_kk = 0
         self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1}框框")
 
@@ -218,8 +164,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.text_api(draw_message("engineer", 0, "Engineer", "critical"))
         elif event.key() == Qt.Key_F:  # 添加飞坡预警
             self.text_api(draw_message("fly", 0, "Fly", "critical"))
-        elif event.key() == Qt.Key_H:  # 添加高亮模式
-            Port_operate.highlight = not Port_operate.highlight
         elif event.key() == Qt.Key_C:  # 添加清零
             self.draw_module.clear_message()
         else:
@@ -229,16 +173,17 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         """
         切换视角
         """
-        if self.view_change:
-            if self.__cam_left:
-                self.view_change = 0
-            else:
-                return
-        else:
-            if self.__cam_right:
-                self.view_change = 1
-            else:
-                return
+        pass
+        # if self.view_change:
+        #     if self.__cam_left:
+        #         self.view_change = 0
+        #     else:
+        #         return
+        # else:
+        #     if self.__cam_right:
+        #         self.view_change = 1
+        #     else:
+        #         return
 
     def record_on_clicked(self) -> None:
         if not self.record_state:
@@ -261,6 +206,25 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         关闭程序
         """
         self.terminate = True
+
+    def SpeedUp_on_clicked(self) -> None:
+        config.global_speed += 0.25
+        self._event_speed.set()
+        self.CurrentSpeed.setText(f"x{config.global_speed}")
+
+    def SlowDown_on_clicked(self) -> None:
+        if(config.global_speed <= 0.25):
+            return
+        config.global_speed -= 0.25
+        self._event_speed.set()
+        self.CurrentSpeed.setText(f"x{config.global_speed}")
+
+    def Pause_on_clicked(self) -> None:
+        config.global_pause = not config.global_pause
+        if config.global_pause:
+            self.Pause.setText("继续")
+        else:
+            self.Pause.setText("暂停")
 
     def epnp_on_clicked(self) -> None:
         if self.tabWidget.currentIndex() == 1:
@@ -297,7 +261,7 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
             self.sp.save()
             self.sp.clc()
             self.pnp_textBrowser.clear()
-            self.update_epnp(self.sp.translation, self.sp.rotation, self.view_change)
+            self._update_epnp(self.sp.translation, self.sp.rotation, self.view_change)
             self.draw_module.info_update_dly(self.loc_alarm.get_draw(0))
             self.draw_module.info_update_reproject(self.repo_left.get_scene_region())
 
@@ -317,8 +281,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
     def pc_mouseEvent(self, event) -> None:
         if self.show_pc_state:
             # TODO: 这里的3072是个常值，最好改了
-            x = int(event.x() / self.main_demo.width() * 3072)
-            y = int(event.y() / self.main_demo.height() * 2048) + cam_config['cam_left']['roi'][1]
+            x = int(event.x() / self.main_demo.width() * cam_config['cam_left']['size'][0])
+            y = int(event.y() / self.main_demo.height() * cam_config['cam_left']['size'][1]) + cam_config['cam_left']['roi'][1]
             w = 10
             h = 5
             # 格式定义： [N, [bbox(xyxy), conf, cls, bbox(xyxy), conf, cls, col, N]
@@ -330,42 +294,43 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                     [np.array([[1., x, y]]), dph], axis=1))
 
     def eco_key_on_clicked(self, event) -> None:
+        step = 20
         if event.key() == Qt.Key_P:  # 换框
             self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1}框框")
             self._num_kk = abs(1 - self._num_kk)
-        elif event.key() == Qt.Key_W:
-            self.Eco_cut[2] -= 10
-            self.Eco_cut[3] -= 10
-        elif event.key() == Qt.Key_S:
-            self.Eco_cut[2] += 10
-            self.Eco_cut[3] += 10
-        elif event.key() == Qt.Key_A:
-            self.Eco_cut[0] -= 10
-            self.Eco_cut[1] -= 10
-        elif event.key() == Qt.Key_D:
-            self.Eco_cut[0] += 10
-            self.Eco_cut[1] += 10
+        elif event.key() == Qt.Key_W and self._Eco_cut[2] > step:
+            self._Eco_cut[2] -= step
+            self._Eco_cut[3] -= step
+        elif event.key() == Qt.Key_S and self._Eco_cut[3] < 2048 - step:
+            self._Eco_cut[2] += step
+            self._Eco_cut[3] += step
+        elif event.key() == Qt.Key_A and self._Eco_cut[0] > step:
+            self._Eco_cut[0] -= step
+            self._Eco_cut[1] -= step
+        elif event.key() == Qt.Key_D and self._Eco_cut[1] < 3072 - step:
+            self._Eco_cut[0] += step
+            self._Eco_cut[1] += step
 
     def eco_mouseEvent(self, event) -> None:
         if self.__pic_left is None:
             return
         x = event.x()
         y = event.y()
-        x = int(x / self.far_demo.width() * (self.Eco_cut[1] - self.Eco_cut[0]) + self.Eco_cut[0])
-        y = int(y / self.far_demo.height() * (self.Eco_cut[3] - self.Eco_cut[2]) + self.Eco_cut[2])
+        x = int(x / self.far_demo.width() * (self._Eco_cut[1] - self._Eco_cut[0]) + self._Eco_cut[0])
+        y = int(y / self.far_demo.height() * (self._Eco_cut[3] - self._Eco_cut[2]) + self._Eco_cut[2])
         if event.button() == Qt.LeftButton:
-            self.Eco_point[0] = x
-            self.Eco_point[1] = y
+            self._Eco_point[0] = x
+            self._Eco_point[1] = y
         if event.button() == Qt.RightButton:
-            self.Eco_point[2] = x
-            self.Eco_point[3] = y
-        if self.Eco_point[2] > self.Eco_point[0] and self.Eco_point[3] > self.Eco_point[1]:
-            self.supply_detector.update_ori(self.__pic_left, self.Eco_point, self._num_kk)
+            self._Eco_point[2] = x
+            self._Eco_point[3] = y
+        if self._Eco_point[2] > self._Eco_point[0] and self._Eco_point[3] > self._Eco_point[1]:
+            self.supply_detector.update_ori(self.__pic_left, self._Eco_point, self._num_kk)
             self.text_api(
                 draw_message("eco_board", 2,
-                             (self.Eco_point[0], self.Eco_point[1],
-                              self.Eco_point[2],
-                              self.Eco_point[3]), "info"))
+                             (self._Eco_point[0], self._Eco_point[1],
+                              self._Eco_point[2],
+                              self._Eco_point[3]), "info"))
 
     def epnp_next_on_clicked(self) -> None:
         self.sp.step(1)
@@ -392,27 +357,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if position not in ["main_demo", "map", "far_demo", "blood", "hero_demo", "left_demo", "right_demo"]:
             print("[ERROR] The position isn't a member of this UI_window")
             return False
-        if position == "main_demo":
-            width = self.main_demo.width()
-            height = self.main_demo.height()
-        elif position == "far_demo":
-            width = self.far_demo.width()
-            height = self.far_demo.height()
-        elif position == "map":
-            width = self.map.width()
-            height = self.map.height()
-        elif position == "blood":
-            width = self.blood.width()
-            height = self.blood.height()
-        elif position == "hero_demo":
-            width = self.hero_demo.width()
-            height = self.hero_demo.height()
-        elif position == "left_demo":
-            width = self.left_demo.width()
-            height = self.left_demo.height()
-        elif position == "right_demo":
-            width = self.left_demo.width()
-            height = self.left_demo.height()
+        width = self.__dict__[position].width()
+        height = self.__dict__[position].height()
         if frame.shape[2] == 3:
             rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
         elif frame.shape[2] == 2:
@@ -426,27 +372,8 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         temp_pixmap = QPixmap(temp_image).scaled(width, height, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
 
         # set the image to the QPixmap location to show the image on the UI
-        if position == "main_demo":
-            self.main_demo.setPixmap(temp_pixmap)
-            self.main_demo.setScaledContents(True)
-        elif position == "far_demo":
-            self.far_demo.setPixmap(temp_pixmap)
-            self.far_demo.setScaledContents(True)
-        elif position == "map":
-            self.map.setPixmap(temp_pixmap)
-            self.map.setScaledContents(True)
-        elif position == "blood":
-            self.blood.setPixmap(temp_pixmap)
-            self.blood.setScaledContents(True)
-        elif position == "hero_demo":
-            self.hero_demo.setPixmap(temp_pixmap)
-            self.hero_demo.setScaledContents(True)
-        elif position == "left_demo":
-            self.left_demo.setPixmap(temp_pixmap)
-            self.left_demo.setScaledContents(True)
-        elif position == "right_demo":
-            self.right_demo.setPixmap(temp_pixmap)
-            self.right_demo.setScaledContents(True)
+        self.__dict__[position].setPixmap(temp_pixmap)
+        self.__dict__[position].setScaledContents(True)
         return True
 
     def set_board_text(self, _type: str, position: str, message: str) -> None:
@@ -502,51 +429,41 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         if self.__cam_right:
             self.PRE_right.start()
 
-    def update_state(self) -> None:
-        # if isinstance(self.__res_left, bool):
-        #     self.set_board_text("ERROR", "左相机", "左相机寄了")
-        # else:
-        #     self.set_board_text("INFO", "左相机", "左相机正常工作")
-        # if isinstance(self.__res_right, bool):
-        #     self.set_board_text("ERROR", "右相机", "右相机寄了")
-        # else:
-        #     self.set_board_text("INFO", "右相机", "右相机正常工作")
-        text = ""
-        if isinstance(self.__res_left, bool):
-            text += "左相机寄了      "
-        else:
-            text += "左相机正常工作  "
-        if isinstance(self.__res_right, bool):
-            text += "右相机寄了"
-        else:
-            text += "右相机正常工作"
+    def _update_state(self) -> None:
+        text = ("左相机寄了" if isinstance(self.__res_left, bool) \
+                    else "左相机正常工作") \
+               + "\t" + ("右相机寄了" if isinstance(self.__res_right, bool) \
+                             else "右相机正常工作")
         self.set_board_text("INFO", "相机", text)
         text = "<br \>".join(list(self.board_textBrowser.values()))  # css format to replace \n
         self.condition.setText(text)
 
-    def update_image(self) -> None:
+    # 更新图像
+    def _update_image(self) -> None:
         if self.__pic_left is not None:
             self.draw_module.draw_message(self.__pic_left)
             self.set_image(self.__pic_left, "main_demo")
-            self.set_image(self.__pic_left[self.Eco_cut[2]:self.Eco_cut[3], self.Eco_cut[0]:self.Eco_cut[1]],
+            self.set_image(self.__pic_left[self._Eco_cut[2]:self._Eco_cut[3], self._Eco_cut[0]:self._Eco_cut[1]],
                            "far_demo")
         if self.__pic_right is not None:
             self.set_image(self.__pic_right, "hero_demo")
 
-    def update_epnp(self, tvec: np.ndarray, rvec: np.ndarray, side: int) -> None:
+    # 更新epnp 函数
+    def _update_epnp(self, tvec: np.ndarray, rvec: np.ndarray, side: int) -> None:
         if not side:
             self.repo_left.push_T(rvec, tvec)
             self.loc_alarm.push_T(rvec, tvec, 0)
         else:
             self.loc_alarm.push_T(rvec, tvec, 1)
 
-    def update_reproject(self) -> None:
+    # 更新反投影
+    def _update_reproject(self) -> None:
         if self.__cam_left:
             self.repo_left.check(self.__res_left)
             self.repo_left.push_text()
 
     # 位置预警函数，更新各个预警区域的预警次数
-    def update_location_alarm(self) -> None:
+    def _update_location_alarm(self) -> None:
         t_loc_left = None
         if isinstance(self.__res_left, np.ndarray):
             if self.__res_left.shape[0] != 0:
@@ -574,6 +491,33 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.loc_alarm.check()
         self.loc_alarm.show()
 
+    # 更新串口
+    def _update_serial(self) -> None:
+
+        if self.__serial:
+            Port_operate.gain_positions(self.loc_alarm.get_last_loc())
+            Port_operate.gain_decisions(self.decision_tree.get_decision())
+            if Port_operate.change_view != -1:
+                self.view_change = Port_operate.change_view
+        Port_operate.get_message(self.hp_scene)
+        self.hp_scene.show()
+
+    # 更新决策类
+    def _update_decision(self) -> None:
+        self.supply_detector.eco_detect(self.__pic_left, self.loc_alarm.get_last_loc(),
+                                        lambda x: self.set_image(x, "hero_demo"))
+        self.decision_tree.update_serial(Port_operate.positions_us(),
+                                         Port_operate.HP()[8 * (1 - enemy_color):8 * (1 - enemy_color) + 8],
+                                         Port_operate.HP()[8 * enemy_color:8 * enemy_color + 8],
+                                         Port_operate.get_state(),
+                                         int(420 - time.time() + Port_operate.start_time),
+                                         False)
+        self.decision_tree.update_information(self.loc_alarm.get_last_loc(), self.repo_left.fly,
+                                              self.repo_left.fly_result, self.repo_left.hero_r3,
+                                              self.__res_left, self.repo_left.rp_alarming.copy())
+        self.decision_tree.decision_alarm()
+
+    # 主函数循环
     def spin(self) -> None:
         # get images
         if self.__cam_left:
@@ -590,99 +534,26 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                         self.draw_module.draw_pc(self.__pic_left, depth, cam_config['cam_left']['roi'])
                     self.draw_module.draw_CamPoints(self.__pic_left, cam_config['cam_left']['roi'])
             else:
-                self.update_reproject()
-                self.update_location_alarm()
-
-        # update serial
-        if self.__serial:
-            Port_operate.gain_positions(self.loc_alarm.get_last_loc())
-            Port_operate.gain_decisions(self.decision_tree.get_decision())
-            if Port_operate.change_view != -1:
-                self.view_change = Port_operate.change_view
-        self.decision_tree.update_serial(Port_operate.positions_us(),
-                                         Port_operate.HP()[8 * (1 - enemy_color):8 * (1 - enemy_color) + 8],
-                                         Port_operate.HP()[8 * enemy_color:8 * enemy_color + 8],
-                                         Port_operate.get_state(),
-                                         int(420 - time.time() + Port_operate.start_time),
-                                         Port_operate.highlight)
-
-        self.supply_detector.eco_detect(self.__pic_left, self.loc_alarm.get_last_loc(),
-                                        lambda x: self.set_image(x, "hero_demo"))
-        Port_operate.get_message(self.hp_scene)
-        self.hp_scene.show()
-        self.decision_tree.update_information(self.loc_alarm.get_last_loc(), self.repo_left.fly,
-                                              self.repo_left.fly_result, self.repo_left.hero_r3,
-                                              self.__res_left, self.repo_left.rp_alarming.copy())
-        self.decision_tree.decision_alarm()
-        self.update_image()
-        self.update_state()
+                self._update_reproject()
+                self._update_location_alarm()
+                self._update_serial()
+                self._update_decision()
+        self._update_image()
+        self._update_state()
 
         # if close the program
         if self.terminate:
             self.loc_alarm.close_data()
             self._event_close.set()
             if self.__cam_left:
-                self.PRE_left.join(timeout=0.5)
+                # self.PRE_left.join(timeout=0.5)
+                self.PRE_left.join()
             if self.__cam_right:
-                self.PRE_right.join(timeout=0.5)
+                # self.PRE_right.join(timeout=0.5)
+                self.PRE_right.join()
             sys.exit()
 
-
-class LOGGER(object):
-    """
-    logger 类
-    """
-
-    def __init__(self):
-        # 创建一个logger
-        import time
-        logger_name = time.strftime('%Y-%m-%d %H-%M-%S')
-        self.terminal = sys.stdout
-        self.logger = logging.getLogger(logger_name)
-        self.logger.setLevel(logging.DEBUG)
-        # 创建一个handler，用于写入日志文件
-        log_path = os.path.abspath(os.getcwd()) + "/logs/"  # 指定文件输出路径
-        if not os.path.exists(log_path):
-            os.makedirs(log_path)
-        LogName = log_path + logger_name + '.log'  # 指定输出的日志文件名
-        fh = logging.FileHandler(LogName, encoding='utf-8')  # 指定utf-8格式编码，避免输出的日志文本乱码
-        fh.setLevel(logging.DEBUG)
-
-        # 定义handler的输出格式
-        formatter = logging.Formatter('%(asctime)s-%(levelname)s-%(message)s')
-        fh.setFormatter(formatter)
-
-        # 给logger添加handler
-        self.logger.addHandler(fh)
-
-    def write(self, message):
-        # self.terminal.write(message)
-        if message == '\n':
-            return
-        if "[ERROR]" in message:
-            self.logger.error(message)
-        elif "[WARNING]" in message:
-            self.logger.warning(message)
-        else:
-            self.logger.info(message)
-
-    def flush(self):
-        pass
-
-    def __del__(self):
-        pass
-
-
-if __name__ == "__main__":
-    multiprocessing.set_start_method('spawn')
-    # ui
-    app = QtWidgets.QApplication(sys.argv)
-    sys.stdout = LOGGER()
-    MyShow = Mywindow()
-    MyShow.show()
-
-    timer_main = QTimer()  # 主循环使用的线程
-    timer_main.timeout.connect(MyShow.spin)
-    timer_main.start(0)
-
-    sys.exit(app.exec_())
+    # TODO: 优化关闭窗口体验
+    # def closeEvent(self, event) -> None:
+    #     self.terminate = True
+    #     event.ignore()

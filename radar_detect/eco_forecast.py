@@ -13,7 +13,7 @@
 import time
 from config import enemy_color
 import numpy as np
-from mapping.drawing import draw_message
+from ui.map.drawing import draw_message
 import cv2 as cv
 
 

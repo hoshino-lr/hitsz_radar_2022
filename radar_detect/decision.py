@@ -11,7 +11,7 @@
 import time
 
 import numpy as np
-from mapping.drawing import draw_message
+from ui.map.drawing import draw_message
 from config import enemy_color
 
 

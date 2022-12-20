@@ -11,7 +11,6 @@
 import cv2 as cv
 import numpy as np
 from config import Delaunary_points, cam_config
-from mapping.drawing import draw_message
 
 
 class location_Delaunay(object):
