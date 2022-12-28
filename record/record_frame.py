@@ -1,21 +1,21 @@
 import numpy as np
 import cv2
-from config import resource_prefix, cam_config, record_fps
+from config import resource_prefix, cam_config
 import time
-from record.protobuf.record_pb2 import Record, NpArray
+from record.protobuf.record_pb2 import Record, RecordSequence, NpArray
+
 
 class RecordWriteManager:
     """
     录制写入管理器
     """
-    def __init__(self, cam_name):
+    def __init__(self, cam_name, fps=60):
         print("开始录制")
         basic_path = resource_prefix + 'record/' + cam_name + '-' + RecordWriteManager.gen_timestamp()
         print(basic_path)
         self._record_file = open(basic_path + '.pb', 'ab')
         self._video_file = cv2.VideoWriter(basic_path + '.avi', cv2.VideoWriter_fourcc(*'MP42'),
-                                           record_fps, cam_config[cam_name]['size'])
-        self._start_time = time.time()
+                                           fps, cam_config[cam_name]['size'])
 
     def __del__(self):
         self._record_file.close()

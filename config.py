@@ -9,30 +9,49 @@ import os
 import numpy as np
 from real_points import real_points
 
-global global_speed
-global global_pause
-global_speed= 1.0
-global_pause = False
-
 enemy_color = 0  # 0：敌方为红色；1：敌方为蓝色
 USEABLE = {
-    "cam_left": True,
-    "cam_right": False,
     "serial": False,
     "Lidar": False,
     "locate_state": [0, 1],
 }
 BO = 0
 DEBUG = False
-using_video = True
 resource_prefix = os.path.dirname(os.path.abspath(__file__)) + "/resources/"
-record_fps = 10
 cam_config = {
+    "cam_left": {
+        "enable": True,
+        "id": "J87631625",
+        "size": (3072, 2048),
+        "roi": (0, 200, 3072, 1848),
+        "using_video": True,
+        "using_net": True,
+        "using_net_record": False,
+        "video_path": resource_prefix + "two_cam/1.avi",
+        "K_0": np.mat([[2580.7380664637653, 0.0, 1535.9830165125002],
+                       [0.0, 2582.8839945792183, 1008.784910706948],
+                       [0.0, 0.0, 1.0]]),
+        "C_0": np.mat([[-0.0640364274094021], [0.04211319930460198], [0.0010490064499735965],
+                       [-0.0003352752162304746], [0.27835581516135494]]),
+        "exposure": 15000,
+        "gain": 21,
+        "rvec": np.mat([[1.69750257], [0.69091169], [-0.54474128]]),
+        "tvec": np.mat([[-11381.85466339], [-479.01247871], [9449.30328641]]),
+        "E_0": np.mat([
+            [0.0185759, -0.999824, 0.00251985, -0.0904854],
+            [0.0174645, -0.00219543, -0.999845, -0.132904],
+            [0.999675, 0.018617, 0.0174206, -0.421934],
+            [0, 0, 0, 1]
+        ])},
+
     "cam_right": {
+        "enable": False,
         "id": "J37877236",
         "size": (3072, 2048),
         "roi": (0, 0, 3072, 1648),
+        "using_video": True,
         "using_net": False,
+        "using_net_record": False,
         "video_path": resource_prefix + "two_cam/1.avi",
         "K_0": np.mat([[2505.2629026927225, 0.0, 1529.4286325395244],
                        [0.0, 2505.5722700649067, 1026.1378217662113],
@@ -51,27 +70,6 @@ cam_config = {
             [0, 0, 0, 1]
         ])},
 
-    "cam_left": {
-        "id": "J87631625",
-        "size": (3072, 2048),
-        "roi": (0, 200, 3072, 1848),
-        "using_net": True,
-        "video_path": resource_prefix + "two_cam/2.mp4",
-        "K_0": np.mat([[2580.7380664637653, 0.0, 1535.9830165125002],
-                       [0.0, 2582.8839945792183, 1008.784910706948],
-                       [0.0, 0.0, 1.0]]),
-        "C_0": np.mat([[-0.0640364274094021], [0.04211319930460198], [0.0010490064499735965],
-                       [-0.0003352752162304746], [0.27835581516135494]]),
-        "exposure": 15000,
-        "gain": 21,
-        "rvec": np.mat([[1.69750257], [0.69091169], [-0.54474128]]),
-        "tvec": np.mat([[-11381.85466339], [-479.01247871], [9449.30328641]]),
-        "E_0": np.mat([
-            [0.0185759, -0.999824, 0.00251985, -0.0904854],
-            [0.0174645, -0.00219543, -0.999845, -0.132904],
-            [0.999675, 0.018617, 0.0174206, -0.421934],
-            [0, 0, 0, 1]
-        ])},
 }
 net1_engine = resource_prefix + "net_onnx/net1.engine"
 net2_engine = resource_prefix + "net_onnx/net2.engine"

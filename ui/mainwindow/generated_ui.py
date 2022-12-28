@@ -309,27 +309,27 @@ class Ui_MainWindow(object):
         self.tabWidget.setCurrentIndex(0)
 
         # Manual add event listener
-        self.ChangeView.clicked.connect(MainWindow.ChangeView_on_clicked)
-        self.epnp_begin.clicked.connect(MainWindow.epnp_calculate)
-        self.epnp_back.clicked.connect(MainWindow.epnp_back_on_clicked)
-        self.epnp_clear.clicked.connect(MainWindow.epnp_clear_on_clicked)
-        self.epnp_next.clicked.connect(MainWindow.epnp_next_on_clicked)
-        self.Record.clicked.connect(MainWindow.record_on_clicked)
-        # TODO: 升级雷达显示
-        # self.ShowLidar.clicked.connect(MainWindow.showpc_on_clicked)
-        self.ShutDown.clicked.connect(MainWindow.CloseProgram_on_clicked)
-        # TODO: 升级新的调速UI
-        # self.SlowDown.clicked.connect(MainWindow.SlowDown_on_clicked)
-        # self.SpeedUp.clicked.connect(MainWindow.SpeedUp_on_clicked)
-        # self.Pause.clicked.connect(MainWindow.Pause_on_clicked)
-        self.pnp_demo.mousePressEvent = MainWindow.epnp_mouseEvent
-        self.main_demo.mouseMoveEvent = MainWindow.pc_mouseEvent
-        self.far_demo.mousePressEvent = MainWindow.eco_mouseEvent
-        self.far_demo.keyPressEvent = MainWindow.eco_key_on_clicked
-        self.condition.keyPressEvent = MainWindow.condition_key_on_clicked
-        self.condition.setFocusPolicy(Qt.ClickFocus)
-        self.far_demo.setFocusPolicy(Qt.ClickFocus)
-        self.tabWidget.currentChanged.connect(MainWindow.epnp_on_clicked)
+        # self.ChangeView.clicked.connect(MainWindow.ChangeView_on_clicked)
+        # self.epnp_begin.clicked.connect(MainWindow.epnp_calculate)
+        # self.epnp_back.clicked.connect(MainWindow.epnp_back_on_clicked)
+        # self.epnp_clear.clicked.connect(MainWindow.epnp_clear_on_clicked)
+        # self.epnp_next.clicked.connect(MainWindow.epnp_next_on_clicked)
+        # self.Record.clicked.connect(MainWindow.record_on_clicked)
+        # # TODO: 升级雷达显示
+        # # self.ShowLidar.clicked.connect(MainWindow.showpc_on_clicked)
+        # self.ShutDown.clicked.connect(MainWindow.CloseProgram_on_clicked)
+        # # TODO: 升级新的调速UI
+        # # self.SlowDown.clicked.connect(MainWindow.SlowDown_on_clicked)
+        # # self.SpeedUp.clicked.connect(MainWindow.SpeedUp_on_clicked)
+        # # self.Pause.clicked.connect(MainWindow.Pause_on_clicked)
+        # self.pnp_demo.mousePressEvent = MainWindow.epnp_mouseEvent
+        # self.main_demo.mouseMoveEvent = MainWindow.pc_mouseEvent
+        # self.far_demo.mousePressEvent = MainWindow.eco_mouseEvent
+        # self.far_demo.keyPressEvent = MainWindow.eco_key_on_clicked
+        # self.condition.keyPressEvent = MainWindow.condition_key_on_clicked
+        # self.condition.setFocusPolicy(Qt.ClickFocus)
+        # self.far_demo.setFocusPolicy(Qt.ClickFocus)
+        # self.tabWidget.currentChanged.connect(MainWindow.epnp_on_clicked)
 
 
         QMetaObject.connectSlotsByName(MainWindow)

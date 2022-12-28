@@ -29,24 +29,11 @@ from radar_detect.decision import decision_tree
 from ui.map.drawing import drawing, draw_message
 
 
-class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui_MainWindow
+class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui_MainWindow
 
-    # _create_event = multiprocessing.get_context('spawn').Event
-    # _create_queue = multiprocessing.get_context('spawn').Queue
-    _create_event = threading.Event
-    _create_queue = queue.Queue
-
-    _right_record = _create_event()
-    _left_record = _create_event()
-    _que_left = _create_queue()
-    _event_right = _create_event()
-    _que_right = _create_queue()
-    _event_left = _create_event()
-    _event_close = _create_event()
-    _event_speed = _create_event()
-
-    def __init__(self):
-        super(Mywindow, self).__init__()
+    def __init__(self, cameras):
+        super(MainWindow, self).__init__()
+        self._cameras = cameras
         self.setupUi(self)
         self.hp_scene = HP_scene(enemy_color, lambda x: self.set_image(x, "blood"))
         self.board_api = lambda x, y, z: self.set_board_text(x, y, z)
@@ -63,21 +50,9 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.__pic_left = None
 
         self._use_lidar = not USEABLE["locate_state"][0]
-        self.__cam_left = USEABLE['cam_left']
-        self.__cam_right = USEABLE['cam_right']
+        self.__cam_left = 'came_left' in cameras
+        self.__cam_right = 'came_left' in cameras
         self.__serial = USEABLE['serial']
-
-        if self.__cam_left:
-            self.PRE_left = threading.Thread(target=process_detect, args=(
-                self._event_left, self._que_left, 'cam_left',
-                {'close': self._event_close, 'record': self._left_record, 'speed': self._event_speed}))
-            self.PRE_left.daemon = True
-
-        if self.__cam_right:
-            self.PRE_right = threading.Thread(target=process_detect, args=(
-                self._event_right, self._que_right, 'cam_right',
-                {'close': self._event_close, 'record': self._right_record, 'speed': self._event_speed}))
-            self.PRE_right.daemon = True
 
         if self.__serial:
             # import threading
@@ -128,7 +103,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.draw_module.info_update_reproject(self.repo_left.get_scene_region())
         self.draw_module.info_update_dly(self.loc_alarm.get_draw(0))
         self.__ui_init()
-        self.start()
 
     def __ui_init(self):
         frame = np.zeros((162, 716, 3)).astype(np.uint8)
@@ -185,46 +159,9 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         #     else:
         #         return
 
-    def record_on_clicked(self) -> None:
-        if not self.record_state:
-            self.record.setText("录制 正在录制")
-            self.record_state = True
-            self._left_record.set()
-            self._right_record.set()
-        else:
-            self.record.setText("录制")
-            self.record_state = False
-            self._left_record.set()
-            self._right_record.set()
-
     def showpc_on_clicked(self) -> None:
         self.show_pc_state = not self.show_pc_state
         self.epnp_mode = False
-
-    def CloseProgram_on_clicked(self) -> None:
-        """
-        关闭程序
-        """
-        self.terminate = True
-
-    def SpeedUp_on_clicked(self) -> None:
-        config.global_speed += 0.25
-        self._event_speed.set()
-        self.CurrentSpeed.setText(f"x{config.global_speed}")
-
-    def SlowDown_on_clicked(self) -> None:
-        if(config.global_speed <= 0.25):
-            return
-        config.global_speed -= 0.25
-        self._event_speed.set()
-        self.CurrentSpeed.setText(f"x{config.global_speed}")
-
-    def Pause_on_clicked(self) -> None:
-        config.global_pause = not config.global_pause
-        if config.global_pause:
-            self.Pause.setText("继续")
-        else:
-            self.Pause.setText("暂停")
 
     def epnp_on_clicked(self) -> None:
         if self.tabWidget.currentIndex() == 1:
@@ -280,7 +217,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
 
     def pc_mouseEvent(self, event) -> None:
         if self.show_pc_state:
-            # TODO: 这里的3072是个常值，最好改了
             x = int(event.x() / self.main_demo.width() * cam_config['cam_left']['size'][0])
             y = int(event.y() / self.main_demo.height() * cam_config['cam_left']['size'][1]) + cam_config['cam_left']['roi'][1]
             w = 10
@@ -423,12 +359,6 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
         self.pnp_condition.setText(text)
         return True
 
-    def start(self) -> None:
-        if self.__cam_left:
-            self.PRE_left.start()
-        if self.__cam_right:
-            self.PRE_right.start()
-
     def _update_state(self) -> None:
         text = ("左相机寄了" if isinstance(self.__res_left, bool) \
                     else "左相机正常工作") \
@@ -521,9 +451,9 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
     def spin(self) -> None:
         # get images
         if self.__cam_left:
-            self.__res_left, self.__pic_left = sub(self._event_left, self._que_left)
+            self.__pic_left = self._cameras['cam_left']['process'].sub()
         if self.__cam_right:
-            self.__res_right, self.__pic_right = sub(self._event_right, self._que_right)
+            self.__pic_left = self._cameras['cam_left']['process'].sub()
 
         # if in epnp_mode , just show the images
         if not self.epnp_mode:
@@ -540,20 +470,3 @@ class Mywindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui
                 self._update_decision()
         self._update_image()
         self._update_state()
-
-        # if close the program
-        if self.terminate:
-            self.loc_alarm.close_data()
-            self._event_close.set()
-            if self.__cam_left:
-                # self.PRE_left.join(timeout=0.5)
-                self.PRE_left.join()
-            if self.__cam_right:
-                # self.PRE_right.join(timeout=0.5)
-                self.PRE_right.join()
-            sys.exit()
-
-    # TODO: 优化关闭窗口体验
-    # def closeEvent(self, event) -> None:
-    #     self.terminate = True
-    #     event.ignore()

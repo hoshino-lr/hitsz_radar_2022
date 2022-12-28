@@ -22,10 +22,9 @@ class Camera_HK(Camera):
     相机类
     """
 
-    def __init__(self, type_, event_list=None):
+    def __init__(self, type_):
         """
-        @param type: 相机左右类型
-        @param event_list: 事件列表
+        @param type_: 相机左右类型
         """
         self.__type = type_
         self.__camera_config = cam_config[self.__type]

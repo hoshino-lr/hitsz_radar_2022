@@ -31,18 +31,3 @@ class Camera(ABC):
     @abstractmethod
     def destroy(self):
         return NotImplemented
-
-
-def create_camera(_type, using_video:bool, event_list=None) -> Camera:
-    '''
-    创建相机
-    :param _type:
-    :param using_video: 是否使用视频
-    :param event_list: 事件列表
-    '''
-    if using_video:
-        from camera.cam_video import Camera_Video
-        return Camera_Video(_type, event_list)
-    else:
-        from camera.cam_hk_v3 import Camera_HK
-        return Camera_HK(_type, event_list)
