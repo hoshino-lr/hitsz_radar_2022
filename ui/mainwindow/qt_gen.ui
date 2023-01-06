@@ -203,31 +203,10 @@
           <property name="horizontalSpacing">
            <number>2</number>
           </property>
-          <item row="1" column="7">
-           <widget class="QCheckBox" name="ReversePlay">
-            <property name="text">
-             <string>倒转</string>
-            </property>
-           </widget>
-          </item>
           <item row="1" column="0">
            <widget class="QPushButton" name="TogglePlay">
             <property name="text">
              <string>暂停</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="9">
-           <widget class="QLabel" name="label_2">
-            <property name="text">
-             <string>FPS：0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1" colspan="11">
-           <widget class="QSlider" name="TimeSlider">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -236,15 +215,38 @@
             <property name="enabled">
              <bool>false</bool>
             </property>
+            <property name="minimum">
+             <double>0.010000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>20.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
             <property name="value">
              <double>1.000000000000000</double>
             </property>
            </widget>
           </item>
-          <item row="0" column="0">
-           <widget class="QLabel" name="PlayStatus">
+          <item row="1" column="2">
+           <widget class="QLabel" name="speedLabel">
             <property name="text">
-             <string>00:00/00:00</string>
+             <string>速度：x</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="8">
+           <widget class="QLabel" name="FpsStatus">
+            <property name="text">
+             <string>网络FPS：0 相机FPS：0</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1" colspan="10">
+           <widget class="QSlider" name="TimeSlider">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
             </property>
            </widget>
           </item>
@@ -261,10 +263,24 @@
             </property>
            </spacer>
           </item>
-          <item row="1" column="2">
-           <widget class="QLabel" name="label">
+          <item row="1" column="6">
+           <widget class="QPushButton" name="ResetSpeed">
             <property name="text">
-             <string>速度：x</string>
+             <string>重置1x</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="PlayStatus">
+            <property name="text">
+             <string>00:00/00:00</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="7">
+           <widget class="QCheckBox" name="CustomSpeed">
+            <property name="text">
+             <string>自定义速度</string>
             </property>
            </widget>
           </item>
@@ -296,20 +312,6 @@
             </property>
             <property name="tickInterval">
              <number>1</number>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="6">
-           <widget class="QPushButton" name="pushButton">
-            <property name="text">
-             <string>重置1x</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="8">
-           <widget class="QCheckBox" name="CustomSpeed">
-            <property name="text">
-             <string>自定义速度</string>
             </property>
            </widget>
           </item>
@@ -412,10 +414,10 @@
             <item row="3" column="1">
              <widget class="QCheckBox" name="UseNet">
               <property name="text">
-               <string>启用神经网络</string>
+               <string>使用录制网络</string>
               </property>
               <property name="checked">
-               <bool>true</bool>
+               <bool>false</bool>
               </property>
              </widget>
             </item>
@@ -549,38 +551,6 @@
  <resources/>
  <connections>
   <connection>
-   <sender>CustomSpeed</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>SpeedSpinBox</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>1049</x>
-     <y>793</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>664</x>
-     <y>793</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>CustomSpeed</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>SpeedSlider</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>1049</x>
-     <y>793</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>782</x>
-     <y>793</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>ShutDown</sender>
    <signal>clicked()</signal>
    <receiver>MainWindow</receiver>
@@ -593,6 +563,38 @@
     <hint type="destinationlabel">
      <x>705</x>
      <y>419</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>CustomSpeed</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>SpeedSlider</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>953</x>
+     <y>793</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>744</x>
+     <y>793</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>CustomSpeed</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>SpeedSpinBox</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>953</x>
+     <y>793</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>626</x>
+     <y>793</y>
     </hint>
    </hints>
   </connection>

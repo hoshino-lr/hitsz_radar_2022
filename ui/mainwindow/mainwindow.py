@@ -3,7 +3,7 @@
 搬迁自原来的main_v4.py
 copied by: 陈希峻 2022/12/20
 """
-
+import bisect
 import queue
 import sys
 import time
@@ -30,7 +30,7 @@ from ui.map.drawing import drawing, draw_message
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui_MainWindow
 
-    def __init__(self, cameras):
+    def __init__(self, cameras: dict[dict]):
         super(MainWindow, self).__init__()
         self._cameras = cameras
         self.setupUi(self)
@@ -104,6 +104,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self.__ui_init()
 
     def __ui_init(self):
+        self.__event_connect()
         frame = np.zeros((162, 716, 3)).astype(np.uint8)
         self.set_image(frame, "left_demo")
         self.set_image(frame, "right_demo")
@@ -121,6 +122,59 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self._Eco_cut = [700, 1300, 400, 600]
         self._num_kk = 0
         self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1}框框")
+
+    # 事件绑定
+    def __event_connect(self) -> None:
+        self.ChangeView.clicked.connect(self.ChangeView_on_clicked)
+        self.epnp_begin.clicked.connect(self.epnp_calculate)
+        self.epnp_back.clicked.connect(self.epnp_back_on_clicked)
+        self.epnp_clear.clicked.connect(self.epnp_clear_on_clicked)
+        self.epnp_next.clicked.connect(self.epnp_next_on_clicked)
+        # self.Record.clicked.connect(self.record_on_clicked)
+        # TODO: 升级雷达显示
+        # self.ShowLidar.clicked.connect(self.showpc_on_clicked)
+        # self.ShutDown.clicked.connect(self.CloseProgram_on_clicked)
+        # TODO: 升级新的调速UI
+        # self.SlowDown.clicked.connect(self.SlowDown_on_clicked)
+        # self.SpeedUp.clicked.connect(self.SpeedUp_on_clicked)
+        # self.Pause.clicked.connect(self.Pause_on_clicked)
+        self.pnp_demo.mousePressEvent = self.epnp_mouseEvent
+        self.main_demo.mouseMoveEvent = self.pc_mouseEvent
+        self.far_demo.mousePressEvent = self.eco_mouseEvent
+        self.far_demo.keyPressEvent = self.eco_key_on_clicked
+        self.condition.keyPressEvent = self.condition_key_on_clicked
+        self.condition.setFocusPolicy(Qt.ClickFocus)
+        self.far_demo.setFocusPolicy(Qt.ClickFocus)
+        self.tabWidget.currentChanged.connect(self.epnp_on_clicked)
+        self.DisplayLidar.toggled.connect(self.showpc_on_clicked)
+        self.ResetSpeed.clicked.connect(self.reset_speed_on_clicked)
+        self.SpeedSlider.valueChanged.connect(self.speed_slider_on_changed)
+        self.CustomSpeed.toggled.connect(self.custom_speed_on_clicked)
+        self.SpeedSpinBox.valueChanged.connect(self.speed_spinbox_on_changed)
+
+    def reset_speed_on_clicked(self):
+        self.SpeedSpinBox.setValue(1.0)
+        self.SpeedSlider.setValue(3)
+
+    def speed_slider_on_changed(self, value):
+        self.SpeedSpinBox.setValue(config.speed_map[value])
+
+    def speed_spinbox_on_changed(self, value):
+        if value <= 0.0:
+            self.SpeedSpinBox.setValue(0.01)
+        for cam in self._cameras.values():
+            cam['camera'].set_prop('speed', value)
+
+    def custom_speed_on_clicked(self, state):
+        if state:
+            self.SpeedSlider.setEnabled(False)
+            self.SpeedSpinBox.setEnabled(True)
+        else:
+            value = self.SpeedSpinBox.value()
+            self.SpeedSlider.setValue(bisect.bisect_left(config.speed_map, value))
+            self.SpeedSlider.setEnabled(True)
+            self.SpeedSpinBox.setEnabled(False)
+
 
     def condition_key_on_clicked(self, event) -> None:
         if event.key() == Qt.Key_Q:
@@ -158,8 +212,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         #     else:
         #         return
 
-    def showpc_on_clicked(self) -> None:
-        self.show_pc_state = not self.show_pc_state
+    def showpc_on_clicked(self, state) -> None:
+        self.show_pc_state = state
         self.epnp_mode = False
 
     def epnp_on_clicked(self) -> None:
@@ -446,6 +500,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
                                               self.__res_left, self.repo_left.rp_alarming.copy())
         self.decision_tree.decision_alarm()
 
+    # 更新UI
+    def _update_ui(self) -> None:
+        # 更新FPS
+        self.FpsStatus.setText("网络FPS：%.2f 相机FPS：%.2f" %
+                               (self._cameras['cam_left']['process'].fps, self._cameras['cam_left']['camera'].real_fps))
+
+
     # 主函数循环
     def spin(self) -> None:
         # get images
@@ -469,3 +530,4 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
                 self._update_decision()
         self._update_image()
         self._update_state()
+        self._update_ui()

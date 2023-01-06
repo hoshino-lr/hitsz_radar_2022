@@ -25,6 +25,9 @@ class ProcessThread():
         self._event = Event()
         self._queue = Queue()
         self._thread = None
+        self._fps = 0
+        self._fps_time = 0
+        self._fps_count = 0
 
         self.start()
 
@@ -35,6 +38,7 @@ class ProcessThread():
         self._queue.queue.clear()
         self._predictor = Predictor(self._camera.name)
         self._is_terminated = False
+        self._fps_time = time.time()
         self._thread = Thread(target=self._spin, name=self._name)
         self._thread.start()
         print(f"子线程开始: {self._name}")
@@ -58,10 +62,6 @@ class ProcessThread():
         else:
             return False, None
 
-    def check(self):
-        # TODO: 检查相机是否正常
-        pass
-
     def __del__(self):
         self.stop()
         self._thread.join()
@@ -70,6 +70,10 @@ class ProcessThread():
     @property
     def is_terminate(self):
         return self._is_terminated
+
+    @property
+    def fps(self):
+        return self._fps
 
     def _pub(self, data):
         if self._event.is_set():
@@ -82,6 +86,17 @@ class ProcessThread():
         self._queue.put(data)
         self._event.set()
 
+    def _fps_update(self):
+        """
+        更新帧率
+        """
+        if self._fps_count >= 10:
+            self._fps = self._fps_count / (time.time() - self._fps_time)
+            self._fps_count = 0
+            self._fps_time = time.time()
+        else:
+            self._fps_count += 1
+
     def _spin(self):
         # count = 0
         # count_error = 0
@@ -89,16 +104,6 @@ class ProcessThread():
         print(f"子线程开始: {self._name}")
         while not self._is_terminated:
             # TODO: 录制功能升级
-            # if event_list['record'].is_set():
-            #     # predictor.record_on_clicked()
-            #     if not is_record:
-            #         record = RecordWriteManager(name)
-            #         is_record = True
-            #     else:
-            #         del record
-            #         is_record = False
-            #     event_list['record'].clear()
-
             frame = self._camera.latest_frame
             if frame is not None:
                 img = cv2.copyMakeBorder(
@@ -107,16 +112,4 @@ class ProcessThread():
                     0, 0, cv2.BORDER_CONSTANT, value=(0, 0, 0))
                 res = self._predictor.detect_cars(img)
                 self._pub((res, img))
-                # TODO: 让UI干计数功能
-            # TODO: 让相机自己监控自己
-            # else:
-            #     # 错误计数
-            #     count_error += 1
-            #     if count_error == 10:
-            #         # TODO: 改相机记得看看这
-            #         self._camera.restart()
-            #         # print(f"相机出错重启:{name}")
-            #         # cam.destroy()
-            #         # del cam
-            #         # cam = create_camera(name, using_video, event_list)
-            #         count_error = 0
+                self._fps_update()

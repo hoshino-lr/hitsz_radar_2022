@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'Demo_v5flCAYI.ui'
+## Form generated from reading UI file 'qt_genilrhFj.ui'
 ##
 ## Created by: Qt User Interface Compiler version 5.15.7
 ##
@@ -105,26 +105,10 @@ class Ui_MainWindow(object):
         self.playControlGridLayout = QGridLayout()
         self.playControlGridLayout.setObjectName(u"playControlGridLayout")
         self.playControlGridLayout.setHorizontalSpacing(2)
-        self.ReversePlay = QCheckBox(self.tab)
-        self.ReversePlay.setObjectName(u"ReversePlay")
-
-        self.playControlGridLayout.addWidget(self.ReversePlay, 1, 7, 1, 1)
-
         self.TogglePlay = QPushButton(self.tab)
         self.TogglePlay.setObjectName(u"TogglePlay")
 
         self.playControlGridLayout.addWidget(self.TogglePlay, 1, 0, 1, 1)
-
-        self.label_2 = QLabel(self.tab)
-        self.label_2.setObjectName(u"label_2")
-
-        self.playControlGridLayout.addWidget(self.label_2, 1, 9, 1, 1)
-
-        self.TimeSlider = QSlider(self.tab)
-        self.TimeSlider.setObjectName(u"TimeSlider")
-        self.TimeSlider.setOrientation(Qt.Horizontal)
-
-        self.playControlGridLayout.addWidget(self.TimeSlider, 0, 1, 1, 11)
 
         self.SpeedSpinBox = QDoubleSpinBox(self.tab)
         self.SpeedSpinBox.setObjectName(u"SpeedSpinBox")
@@ -133,19 +117,40 @@ class Ui_MainWindow(object):
 
         self.playControlGridLayout.addWidget(self.SpeedSpinBox, 1, 3, 1, 1)
 
-        self.PlayStatus = QLabel(self.tab)
-        self.PlayStatus.setObjectName(u"PlayStatus")
+        self.speedLabel = QLabel(self.tab)
+        self.speedLabel.setObjectName(u"speedLabel")
 
-        self.playControlGridLayout.addWidget(self.PlayStatus, 0, 0, 1, 1)
+        self.playControlGridLayout.addWidget(self.speedLabel, 1, 2, 1, 1)
+
+        self.FpsStatus = QLabel(self.tab)
+        self.FpsStatus.setObjectName(u"FpsStatus")
+
+        self.playControlGridLayout.addWidget(self.FpsStatus, 1, 8, 1, 1)
+
+        self.TimeSlider = QSlider(self.tab)
+        self.TimeSlider.setObjectName(u"TimeSlider")
+        self.TimeSlider.setOrientation(Qt.Horizontal)
+
+        self.playControlGridLayout.addWidget(self.TimeSlider, 0, 1, 1, 10)
 
         self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.playControlGridLayout.addItem(self.horizontalSpacer, 1, 1, 1, 1)
 
-        self.label = QLabel(self.tab)
-        self.label.setObjectName(u"label")
+        self.ResetSpeed = QPushButton(self.tab)
+        self.ResetSpeed.setObjectName(u"ResetSpeed")
 
-        self.playControlGridLayout.addWidget(self.label, 1, 2, 1, 1)
+        self.playControlGridLayout.addWidget(self.ResetSpeed, 1, 6, 1, 1)
+
+        self.PlayStatus = QLabel(self.tab)
+        self.PlayStatus.setObjectName(u"PlayStatus")
+
+        self.playControlGridLayout.addWidget(self.PlayStatus, 0, 0, 1, 1)
+
+        self.CustomSpeed = QCheckBox(self.tab)
+        self.CustomSpeed.setObjectName(u"CustomSpeed")
+
+        self.playControlGridLayout.addWidget(self.CustomSpeed, 1, 7, 1, 1)
 
         self.SpeedSlider = QSlider(self.tab)
         self.SpeedSlider.setObjectName(u"SpeedSlider")
@@ -162,16 +167,6 @@ class Ui_MainWindow(object):
         self.SpeedSlider.setTickInterval(1)
 
         self.playControlGridLayout.addWidget(self.SpeedSlider, 1, 4, 1, 1)
-
-        self.pushButton = QPushButton(self.tab)
-        self.pushButton.setObjectName(u"pushButton")
-
-        self.playControlGridLayout.addWidget(self.pushButton, 1, 6, 1, 1)
-
-        self.CustomSpeed = QCheckBox(self.tab)
-        self.CustomSpeed.setObjectName(u"CustomSpeed")
-
-        self.playControlGridLayout.addWidget(self.CustomSpeed, 1, 8, 1, 1)
 
 
         self.gridLayout_2.addLayout(self.playControlGridLayout, 2, 0, 1, 1)
@@ -231,7 +226,7 @@ class Ui_MainWindow(object):
 
         self.UseNet = QCheckBox(self.tab)
         self.UseNet.setObjectName(u"UseNet")
-        self.UseNet.setChecked(True)
+        self.UseNet.setChecked(False)
 
         self.gridLayout.addWidget(self.UseNet, 3, 1, 1, 1)
 
@@ -302,34 +297,9 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
 
         self.retranslateUi(MainWindow)
-        self.CustomSpeed.toggled.connect(self.SpeedSpinBox.setEnabled)
-        self.CustomSpeed.toggled.connect(self.SpeedSlider.setDisabled)
         self.ShutDown.clicked.connect(MainWindow.close)
 
         self.tabWidget.setCurrentIndex(0)
-
-        # Manual add event listener
-        # self.ChangeView.clicked.connect(MainWindow.ChangeView_on_clicked)
-        # self.epnp_begin.clicked.connect(MainWindow.epnp_calculate)
-        # self.epnp_back.clicked.connect(MainWindow.epnp_back_on_clicked)
-        # self.epnp_clear.clicked.connect(MainWindow.epnp_clear_on_clicked)
-        # self.epnp_next.clicked.connect(MainWindow.epnp_next_on_clicked)
-        # self.Record.clicked.connect(MainWindow.record_on_clicked)
-        # # TODO: 升级雷达显示
-        # # self.ShowLidar.clicked.connect(MainWindow.showpc_on_clicked)
-        # self.ShutDown.clicked.connect(MainWindow.CloseProgram_on_clicked)
-        # # TODO: 升级新的调速UI
-        # # self.SlowDown.clicked.connect(MainWindow.SlowDown_on_clicked)
-        # # self.SpeedUp.clicked.connect(MainWindow.SpeedUp_on_clicked)
-        # # self.Pause.clicked.connect(MainWindow.Pause_on_clicked)
-        # self.pnp_demo.mousePressEvent = MainWindow.epnp_mouseEvent
-        # self.main_demo.mouseMoveEvent = MainWindow.pc_mouseEvent
-        # self.far_demo.mousePressEvent = MainWindow.eco_mouseEvent
-        # self.far_demo.keyPressEvent = MainWindow.eco_key_on_clicked
-        # self.condition.keyPressEvent = MainWindow.condition_key_on_clicked
-        # self.condition.setFocusPolicy(Qt.ClickFocus)
-        # self.far_demo.setFocusPolicy(Qt.ClickFocus)
-        # self.tabWidget.currentChanged.connect(MainWindow.epnp_on_clicked)
 
 
         QMetaObject.connectSlotsByName(MainWindow)
@@ -343,12 +313,11 @@ class Ui_MainWindow(object):
         self.left_demo.setText(QCoreApplication.translate("MainWindow", u"left_demo", None))
         self.main_demo.setText(QCoreApplication.translate("MainWindow", u"main_demo", None))
         self.right_demo.setText(QCoreApplication.translate("MainWindow", u"right_demo", None))
-        self.ReversePlay.setText(QCoreApplication.translate("MainWindow", u"\u5012\u8f6c", None))
         self.TogglePlay.setText(QCoreApplication.translate("MainWindow", u"\u6682\u505c", None))
-        self.label_2.setText(QCoreApplication.translate("MainWindow", u"FPS\uff1a0", None))
+        self.speedLabel.setText(QCoreApplication.translate("MainWindow", u"\u901f\u5ea6\uff1ax", None))
+        self.FpsStatus.setText(QCoreApplication.translate("MainWindow", u"\u7f51\u7edcFPS\uff1a0 \u76f8\u673aFPS\uff1a0", None))
+        self.ResetSpeed.setText(QCoreApplication.translate("MainWindow", u"\u91cd\u7f6e1x", None))
         self.PlayStatus.setText(QCoreApplication.translate("MainWindow", u"00:00/00:00", None))
-        self.label.setText(QCoreApplication.translate("MainWindow", u"\u901f\u5ea6\uff1ax", None))
-        self.pushButton.setText(QCoreApplication.translate("MainWindow", u"\u91cd\u7f6e1x", None))
         self.CustomSpeed.setText(QCoreApplication.translate("MainWindow", u"\u81ea\u5b9a\u4e49\u901f\u5ea6", None))
         self.map.setText(QCoreApplication.translate("MainWindow", u"\u5c0f\u5730\u56fe", None))
         self.condition.setText(QCoreApplication.translate("MainWindow", u"\u96f7\u8fbe\u7ad9\u8fd0\u884c\u72b6\u6001", None))
@@ -356,7 +325,7 @@ class Ui_MainWindow(object):
         self.ChangeView.setText(QCoreApplication.translate("MainWindow", u"\u6539\u53d8\u89c6\u89d2", None))
         self.ShutDown.setText(QCoreApplication.translate("MainWindow", u"\u9000\u51fa", None))
         self.DisplayLidar.setText(QCoreApplication.translate("MainWindow", u"\u663e\u793a\u6fc0\u5149\u96f7\u8fbe", None))
-        self.UseNet.setText(QCoreApplication.translate("MainWindow", u"\u542f\u7528\u795e\u7ecf\u7f51\u7edc", None))
+        self.UseNet.setText(QCoreApplication.translate("MainWindow", u"\u4f7f\u7528\u5f55\u5236\u7f51\u7edc", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab), QCoreApplication.translate("MainWindow", u"\u4e3b\u9875\u9762", None))
         self.epnp_begin.setText(QCoreApplication.translate("MainWindow", u"\u5f00\u59cb", None))
         self.epnp_clear.setText(QCoreApplication.translate("MainWindow", u"\u6e05\u7a7a", None))

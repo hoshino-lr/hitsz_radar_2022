@@ -3,6 +3,7 @@
 在这里获取相机流并提供录制功能，可选视频替代
 created by 陈希峻 2022/12/22
 """
+import time
 from abc import abstractmethod, ABC
 from threading import Thread, Lock
 from record.replay_frame import RecordReadManager
@@ -24,12 +25,27 @@ class CameraThread(ABC):
         self._is_terminated = True
         self._lock = Lock()
         self._latest_frame = None
+        self._fps = 0
+        self._fps_time = 0
+        self._fps_count = 0
 
         self.start()
+
+    def _fps_update(self):
+        """
+        更新帧率
+        """
+        if self._fps_count >= 10:
+            self._fps = self._fps_count / (time.time() - self._fps_time)
+            self._fps_count = 0
+            self._fps_time = time.time()
+        else:
+            self._fps_count += 1
 
     @abstractmethod
     def start(self):
         self._is_terminated = False
+        self._fps_time = time.time()
         pass
 
     @abstractmethod
@@ -53,6 +69,11 @@ class CameraThread(ABC):
     @property
     def config(self):
         return self._config
+
+    @property
+    def real_fps(self):
+        return self._fps
+
 
 
 class CameraThread_Real(CameraThread):
@@ -82,6 +103,7 @@ class CameraThread_Real(CameraThread):
             result, frame = self._camera.get_img()
             with self._lock:
                 self._latest_frame = frame
+            self._fps_update()
 
     def _mark_error(self):
         """
@@ -96,6 +118,7 @@ class CameraThread_Real(CameraThread):
         """
         错误重启
         """
+        print(f"相机:{self._name} 错误重启")
         self.stop()
         self.start()
 
@@ -126,6 +149,7 @@ class CameraThread_Video(CameraThread):
                 break
             with self._lock:
                 self._latest_frame = frame
+            self._fps_update()
 
     def set_prop(self, key, value):
         """
