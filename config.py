@@ -20,6 +20,7 @@ DEBUG = False
 resource_prefix = os.path.dirname(os.path.abspath(__file__)) + "/resources/"
 cam_config = {
     "cam_left": {
+        "name": "cam_left",
         "enable": True,
         "id": "J87631625",
         "size": (3072, 2048),
@@ -45,6 +46,7 @@ cam_config = {
         ])},
 
     "cam_right": {
+        "name": "cam_right",
         "enable": False,
         "id": "J37877236",
         "size": (3072, 2048),

@@ -64,7 +64,4 @@ if __name__ == "__main__":
 
     # public.L_CAMERA_THREAD = CameraThread_Real("")
     # TODO: 改成响应式
-    timer_main = QTimer()  # 主循环使用的线程
-    timer_main.timeout.connect(MyShow.spin)
-    timer_main.start(0)
     sys.exit(app.exec_())

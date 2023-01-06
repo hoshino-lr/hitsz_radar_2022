@@ -16,13 +16,16 @@ class CameraThread(ABC):
     """
 
     @abstractmethod
-    def __init__(self, name):
-        self._name = name
+    def __init__(self, config):
+        self._config = config
+        self._name = config["name"]
         self._camera = None
         self._thread = None
         self._is_terminated = True
         self._lock = Lock()
         self._latest_frame = None
+
+        self.start()
 
     @abstractmethod
     def start(self):
@@ -47,15 +50,19 @@ class CameraThread(ABC):
         with self._lock:
             return self._latest_frame.copy()
 
+    @property
+    def config(self):
+        return self._config
+
 
 class CameraThread_Real(CameraThread):
     """
     真实相机
     """
 
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, config):
         self._err_cnt = 0
+        super().__init__(config)
 
     def start(self):
         from camera.cam_hk_v3 import Camera_HK
@@ -98,9 +105,9 @@ class CameraThread_Video(CameraThread):
     视频相机
     """
 
-    def __init__(self, name, record: RecordReadManager):
-        super().__init__(name)
+    def __init__(self, config, record: RecordReadManager):
         self._record = record
+        super().__init__(config)
 
     def start(self):
         super().start()

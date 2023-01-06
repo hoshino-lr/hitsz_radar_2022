@@ -7,20 +7,26 @@ created by 陈希峻 2022/12/22
 import time
 from threading import Event, Thread
 from queue import Queue
+
+import cv2
+
 from threads.camera_thread import CameraThread
 from net.network_pro import Predictor
 from record.record_frame import RecordWriteManager
 
 
 class ProcessThread():
-    def __init__(self, camera):
+    def __init__(self, camera: CameraThread):
         self._camera = camera
+        self._roi = camera.config['roi']
         self._name = camera.name
         self._predictor = None
         self._is_terminated = True
         self._event = Event()
         self._queue = Queue()
         self._thread = None
+
+        self.start()
 
     def start(self):
         if not isinstance(self._camera, CameraThread):
@@ -40,9 +46,17 @@ class ProcessThread():
         pass
 
     def sub(self):
-        self._event.wait()
-        self._event.clear()
-        return self._queue.get()
+        has_data = self._event.wait(timeout=0.1)
+        if has_data:
+            try:
+                data = self._queue.get_nowait()
+            except:
+                print("处理线程接受数据出错")
+                data = False, None
+            self._event.clear()
+            return data
+        else:
+            return False, None
 
     def check(self):
         # TODO: 检查相机是否正常
@@ -58,6 +72,13 @@ class ProcessThread():
         return self._is_terminated
 
     def _pub(self, data):
+        if self._event.is_set():
+            return
+        if self._queue.full():
+            try:
+                self._queue.get()
+            except:
+                pass
         self._queue.put(data)
         self._event.set()
 
@@ -65,6 +86,7 @@ class ProcessThread():
         # count = 0
         # count_error = 0
         # t1 = 0
+        print(f"子线程开始: {self._name}")
         while not self._is_terminated:
             # TODO: 录制功能升级
             # if event_list['record'].is_set():
@@ -77,22 +99,15 @@ class ProcessThread():
             #         is_record = False
             #     event_list['record'].clear()
 
-            result, frame = self._camera.get_img()
-            if result and frame is not None:
-                # t3 = time.time()
-                res, frame = self._predictor.detect_cars(frame)
-                # if is_record:
-                #     record.write(video_data=frame, net_data=res)
-                self._pub((res, frame))
+            frame = self._camera.latest_frame
+            if frame is not None:
+                img = cv2.copyMakeBorder(
+                    frame[self._roi[1]:self._roi[3] + self._roi[1], :, :], 0,
+                    self._roi[1],
+                    0, 0, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+                res = self._predictor.detect_cars(img)
+                self._pub((res, img))
                 # TODO: 让UI干计数功能
-                # time.sleep(0.04)
-                # t1 = t1 + time.time() - t3
-                # count += 1
-                # if count == 100:
-                #     fps = float(count) / t1
-                #     print(f'{self._name} count:{count} fps: {int(fps)} 传输等待队列: {self._queue.qsize()}')
-                #     count = 0
-                #     t1 = 0
             # TODO: 让相机自己监控自己
             # else:
             #     # 错误计数

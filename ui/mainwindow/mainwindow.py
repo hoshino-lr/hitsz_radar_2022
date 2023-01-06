@@ -20,7 +20,6 @@ from ui.mainwindow.generated_ui import Ui_MainWindow
 from radar_detect.Linar_rs import Radar
 from radar_detect.reproject import Reproject
 from radar_detect.location_alarm import Alarm
-from mul_manager.pro_manager import sub, process_detect
 from Serial.HP_show import HP_scene
 from Serial.port_operation import Port_operate
 from radar_detect.solve_pnp import SolvePnp
@@ -50,8 +49,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self.__pic_left = None
 
         self._use_lidar = not USEABLE["locate_state"][0]
-        self.__cam_left = 'came_left' in cameras
-        self.__cam_right = 'came_left' in cameras
+        self.__cam_left = 'cam_left' in cameras
+        self.__cam_right = 'cam_right' in cameras
         self.__serial = USEABLE['serial']
 
         if self.__serial:
@@ -451,9 +450,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
     def spin(self) -> None:
         # get images
         if self.__cam_left:
-            self.__pic_left = self._cameras['cam_left']['process'].sub()
+            self.__res_left, self.__pic_left = self._cameras['cam_left']['process'].sub()
         if self.__cam_right:
-            self.__pic_left = self._cameras['cam_left']['process'].sub()
+            self.__res_right, self.__pic_right = self._cameras['cam_left']['process'].sub()
 
         # if in epnp_mode , just show the images
         if not self.epnp_mode:

@@ -31,7 +31,7 @@ class RecordReadManager:
         self._last_time = time.time()
 
     def _get_spf(self):
-        if self._prop['is_speed'] > 0:
+        if self._prop['speed'] > 0:
             return self._ori_spf / self._prop['speed']
         else:
             raise ValueError('speed must be positive')
