@@ -145,8 +145,8 @@ class CameraThread_Video(CameraThread):
         while not self._is_terminated:
             result, frame = self._record.read_video()
             if not result:
-                self._is_terminated = True
-                break
+                self._record.reset()
+                continue
             with self._lock:
                 self._latest_frame = frame
             self._fps_update()

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'qt_genilrhFj.ui'
+## Form generated from reading UI file 'qt_genyWyFZN.ui'
 ##
 ## Created by: Qt User Interface Compiler version 5.15.7
 ##
@@ -113,6 +113,9 @@ class Ui_MainWindow(object):
         self.SpeedSpinBox = QDoubleSpinBox(self.tab)
         self.SpeedSpinBox.setObjectName(u"SpeedSpinBox")
         self.SpeedSpinBox.setEnabled(False)
+        self.SpeedSpinBox.setMinimum(0.010000000000000)
+        self.SpeedSpinBox.setMaximum(20.000000000000000)
+        self.SpeedSpinBox.setSingleStep(0.100000000000000)
         self.SpeedSpinBox.setValue(1.000000000000000)
 
         self.playControlGridLayout.addWidget(self.SpeedSpinBox, 1, 3, 1, 1)
@@ -129,6 +132,7 @@ class Ui_MainWindow(object):
 
         self.TimeSlider = QSlider(self.tab)
         self.TimeSlider.setObjectName(u"TimeSlider")
+        self.TimeSlider.setMaximum(999)
         self.TimeSlider.setOrientation(Qt.Horizontal)
 
         self.playControlGridLayout.addWidget(self.TimeSlider, 0, 1, 1, 10)

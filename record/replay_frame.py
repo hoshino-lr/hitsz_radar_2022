@@ -96,6 +96,9 @@ class RecordReadManager:
         elif hasattr(self, '_' + key):
             return getattr(self, '_' + key)
 
+    def reset(self):
+        self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
     def __del__(self):
         self._cap.release()
 

@@ -84,6 +84,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self.decision_tree = decision_tree(self.text_api)  # 决策树
         self.supply_detector = eco_forecast(self.text_api)  # 经济预测(判断敌方哪个加弹了)
 
+        self.is_paused = False
+        self.is_slider_held = False
+        self.ori_spf = self._cameras['cam_left']['camera'].get_prop('ori_spf') if self.__cam_left else 1.0
+        self.total_time = int(self._cameras['cam_left']['camera'].get_prop('total_frame') * self.ori_spf) \
+                              if self.__cam_left else 0
+
         try:
             self.sp.read(f'cam_left_{enemy2color[enemy_color]}')
             self.repo_left.push_T(self.sp.rvec, self.sp.tvec)
@@ -122,6 +128,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self._Eco_cut = [700, 1300, 400, 600]
         self._num_kk = 0
         self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1}框框")
+        self.PlayStatus.setText("0:00/%d:%02d" % (self.total_time // 60, self.total_time % 60))
 
     # 事件绑定
     def __event_connect(self) -> None:
@@ -148,9 +155,40 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self.tabWidget.currentChanged.connect(self.epnp_on_clicked)
         self.DisplayLidar.toggled.connect(self.showpc_on_clicked)
         self.ResetSpeed.clicked.connect(self.reset_speed_on_clicked)
-        self.SpeedSlider.valueChanged.connect(self.speed_slider_on_changed)
+        self.SpeedSlider.valueChanged.connect(lambda value: self.SpeedSpinBox.setValue(config.speed_map[value]))
         self.CustomSpeed.toggled.connect(self.custom_speed_on_clicked)
         self.SpeedSpinBox.valueChanged.connect(self.speed_spinbox_on_changed)
+        self.TogglePlay.clicked.connect(self.toggle_play_on_clicked)
+        self.TimeSlider.sliderPressed.connect(self.time_slider_pressed)
+        self.TimeSlider.sliderReleased.connect(self.time_slider_released)
+        self.TimeSlider.valueChanged.connect(self.time_slider_on_changed)
+
+    def time_slider_pressed(self):
+        self.is_slider_held = True
+
+    def time_slider_released(self):
+        self.is_slider_held = False
+        for cam in self._cameras.values():
+            cam['camera'].set_prop('frame', self.TimeSlider.value() *
+                         self._cameras['cam_left']['camera'].get_prop('total_frame') // self.TimeSlider.maximum())
+
+    def time_slider_on_changed(self, value):
+        if self.is_slider_held:
+            now_time = value * self.total_time // self.TimeSlider.maximum()
+            self.PlayStatus.setText("%d:%02d/%d:%02d" %
+                                    (now_time // 60, now_time % 60, self.total_time // 60, self.total_time % 60))
+
+    def toggle_play_on_clicked(self) -> None:
+        if self.is_paused:
+            self.is_paused = False
+            self.TogglePlay.setText("暂停")
+            for cam in self._cameras.values():
+                cam['camera'].set_prop('is_paused', False)
+        else:
+            self.is_paused = True
+            self.TogglePlay.setText("继续")
+            for cam in self._cameras.values():
+                cam['camera'].set_prop('is_paused', True)
 
     def reset_speed_on_clicked(self):
         self.SpeedSpinBox.setValue(1.0)
@@ -174,7 +212,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
             self.SpeedSlider.setValue(bisect.bisect_left(config.speed_map, value))
             self.SpeedSlider.setEnabled(True)
             self.SpeedSpinBox.setEnabled(False)
-
 
     def condition_key_on_clicked(self, event) -> None:
         if event.key() == Qt.Key_Q:
@@ -271,7 +308,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
     def pc_mouseEvent(self, event) -> None:
         if self.show_pc_state:
             x = int(event.x() / self.main_demo.width() * cam_config['cam_left']['size'][0])
-            y = int(event.y() / self.main_demo.height() * cam_config['cam_left']['size'][1]) + cam_config['cam_left']['roi'][1]
+            y = int(event.y() / self.main_demo.height() * cam_config['cam_left']['size'][1]) + \
+                cam_config['cam_left']['roi'][1]
             w = 10
             h = 5
             # 格式定义： [N, [bbox(xyxy), conf, cls, bbox(xyxy), conf, cls, col, N]
@@ -505,6 +543,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         # 更新FPS
         self.FpsStatus.setText("网络FPS：%.2f 相机FPS：%.2f" %
                                (self._cameras['cam_left']['process'].fps, self._cameras['cam_left']['camera'].real_fps))
+        # 更新进度条
+        if not self.is_slider_held:
+            now_time = int(self._cameras['cam_left']['camera'].get_prop('frame') * self.ori_spf) \
+                if self.__cam_left else 0
+            self.PlayStatus.setText("%d:%02d/%d:%02d" %
+                                    (now_time // 60, now_time % 60, self.total_time // 60, self.total_time % 60))
+            self.TimeSlider.setValue(int(now_time / self.total_time * self.TimeSlider.maximum()))
 
 
     # 主函数循环
