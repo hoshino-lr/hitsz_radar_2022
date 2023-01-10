@@ -42,13 +42,13 @@ class Reproject(object):
         self.fly = False
         self.hero_r3 = False
         self._text_api = text_api  # 发送text的api
-        self.rp_alarming = {}
+        self.rp_alarming = {}   # 存储反投影预警信息，键为区域对应的字符串，值为该区域装甲板类型数组
         self._filter_alarming = {}
         self.fly_result = np.array([])
         self._region_count = {}  # 检测区域计数
         self._time = {}  # 时间间隔
-        self._start = {}  # 开始时间
-        self._end = {}  # 结束时间
+        self._start = {}  # 一秒三帧检测开始时间
+        self._end = {}  # 一秒三帧检测结束时间
         self._plot_region()  # 预警区域坐标初始化
 
     def _plot_region(self) -> None:
@@ -110,21 +110,22 @@ class Reproject(object):
     def check(self, net_input) -> None:
         """
         预警预测
-        Args:
-            net_input:输入
+        :param net_input: 网络的输出
         """
         armors = None  # armors:N,cls+对应的车辆预测框序号+装甲板bbox
         cars = None  # cars:N,cls+车辆bbox
-        self.fly = False
-        self.hero_r3 = False
+        self.fly = False    # 有飞坡
+        self.hero_r3 = False    # 英雄在敌方3号高地
         self.rp_alarming = {}
         if isinstance(net_input, np.ndarray):  # 解析网络输入
             if len(net_input):
+                # 只截取关键的信息
                 armors = net_input[:, [11, 13, 6, 7, 8, 9]]
                 cars = net_input[:, [11, 0, 1, 2, 3]]
 
         # color_bbox = []
         if isinstance(armors, np.ndarray) and isinstance(cars, np.ndarray):
+            # (N,1) ndarray
             cls = armors[:, 0].reshape(-1, 1)
             # 默认使用bounding box为points四点
             x1 = armors[:, 2].reshape(-1, 1)
@@ -154,6 +155,7 @@ class Reproject(object):
             #     points = np.concatenate([points, color_fp], axis=0)
             #     cls = np.concatenate([cls, color_cls], axis=0)
             points = points.reshape((-1, 4, 2))
+            # 判断每个检测框是否有一点在指定区域内
             home = np.array(
                 [[is_inside_polygon(np.array([[0, 1365], [3072, 1365], [0, 2048], [3072, 2048]]), p) for p in cor] for
                  cor in points])
@@ -163,10 +165,12 @@ class Reproject(object):
             #     self.rp_alarming['a_xxx_tou_a'] = alarm_home.reshape(-1, 1)
             for r in self._scene_region.keys():
                 # 判断对于各个预测框，是否有点在该区域内
+                # (N,1)
                 mask = np.array([[is_inside_polygon(self._scene_region[r][:, :2], p) for p in cor] for cor in points])
                 mask = np.sum(mask, axis=1) > 0  # True or False,只要有一个点在区域内，则为True
                 alarm_target = cls[mask]  # 需要预警的装甲板种类
                 if len(alarm_target):
+                    # 装甲板数组
                     self.rp_alarming[r] = alarm_target.reshape(-1, 1)
 
     def push_text(self) -> None:
@@ -181,25 +185,31 @@ class Reproject(object):
                 if location == "tou":
                     continue
                 if location == "敌方3号高地":
+                    # 敌方3号高地检测到英雄
                     result = self.rp_alarming[r] == 1
                     if result.any():
                         self.hero_r3 = True
                         print(f"[ERROR] 反投影{location}", f"在{location}处有英雄！！！")
                 if location == "飞坡":
                     self.fly = True
+                    # 飞坡预警只选取该区域的一个检测结果
                     self.fly_result = int(self.rp_alarming[r][0][0])
                     continue
                 if self._time[f'{location}'] == 0:
+                    # 短时间内第一次在该区域检测到敌方
                     self._start[f'{location}'] = time.time()
                     self._region_count[f'{location}'] += 1
                     self._end[f'{location}'] = time.time()
                     self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
                 else:
+                    # 重复检测到，判断是否在一秒内检测到3帧
                     self._end[f'{location}'] = time.time()
                     self._time[f'{location}'] = self._end[f'{location}'] - self._start[f'{location}']
                     if self._time[f'{location}'] <= 1:
                         self._region_count[f'{location}'] += 1
+                    
                     if self._time[f'{location}'] >= self._clock:
+                        # 检测到三帧，认为有敌人
                         if self._region_count[f'{location}'] >= self._frame:
                             self._filter_alarming[r] = self.rp_alarming[r].copy()
                             print(f"[ERROR] 反投影{location}", f"在{location}处有敌人！！！")
@@ -207,7 +217,14 @@ class Reproject(object):
                         self._time[f'{location}'] = 0
 
     def get_rp_alarming(self):
+        """
+        获取已经过一秒三帧筛选的反投影预警信息
+        :return: 字典，键为区域字符串，值为区域内的敌人装甲板编号
+        """
         return self._filter_alarming
 
     def get_scene_region(self):
+        """
+        获取反投影位置图形
+        """
         return self._scene_region

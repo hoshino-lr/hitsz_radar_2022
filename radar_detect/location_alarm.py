@@ -27,7 +27,7 @@ class Alarm(draw_map.CompeteMap):
 
     con_thre = 0.5  # 置信度阈值
     con_decre1 = 0.075  # 置信度没超过阈值时的衰减速度
-    con_incre = 0.10  # 置信度增加速度
+    con_incre = 0.10  # 检测到装甲板时，置信度增加速度
     con_decre2 = 0.025  # 置信度超过阈值时的衰减速度
 
     _lp = True  # 是否位置预测
@@ -65,9 +65,10 @@ class Alarm(draw_map.CompeteMap):
         # current_time 车辆出现时间字典，键为字符'1'-'5'，值为车辆出现的时间点
         self._current_time = {}
 
-        # location 车辆位置字典，键为字符'1'-'5'，值为车辆的位置数组，包含车辆坐标及出现时间间隔:[x, y, time]
+        # 下面两个字典的value应该是数组[x, y, z, time]
+        # location 车辆位置字典，键为字符'1'-'5'，值为车辆的位置数组，包含车辆坐标及出现时间间隔:[x, y, z, time]
         self._location = {}
-        # location 车辆最后一次位置字典，键为字符'1'-'5'，值为车辆的位置数组，包含车辆坐标及出现时间间隔:[x, y, time]
+        # location 车辆最后一次位置字典，键为字符'1'-'5'，值为车辆的位置数组，包含车辆坐标及出现时间间隔:[x, y, z, time]
         self._last_location = {}
         # confidence 车辆置信度字典，键为字符'1'-'5'，值为车辆的置信度
         self._confidence = {}
@@ -80,6 +81,7 @@ class Alarm(draw_map.CompeteMap):
         # self._z_cache = [None, None]
         self._camera_position = [None, None]
         self._T = [None, None]
+        # 根据敌方颜色确定识别颜色
         if int(enemy_color) == 0:
             choose_left = "cam_left_red"
             choose_right = "cam_right_red"
@@ -87,6 +89,7 @@ class Alarm(draw_map.CompeteMap):
             choose_left = "cam_left_blue"
             choose_right = "cam_right_blue"
 
+        # 左右相机的德劳内三角定位
         self._loc_D = [location_Delaunay(
             "cam_left", debug, choose[choose_left]), location_Delaunay("cam_right", debug, choose[choose_right])]
 
@@ -107,8 +110,9 @@ class Alarm(draw_map.CompeteMap):
             self._current_time[str(i)] = start_time
             self._confidence[i] = 0
 
-        # 前一帧位置为全零
+        # 初始化定位信息
         self._locations = [np.zeros((5, 3)), np.zeros((5, 3))]
+        # 初始化最后一次位置
         self._location_cache = self._location.copy()
         self._last_location = self._location.copy()
 
@@ -121,7 +125,7 @@ class Alarm(draw_map.CompeteMap):
 
     def push_T(self, rvec, tvec, camera_type):
         """
-        位姿信息
+        位姿信息，求算从图像坐标转为世界坐标的矩阵
         :param rvec:旋转矩阵
         :param tvec:平移矩阵
         :param camera_type:相机编号，若为单相机填0
@@ -131,11 +135,13 @@ class Alarm(draw_map.CompeteMap):
         T[:3, :3] = cv.Rodrigues(rvec)[0]  # 旋转向量转化为旋转矩阵
         T[:3, 3] = tvec.reshape(-1)  # 加上平移向量
         T = np.linalg.inv(T)  # 矩阵求逆
+        # 相机的世界坐标
         camera_position = (T @ (np.array([0, 0, 0, 1])))[:3]
         self._camera_position[camera_type] = camera_position.copy()
         self._T[camera_type] = T.copy()
 
     def change_mode(self, camera_type):
+        # 循环切换到下一个定位模式
         self.state[camera_type] = (self.state[camera_type] + 1) % 4
 
     def _check_alarm(self):
@@ -148,9 +154,10 @@ class Alarm(draw_map.CompeteMap):
             alarm_type, team, target, l_type = loc.split('_')
             if color2enemy[team] == self._enemy:
                 targets = []
-                # 检测敌方
+                # 对所有装甲板和所有区域，检测装甲板是否在区域内
                 for armor in list(self._location.keys())[0:5]:
                     l_ = np.float32(self._location[armor])
+                    # 在区域内
                     if is_inside_polygon(np.array(self._region[loc])[:, :2], l_[0:2]):
                         targets.append(armor)
                     # if alarm_type == 'm' or alarm_type == 'a':  # 若为位置预警
@@ -202,13 +209,14 @@ class Alarm(draw_map.CompeteMap):
     def _adjust_z(self, camera_type):
         """
         z轴突变调整，仅针对一个装甲板
-        :param l_:(cls+x+y+z) 一个id的位置
         :param camera_type:相机编号
         """
         position = self._T[camera_type][:, 3].copy().reshape(-1)
         t = time.time()
         for i in range(1, 6):
+            # z坐标大，则需警惕误识别
             if self._location[str(i)][2] >= 1.2 and (t - self._last_location[str(i)][3]) < 1:
+                # 相似三角形 投影到原z坐标对应平面
                 z_ratio = (self._location[str(i)][2] - self._last_location[str(i)][2]) / (position[2] - self._location[str(i)][2])
                 self._location[str(i)][2] = self._last_location[str(i)][2]
                 self._location[str(i)][0] = self._location[str(i)][0] - z_ratio * (
@@ -218,7 +226,7 @@ class Alarm(draw_map.CompeteMap):
 
     def _location_prediction(self):
         """
-        位置预测
+        位置预测，更新_last_location
         """
         # 上两帧位置 (2,N)
         # pre = np.float32(list(i[0:3] for i in list(self._location_cache.values())))
@@ -233,17 +241,20 @@ class Alarm(draw_map.CompeteMap):
 
         # now[do_prediction] = pre[do_prediction]
 
-        # 预测填入
+        # z轴突变调整
         if self._z_a:
             self._adjust_z(0)
         for i in range(1, 6):
+            # 置信度达到阈值
             if self._confidence[i] >= self.con_thre and self._location[str(i)][0] > 0:
                 if self._last_location[str(i)][0] > 0:
                     if self._current_time[str(i)] - self._last_location[str(i)][3] < 1:
+                        # 位置变化大，取之前位置
                         if abs(self._last_location[str(i)][0] - self._location[str(i)][0]) + \
                                 abs(self._last_location[str(i)][1] - self._location[str(i)][1]) > 3:
                             temp = self._location[str(i)][0:3]
                         else:
+                            # 滤波，防止位置抖动
                             temp = (np.array(self._location[str(i)][0:3]) * self.filter + np.array(
                                 self._last_location[str(i)][0:3]) * (1 - self.filter)).tolist()
                     else:
@@ -251,9 +262,10 @@ class Alarm(draw_map.CompeteMap):
                 else:
                     temp = self._location[str(i)][0:3]
                 temp.append(self._current_time[str(i)])
+                # 更新最新一次的位置信息
                 self._last_location[str(i)] = temp
             else:
-                self._location[str(i)] = [0, 0, 0, 0]
+                self._location[str(i)] = [0, 0, 0, 0]   # 置信度不满足要求，重置位置信息，不再参与预测
             # push new data
             self._location_cache = self._location.copy()
 
@@ -265,18 +277,17 @@ class Alarm(draw_map.CompeteMap):
 
     def two_camera_merge_update(self, t_locations_left, t_locations_right, rp_alarming: dict):
         """
-        :param t_locations_left: the list of the predicted locations [N,cls+x+y+z] of the both two cameras
-        :param t_locations_right: the list of the predicted locations [N,cls+x+y+z] of the both two cameras
-
-        Args:
-            rp_alarming:
+        对两个相机的检测结果的合并处理
+        :param t_locations_left: 左相机检测到的装甲板位置信息 [N, cls+x+y+z]
+        :param t_locations_right: 右相机检测到的装甲板位置信息（没有使用）
+        :param rp_alarming: 反投影
         """
         if self._save_data:
             pickle.dump([t_locations_left, t_locations_right, rp_alarming], self._f)
         # init location
         for i in range(1, 6):
             self._location[str(i)][0:2] = [0, 0]
-
+        # 更新左右相机检测的定位信息
         self._update_position(t_locations_left, 0, self.state[0], rp_alarming)
         self._update_position(t_locations_right, 1, self.state[1], rp_alarming)
 
@@ -294,7 +305,6 @@ class Alarm(draw_map.CompeteMap):
             left_location[choose] = right_location[choose]
         except Exception as e:
             print(choose)
-        # 预测填入
         T = time.time()
         for i in range(1, 6):
             self._location[str(i)][0:3] = left_location[i - 1].tolist()
@@ -316,8 +326,8 @@ class Alarm(draw_map.CompeteMap):
 
     def _update_position(self, t_location, camera_type, detection_type, rp_alarming: dict):
         """
-        #单相机使用
-        :param t_location: the predicted locations [N,cls+x+y+z]
+        根据一个相机的检测结果，在世界坐标系下更新装甲板位置
+        :param t_location: the predicted locations [N,cls+x+y+depth]
         :param camera_type: 0: left 1: right
         :param detection_type: 0: radar 1: Delaunary 2: kd_tree
         """
@@ -335,13 +345,17 @@ class Alarm(draw_map.CompeteMap):
             pred_loc = []
             locations[1:3] = np.around(locations[1:3])
             for armor in range(1, 6):
+                # 检测到装甲板
                 if (locations[:, 0] == armor).any():
+                    # 使用雷达点云定位
                     if not detection_type and not camera_type:
+                        # 一次只找一个装甲板 拉成4维向量
                         l1 = locations[locations[:, 0]
                                        == armor].reshape(-1)
+                        # 以下是对世界坐标的计算
                         K_C = np.linalg.inv(self._K_O)
                         C = (K_C @ np.concatenate([l1[1:3], np.ones(1)], axis=0).reshape(3, 1)) * l1[
-                            3] * 1000
+                            3] * 1000   # 做了单位换算
                         B = np.concatenate(
                             [np.array(C).flatten(), np.ones(1)], axis=0)
                         l1[1:] = (self._T[0] @ B)[:3] / 1000
@@ -351,6 +365,7 @@ class Alarm(draw_map.CompeteMap):
                                 continue
                             # 反投影模块信息表明当前区域有对应编号车辆
                             if (rp_alarming[i] == armor).any():
+                                # 与3维区域比较 结果相同则不使用德劳内
                                 if is_inside_polygon(np.array(self._region[i])[:, :2], l1[1:3]):
                                     break
                                 else:
@@ -372,6 +387,7 @@ class Alarm(draw_map.CompeteMap):
                     if l1[1] > self.thre_predict[1] or l1[1] < self.thre_predict[0]:
                         continue
                     # 装甲板置信度处理
+                    # 检测到，涨置信度
                     self._confidence[armor] = min(1.1, self._confidence[armor] + self.con_incre)
                     if self._confidence[armor] < self.con_thre:
                         continue
@@ -383,7 +399,7 @@ class Alarm(draw_map.CompeteMap):
                     else:
                         self._confidence[armor] -= self.con_decre1
                         self._confidence[armor] = max(0., self._confidence[armor])
-
+            # 更新定位信息
             if len(pred_loc):
                 l_ = np.stack(pred_loc, axis=0)
                 choose = l_[:, 0].reshape(-1).astype(np.int32)
@@ -402,6 +418,7 @@ class Alarm(draw_map.CompeteMap):
         显示点云定位
         """
         self._refresh()
+        # 左相机，使用点云定位
         if not camera_type and not self.state[camera_type]:
             l1 = armor.reshape(-1)
             K_C = np.linalg.inv(self._K_O)
@@ -411,6 +428,7 @@ class Alarm(draw_map.CompeteMap):
             l1[1:] = (self._T[0] @ B)[:3] / 1000
             print(l1)
         else:
+            # 德劳内（后两种定位均在其中）
             l1 = armor.reshape(-1)
             l1[1:] = self._loc_D[camera_type].get_point_pos(l1, self.state[camera_type]).reshape(-1)
         try:
@@ -421,9 +439,16 @@ class Alarm(draw_map.CompeteMap):
             print(e)
 
     def get_draw(self, camera_type):
+        """
+        获取德劳内标点
+        """
         return self._loc_D[camera_type].get_points()
 
     def get_last_loc(self) -> np.ndarray:
+        """
+        获取最新一次的位置信息
+        :return: (5,4) ndarray
+        """
         return np.array(list(self._last_location.values()))
 
     def show(self):

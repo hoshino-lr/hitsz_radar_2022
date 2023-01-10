@@ -10,6 +10,7 @@ from config import objPoints, objNames, DEBUG, cam_config, enemy2color, enemy_co
 
 
 class SolvePnp(CameraLocation):
+    """PNP解算"""
     imgPoints = np.zeros((6, 2), dtype=np.float32)
     rvec = np.zeros((3, 1), dtype=np.float64)
     tvec = np.zeros((3, 1), dtype=np.float64)
@@ -24,6 +25,11 @@ class SolvePnp(CameraLocation):
         self.side_text = ""
 
     def add_point(self, x: int, y: int) -> None:
+        """
+        添加选取点
+        :param x: int类型，点坐标
+        :param y: int类型，点坐标
+        """
         if self.count < self.count_max - 1:
             self.imgPoints[self.count, :] = np.array([float(x), float(y) + self.offset_y])
             self.count += 1
@@ -32,11 +38,18 @@ class SolvePnp(CameraLocation):
         self._update_info()
 
     def del_point(self) -> None:
+        """
+        删除最后一个加入的点
+        """
         if self.count < self.count_max and self.count > 0:
             self.imgPoints[self.count] = np.array([0, 0])
         self._update_info()
 
     def sel_cam(self, side) -> None:
+        """
+        根据相机类型（左/右）初始化类成员
+        :param side: 0:left 1:right
+        """
         if side == 0:
             side_text = f'cam_left_{enemy2color[enemy_color]}'
         else:
@@ -44,7 +57,9 @@ class SolvePnp(CameraLocation):
         self.side_text = side_text
         self.count_max = len(objNames[int(self.debug)][side_text])
         self.names = objNames[int(self.debug)][side_text]
+        # 初始化imgPoints
         self.imgPoints = np.zeros((self.count_max, 2), dtype=np.float32)
+        # 使用config中存储的objPoints
         self.objPoints = objPoints[int(self.debug)][side_text] * 1000  # 米转换成毫米
 
         if side == 0:
@@ -52,8 +67,8 @@ class SolvePnp(CameraLocation):
         else:
             side_text = f'cam_right'
         self.size = cam_config[side_text]['size']
-        self.distCoeffs = cam_config[side_text]['C_0']
-        self.cameraMatrix = cam_config[side_text]['K_0']
+        self.distCoeffs = cam_config[side_text]['C_0']  # 相机畸变系数
+        self.cameraMatrix = cam_config[side_text]['K_0']    # 相机内参矩阵
         self.offset_y = cam_config[side_text]['roi'][1]
         self.count = 0
         self._update_info()
@@ -76,11 +91,17 @@ class SolvePnp(CameraLocation):
         self.rvec = ca.rotation
 
     def clc(self) -> None:
+        """
+        清除所有选取点
+        """
         self.imgPoints = np.zeros((self.count_max, 2), dtype=np.float32)
         self.count = 0
         self._update_info()
 
     def step(self, num) -> None:
+        """
+        改变self.count，增量为num
+        """
         if self.count + num >= self.count_max or self.count + num < 0:
             pass
         else:
@@ -88,6 +109,9 @@ class SolvePnp(CameraLocation):
         self._update_info()
 
     def _update_info(self):
+        """
+        更新UI文本
+        """
         self._api("INFO", "side", f"当前相机位置：{self.side_text}")
         self._api("INFO", "sp+state", f"当前标注状态：{self.sp_state}")
         self._api("INFO", "count", f"当前点：{self.count + 1}")
@@ -103,6 +127,7 @@ class SolvePnp(CameraLocation):
     def locate_pick(self) -> bool:
         if self.imgPoints.all():  # 粗暴的判断
             try:
+                # 调用opencv库的PnP解算函数，解算相机位姿向量
                 _, rvec, tvec, _ = cv2.solvePnPRansac(objectPoints=self.objPoints,
                                                       distCoeffs=self.distCoeffs,
                                                       cameraMatrix=self.cameraMatrix,

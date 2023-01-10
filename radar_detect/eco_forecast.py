@@ -89,11 +89,17 @@ class eco_forecast(object):
             t_score = 2.5
         else:
             t_score = 0
+        # 距离分与时间分加权计算
         score = t_score * self._time_weight + d_score * self._dis_weight
         return score
 
     def eco_detect(self, pic, detect_message: np.ndarray, hero_api) -> None:
-        # 用帧差法
+        """
+        检查是否有小车补弹
+        :param pic: 检测时相机捕捉到的画面
+        :param detect_message: 敌方最近一次被检测到的位置
+        :param hero_api:
+        """
         detect_flag = False
         kernel = cv.getStructuringElement(cv.MORPH_RECT, (5, 5))
         if self.cut1 is not None and isinstance(pic, np.ndarray):
