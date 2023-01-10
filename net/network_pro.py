@@ -52,19 +52,15 @@ class Predictor(object):
     net2_anchors = [[4, 5], [8, 10], [13, 16], [23, 29], [43, 55], [73, 105], [146, 217], [231, 300], [335, 433]]
     net2_strides = [8, 16, 32]
 
-    def __init__(self, _name):
+    def __init__(self, name: str):
         """
         初始化函数
         :param _name 
         """
-        self.using_net = cam_config[_name]["using_net"] # R:False L:True
-        if self.using_net:
-            # net1初始化
-            self._net1 = YoLov5TRT(self.net1_trt_file)
-            # net2初始化
-            self._net2 = YoLov5TRT(self.net2_trt_file)
-        self.img_src = np.zeros(cam_config[_name]["size"])  # 生成3072x2048的零矩阵（图片大小）
-        self.name = _name  # 选择的相机是左还是右
+        self._net1 = YoLov5TRT(self.net1_trt_file)  # net1初始化
+        self._net2 = YoLov5TRT(self.net2_trt_file)  # net2初始化
+        self.img_src = np.zeros(cam_config[name]["size"])  # 生成图片大小的零矩阵
+        self.name = name  # 选择的相机是左还是右
         self.choose_type = 0  # 只选择检测cars类，不检测哨兵和基地
         self.enemy_color = not enemy_color
         self.lock = threading.Condition()   # 多线程操作
@@ -90,43 +86,40 @@ class Predictor(object):
         检测函数
         :param src 3072x2048
         """
-        if not self.using_net:
-            return np.array([]), src
-        else:
-            self.lock.acquire()
-            self.img_src = src.copy()
-            self.lock.notify()
-            self.lock.release()
-            # 图像预处理
-            img = cv.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv.INTER_LINEAR)
-            # 将图片通道顺序从BGR转到RGB
-            img = img[:, :, ::-1].transpose(2, 0, 1)    # ::-1相当于于反转
-            # 在内存中连续存储，提高访问速度
-            img = np.ascontiguousarray(img) 
-            img = img.astype(np.float32)    # 转换数值类型为float32
-            img /= 255.0    
+        self.lock.acquire()
+        self.img_src = src.copy()
+        self.lock.notify()
+        self.lock.release()
+        # 图像预处理
+        img = cv.resize(self.img_src, (self.net1_inpHeight, self.net1_inpWidth), interpolation=cv.INTER_LINEAR)
+        # 将图片通道顺序从BGR转到RGB
+        img = img[:, :, ::-1].transpose(2, 0, 1)  # ::-1相当于于反转
+        # 在内存中连续存储，提高访问速度
+        img = np.ascontiguousarray(img)
+        img = img.astype(np.float32)  # 转换数值类型为float32
+        img /= 255.0
 
-            # 把图片输入网络进行推理
-            net1_output = self._net1.infer(img, 1)[0]
-            res = self.net1_process_sjtu(net1_output)
+        # 把图片输入网络进行推理
+        net1_output = self._net1.infer(img, 1)[0]
+        res = self.net1_process_sjtu(net1_output)
 
-            if res.shape[0] != 0:
-                # 将第一层网络得到的640x640图片尺寸下的一组识别框的坐标转化为原图中的
-                res[:, :4] = self.scale_coords((640, 640), res[:, :4], self.img_src.shape).round()
-                # 拼图
-                net2_img = self.jigsaw(res[:, :4], self.img_src)
-                # 输入第二层网络进行推理和NMS筛选
-                net2_output = self.detect_armor(net2_img)
-                # 对网络输出结果进行处理
-                net2_output = self.net2_output_process(net2_output, det_points=res[:, :4], shape=self.img_src.shape)
-                # 横向拼接res和net2_output
-                res = np.concatenate([res, net2_output], axis=1)
+        if res.shape[0] != 0:
+            # 将第一层网络得到的640x640图片尺寸下的一组识别框的坐标转化为原图中的
+            res[:, :4] = self.scale_coords((640, 640), res[:, :4], self.img_src.shape).round()
+            # 拼图
+            net2_img = self.jigsaw(res[:, :4], self.img_src)
+            # 输入第二层网络进行推理和NMS筛选
+            net2_output = self.detect_armor(net2_img)
+            # 对网络输出结果进行处理
+            net2_output = self.net2_output_process(net2_output, det_points=res[:, :4], shape=self.img_src.shape)
+            # 横向拼接res和net2_output
+            res = np.concatenate([res, net2_output], axis=1)
 
-            # 画图
-            if self.img_show and res.shape != 0:  
-                self.net_show(res)
-            res = armor_filter(res)
-            return res, self.img_src
+        # 画图
+        if self.img_show and res.shape != 0:
+            self.net_show(res)
+        res = armor_filter(res)
+        return res, self.img_src
 
     # 第二层网络的推理
     def detect_armor(self, src):
@@ -496,9 +489,8 @@ class Predictor(object):
         """
         停止tensorrt线程，在关闭之前必须做这个操作，不然tensorrt的streamer可能无法释放
         """
-        if self.using_net:
-            del self._net1
-            del self._net2
+        del self._net1
+        del self._net2
 
     def net_show(self, res):
         """绘制函数"""
