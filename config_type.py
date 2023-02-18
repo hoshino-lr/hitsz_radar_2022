@@ -29,7 +29,7 @@ class CameraConfig:
 class HikCameraDriverConfigExt:
     """海康相机驱动的设置，用作 :py:class:`CameraConfig` 的扩展"""
     roi: tuple[int, int, int, int]
-    """ROI 设置 (x, y, w, h)"""
+    """ROI 设置 (x, y, w, h)，注意偏移需要是 8 的整倍数而长宽需要是 16 的整倍数，建议在 MVS 中测试可用后再填入"""
     camera_id: str
     """序列号"""
     exposure: int
