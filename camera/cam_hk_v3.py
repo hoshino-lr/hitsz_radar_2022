@@ -226,6 +226,13 @@ class Camera_HK(Camera):
             print(e)
         self.init_ok = False
 
+    def __del__(self):
+        """
+        保底销毁，防止程序意外退出时未释放相机资源
+        """
+        if self.init_ok:
+            self.destroy()
+
 
 if __name__ == "__main__":
     import time
