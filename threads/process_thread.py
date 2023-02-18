@@ -106,10 +106,6 @@ class ProcessThread():
             # TODO: 录制功能升级
             frame = self._camera.latest_frame
             if frame is not None:
-                img = cv2.copyMakeBorder(
-                    frame[self._roi[1]:self._roi[3] + self._roi[1], :, :], 0,
-                    self._roi[1],
-                    0, 0, cv2.BORDER_CONSTANT, value=(0, 0, 0))
-                res = self._predictor.detect_cars(img)
-                self._pub((res, img))
+                res = self._predictor.detect_cars(frame)
+                self._pub((res, frame))
                 self._fps_update()

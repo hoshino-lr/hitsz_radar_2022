@@ -30,7 +30,7 @@ class Camera_Video(Camera):
         self.__size = self.__camera_config['size']
         self.__roi = self.__camera_config['roi']
         self.__img = np.ndarray((self.__size[1], self.__size[0], 3), dtype="uint8")
-        self.cap = VideoCap(self.__camera_config["video_path"], self.__size, self.__roi, event_list)
+        self.cap = VideoCap(self.__camera_config["video_path"], self.__size, event_list)
         self.init_ok = True
 
     def get_img(self) -> (bool, np.ndarray):
@@ -53,9 +53,8 @@ class VideoCap:
 
     实现了固定帧率的视频读取
     """
-    def __init__(self, video_path, size, roi, event_list):
+    def __init__(self, video_path, size, event_list):
         self.__size = size
-        self.__roi = roi
         self.__img = np.ndarray((self.__size[1], self.__size[0], 3), dtype="uint8")
         print(f"打开视频: {video_path}")
         self.__cap = cv2.VideoCapture(video_path)
@@ -76,10 +75,7 @@ class VideoCap:
             time.sleep(0.1)
         result, frame = self.__cap.read()
         if result:
-            self.__img = cv2.copyMakeBorder(
-                frame[self.__roi[1]:self.__roi[3] + self.__roi[1], :, :], 0,
-                self.__roi[1],
-                0, 0, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+            self.__img = frame
         if self.__last_time + self.__spf > time.time():
             time.sleep(self.__last_time + self.__spf - time.time())
         self.__last_time = time.time()
