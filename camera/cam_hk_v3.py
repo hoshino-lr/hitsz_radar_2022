@@ -4,36 +4,32 @@
 created by 李龙 2021/11
 最终修改 by 陈希峻 2022/11
 """
-import re
-import time
-import sys
-import threading
-import termios
-from ctypes import *
 import cv2 as cv
 import numpy as np
 from camera.MvImport.MvCameraControl_class import *
-from config import cam_config
 from camera.cam import Camera
+from config_type import HikCameraDriverConfigExt
 
 
 class Camera_HK(Camera):
     """
-    相机类
+    海康机器人相机类。
+    通过加载 Hikrobot MVS 提供的动态库来实现，
+    需要设置 `MVCAM_COMMON_RUNENV`
+    和 `LD_LIBRARY_PATH` 环境变量。
     """
 
-    def __init__(self, type_):
+    def __init__(self, config: HikCameraDriverConfigExt):
         """
-        @param type_: 相机左右类型
+        @param config: 相机配置
         """
-        self.__type = type_
-        self.__camera_config = cam_config[self.__type]
-        self.__id = self.__camera_config['id']
-        self.__size = self.__camera_config['size']
-        self.__roi = self.__camera_config['roi']
-        self.__img = np.ndarray((self.__size[1], self.__size[0], 3), dtype="uint8")
-        self.__exposure = self.__camera_config['exposure']
-        self.__gain = self.__camera_config['gain']
+        self.__camera_config = config
+        self.__id = self.__camera_config.camera_id
+        self.__roi = self.__camera_config.roi
+        self.__exposure = self.__camera_config.exposure
+        self.__gain = self.__camera_config.gain
+        self.__img = None
+
         # ch:创建相机实例 | en:Creat Camera Object
         self.cam = MvCamera()
 
@@ -165,6 +161,7 @@ class Camera_HK(Camera):
                 self.init_ok = False
             self.__stDeviceList = MV_FRAME_OUT_INFO_EX()
             memset(byref(self.__stDeviceList), 0, sizeof(self.__stDeviceList))
+            self.init_ok = True
         else:
             self.init_ok = False
 
@@ -201,7 +198,7 @@ class Camera_HK(Camera):
             return False
             # return True
 
-    def get_img(self) -> (bool, np.ndarray):
+    def get_img(self) -> tuple[bool, np.ndarray]:
         if self.init_ok:
             result = self.work_thread()
             return result, self.__img
@@ -232,13 +229,16 @@ class Camera_HK(Camera):
 
 if __name__ == "__main__":
     import time
-    import sys
 
-    sys.path.append("..")
     cv.namedWindow("test", cv.WINDOW_NORMAL)
 
-    name = "cam_left"  # 唯一要改的参数
-    cam_test = Camera_HK(name)
+    cam_test_config = HikCameraDriverConfigExt(
+        roi=(0, 0, 3072, 2048),
+        camera_id="00J59583857",  # 调整为要测试的相机的 ID
+        exposure=15000,
+        gain=20,
+    )
+    cam_test = Camera_HK(cam_test_config)
     t1 = time.time()
     count_fps = 0
     count_s = 0
@@ -260,8 +260,9 @@ if __name__ == "__main__":
                 cam_test.destroy()
                 break
             if key == ord('s'):
-                cv.imwrite(f"../resources/cam_data/{name}/{count_s}.jpg", frame)
-                print(f"../resources/cam_data/{name}/{count_s}.jpg")
+                path = f"../resources/cam_data/{cam_test_config.camera_id}/{count_s}.jpg"
+                cv.imwrite(path, frame)
+                print(path)
                 count_s += 1
         else:
             break
