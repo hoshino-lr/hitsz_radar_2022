@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package rdr;
+
+import "google/protobuf/timestamp.proto";
+
+message LiDARDepthPixels {
+  google.protobuf.Timestamp timestamp = 1;
+  repeated DepthPixel pixels = 2;
+}
+
+message DepthPixel {
+  int32 x = 1;
+  int32 y = 2;
+  float z = 3;
+}
+
+message LiDARRawPoints {
+  google.protobuf.Timestamp timestamp = 1;
+  repeated RawPoint points = 2;
+}
+
+message RawPoint {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}

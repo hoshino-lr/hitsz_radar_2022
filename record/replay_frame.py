@@ -3,7 +3,8 @@ import cv2
 from config import cam_config
 import time
 from threading import Lock
-from record.protobuf.record_pb2 import Record, NpArray
+
+from proto.record.record_pb2 import Record, RecordSequence, NpArray
 
 SLEEP_TIME = 0.1
 

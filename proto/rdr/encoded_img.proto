@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package rdr;
+
+import "google/protobuf/timestamp.proto";
+//import "google/protobuf/empty.proto";
+
+
+message EncodedImg {
+  google.protobuf.Timestamp timestamp = 1;
+  bytes data = 2;
+}

@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package rdr;
+
+import "google/protobuf/timestamp.proto";
+//import "google/protobuf/empty.proto";
+
+
+message Report {
+  google.protobuf.Timestamp timestamp = 1;
+  repeated StatusStruct statuses = 2;
+}
+
+message StatusStruct {
+  Type type = 1;
+  enum Type {
+    NULL = 0;
+    CAMERA1 = 1;
+    CAMERA2 = 2;
+    LIDAR = 3;
+    PROJECTION = 4;
+    IMU = 5;
+  }
+  Status status = 2;
+  enum Status {
+    OK = 0;
+    ERROR = 1;
+  }
+  optional string optional_error_message = 3;
+}

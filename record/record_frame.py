@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 from config import resource_prefix, cam_config
 import time
-from record.protobuf.record_pb2 import Record, RecordSequence, NpArray
+from proto.record.record_pb2 import Record, RecordSequence, NpArray, NetData
 
 
 class RecordWriteManager:

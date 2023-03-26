@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package rdr;
+
+import "google/protobuf/timestamp.proto";
+//import "google/protobuf/empty.proto";
+
+
+message ImageAndArmor {
+  google.protobuf.Timestamp timestamp = 1;
+  bytes data = 2;
+  repeated CarInfo armors = 3;
+}
+
+message DetectedArmor {
+  google.protobuf.Timestamp timestamp = 1;
+  repeated CarInfo armors = 2;
+}
+
+message CarInfo {
+  Armor armor = 1;
+  Car car = 2;
+}
+
+message Armor {
+  float x = 1;
+  float y = 2;
+  float height = 3;
+  float width = 4;
+  float confidence = 5;
+  Color color = 6;
+  Type type = 7;
+  enum Type {
+    GUARD = 0;
+    N1 = 1;
+    N2 = 2;
+    N3 = 3;
+    N4 = 4;
+    N5 = 5;
+    OUTPOST = 6;
+    BASE_SMALL = 7;
+    BASE_BIG = 8;
+    NONE = 9;
+  }
+}
+
+message Car {
+  float x = 1;
+  float y = 2;
+  float height = 3;
+  float width = 4;
+  float confidence = 5;
+  Color color = 6;
+  Type type = 7;
+  enum Type {
+    CAR = 0;
+    WATCHER = 1;
+    BASE = 2;
+  }
+}
+
+enum Color {
+  BLUE = 0;
+  RED = 1;
+  N = 2;
+  P = 3;
+}

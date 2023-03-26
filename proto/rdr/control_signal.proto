@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package rdr;
+
+import "google/protobuf/timestamp.proto";
+//import "google/protobuf/empty.proto";
+
+
+message ControlSignal {
+  google.protobuf.Timestamp timestamp = 1;
+  Type type = 2;
+  enum Type {
+    SHUTDOWN = 0;
+    START_RECORDING = 1;
+  }
+}
