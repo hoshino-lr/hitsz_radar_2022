@@ -1,7 +1,0 @@
-pycuda
-PyQt5
-numpy
-tensorrt
-opencv-python-headless
-pyserial
-pyrdr

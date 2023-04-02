@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "hitsz-radar"
+version = "0.1.0"
+description = ""
+authors = ["Shiroki Satsuki <me@shirok1.dev>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pycuda = "^2022.2.2"
+pyqt5 = "^5.15.7"
+ipython = "^8.8.0"
+pyserial = "^3.5"
+numpy = "~1.24.2"
+protobuf = "^4.21.12"
+opencv-python = "^4.7.0.68"
+cython = "^0.29.33"
+poetry-dotenv-plugin = "^0.1.0"
+mypy-protobuf = "^3.4.0"
+poetry-grpc-plugin = "^0.1.5"
+loguru = "^0.6.0"
+opencv-contrib-python = "^4.7.0.72"
+mypy = "^1.1.1"
+pyzmq = "^25.0.1"
+
+
+[[tool.poetry.source]]
+name = "mirrors"
+url = "https://mirrors.bfsu.edu.cn/pypi/web/simple/"
+default = true
+secondary = false
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry-grpc-plugin]
+proto_path = "proto"
+python_out = "proto"
