@@ -4,18 +4,21 @@
 copied by: 陈希峻 2022/12/20
 """
 import bisect
-import queue
-import sys
+from typing import Optional
+
 import time
 import cv2 as cv
 import numpy as np
 import threading
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtCore import QTimer, Qt, QRect
+from PyQt5.QtCore import Qt, QRect
+from loguru import logger
 
 import config
+from abstraction.pipeline import ProcessPipeline
 from config import USEABLE, enemy_color, cam_config, enemy2color
+from service.video_service import VideoReader
 from ui.mainwindow.generated_ui import Ui_MainWindow
 from radar_detect.Linar_rs import Radar
 from radar_detect.reproject import Reproject
@@ -30,7 +33,7 @@ from ui.map.drawing import drawing, draw_message
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意Ui_MainWindow
 
-    def __init__(self, cameras: dict[dict]):
+    def __init__(self, cameras: dict[str, ProcessPipeline], record: Optional[VideoReader] = None):
         super(MainWindow, self).__init__()
         self._cameras = cameras
         self.setupUi(self)
@@ -43,8 +46,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self.item = None
         self.scene = QtWidgets.QGraphicsScene()  # 创建场景
 
-        self.__res_right = False
-        self.__res_left = False
+        self._record = record
+
+        self.__res_right = None
+        self.__res_left = None
         self.__pic_right = None
         self.__pic_left = None
 
@@ -69,11 +74,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self.text_api = lambda x: self.draw_module.update(x)
         self.lidar = Radar('cam_left', text_api=self.text_api, imgsz=cam_config['cam_left']["size"], queue_size=100)
 
-        if USEABLE['Lidar']:
-            self.lidar.start()
-        else:
-            # 读取预定的点云文件
-            self.lidar.preload()
+        # if USEABLE['Lidar']:
+        #     self.lidar.start()
+        # else:
+        #     # 读取预定的点云文件
+        #     self.lidar.preload()
+        self.lidar.preload()
 
         self.sp = SolvePnp(self.pnp_api)  # pnp解算
 
@@ -86,9 +92,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
 
         self.is_paused = False
         self.is_slider_held = False
-        self.ori_spf = self._cameras['cam_left']['camera'].get_prop('ori_spf') if self.__cam_left else 1.0
-        self.total_time = int(self._cameras['cam_left']['camera'].get_prop('total_frame') * self.ori_spf) \
-                              if self.__cam_left else 0
+        self.total_time = self._record.total_time if self._record is not None else 0.0
 
         try:
             self.sp.read(f'cam_left_{enemy2color[enemy_color]}')
@@ -127,7 +131,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self._Eco_point = [0, 0, 0, 0]
         self._Eco_cut = [700, 1300, 400, 600]
         self._num_kk = 0
-        self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1}框框")
+        self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1} 框框")
         self.PlayStatus.setText("0:00/%d:%02d" % (self.total_time // 60, self.total_time % 60))
 
     # 事件绑定
@@ -154,25 +158,47 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self.far_demo.setFocusPolicy(Qt.ClickFocus)
         self.tabWidget.currentChanged.connect(self.epnp_on_clicked)
         self.DisplayLidar.toggled.connect(self.showpc_on_clicked)
-        self.ResetSpeed.clicked.connect(self.reset_speed_on_clicked)
-        self.SpeedSlider.valueChanged.connect(lambda value: self.SpeedSpinBox.setValue(config.speed_map[value]))
-        self.CustomSpeed.toggled.connect(self.custom_speed_on_clicked)
-        self.SpeedSpinBox.valueChanged.connect(self.speed_spinbox_on_changed)
-        self.TogglePlay.clicked.connect(self.toggle_play_on_clicked)
-        self.TimeSlider.sliderPressed.connect(self.time_slider_pressed)
-        self.TimeSlider.sliderReleased.connect(self.time_slider_released)
-        self.TimeSlider.valueChanged.connect(self.time_slider_on_changed)
+        if self._record is not None:
+            logger.debug("正在播放录像")
+            self.ResetSpeed.clicked.connect(self.reset_speed_on_clicked)
+            self.SpeedSlider.valueChanged.connect(lambda value: self.SpeedSpinBox.setValue(config.speed_map[value]))
+            self.CustomSpeed.toggled.connect(self.custom_speed_on_clicked)
+            self.SpeedSpinBox.valueChanged.connect(self.speed_spinbox_on_changed)
+            self.TogglePlay.clicked.connect(self.toggle_play_on_clicked)
+            self.TimeSlider.sliderPressed.connect(self.time_slider_pressed)
+            self.TimeSlider.sliderReleased.connect(self.time_slider_released)
+            self.TimeSlider.valueChanged.connect(self.time_slider_on_changed)
+        else:
+            logger.debug("未播放录像，禁用相关功能")
+            self.ResetSpeed.setEnabled(False)
+            self.ResetSpeed.setEnabled(False)
+            self.SpeedSlider.setEnabled(False)
+            self.CustomSpeed.setEnabled(False)
+            self.SpeedSpinBox.setEnabled(False)
+            self.TogglePlay.setEnabled(False)
+            self.TimeSlider.setEnabled(False)
 
     def time_slider_pressed(self):
+        """
+        时间条被按下
+        """
         self.is_slider_held = True
 
     def time_slider_released(self):
+        """
+        时间条被释放
+        """
         self.is_slider_held = False
-        for cam in self._cameras.values():
-            cam['camera'].set_prop('frame', self.TimeSlider.value() *
-                         self._cameras['cam_left']['camera'].get_prop('total_frame') // self.TimeSlider.maximum())
+        if self._record is not None:
+            self._record.time_pos = self.TimeSlider.value() / self.TimeSlider.maximum()
+        # for cam in self._cameras.values():
+        #     cam['camera_service'].set_prop('new_data', self.TimeSlider.value() *
+        #                  self._cameras['cam_left']['camera_service'].get_prop('total_frame') // self.TimeSlider.maximum())
 
     def time_slider_on_changed(self, value):
+        """
+        时间条值变化（被拖动）
+        """
         if self.is_slider_held:
             now_time = value * self.total_time // self.TimeSlider.maximum()
             self.PlayStatus.setText("%d:%02d/%d:%02d" %
@@ -182,13 +208,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         if self.is_paused:
             self.is_paused = False
             self.TogglePlay.setText("暂停")
-            for cam in self._cameras.values():
-                cam['camera'].set_prop('is_paused', False)
         else:
             self.is_paused = True
             self.TogglePlay.setText("继续")
-            for cam in self._cameras.values():
-                cam['camera'].set_prop('is_paused', True)
+        if self._record is not None:
+            self._record.is_paused = self.is_paused
 
     def reset_speed_on_clicked(self):
         self.SpeedSpinBox.setValue(1.0)
@@ -200,8 +224,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
     def speed_spinbox_on_changed(self, value):
         if value <= 0.0:
             self.SpeedSpinBox.setValue(0.01)
-        for cam in self._cameras.values():
-            cam['camera'].set_prop('speed', value)
+        if self._record is not None:
+            self._record.speed = value
 
     def custom_speed_on_clicked(self, state):
         if state:
@@ -282,6 +306,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self.sp.clc()
         self.pnp_textBrowser.clear()
 
+        # count([])
+
     def epnp_calculate(self) -> None:
         result = self.sp.locate_pick()
         if result:
@@ -323,7 +349,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
     def eco_key_on_clicked(self, event) -> None:
         step = 20
         if event.key() == Qt.Key_P:  # 换框
-            self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1}框框")
+            self.set_board_text("INFO", "框框状态", f"{self._num_kk + 1} 框框")
             self._num_kk = abs(1 - self._num_kk)
         elif event.key() == Qt.Key_W and self._Eco_cut[2] > step:
             self._Eco_cut[2] -= step
@@ -371,18 +397,19 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
     def epnp_clear_on_clicked(self) -> None:
         self.sp.clc()
 
-    def set_image(self, frame, position="") -> bool:
+    def set_image(self, frame, position) -> bool:
         """
         Image Show Function
 
-        :param frame: the image to show
+        :param frame: The image to show
         :param position: where to show
-        :return: a flag to indicate whether the showing process have succeeded or not
+        :return: a flag to indicate whether the showing process has succeeded or not
         """
         if frame is None:
             return False
         if position not in ["main_demo", "map", "far_demo", "blood", "hero_demo", "left_demo", "right_demo"]:
-            print("[ERROR] The position isn't a member of this UI_window")
+            import inspect
+            logger.error(f"使用了错误的 position \"{position}\"，检查 {inspect.stack()[1]}")
             return False
         width = self.__dict__[position].width()
         height = self.__dict__[position].height()
@@ -446,17 +473,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
             else:
                 msg = f"<font color='#FF8033'><b>{message}</b></font>"
             self.pnp_textBrowser[position] = msg.replace('\n', "<br />")
-        text = "<br \>".join(list(self.pnp_textBrowser.values()))  # css format to replace \n
+        text = "<br />".join(list(self.pnp_textBrowser.values()))  # css format to replace \n
         self.pnp_condition.setText(text)
         return True
 
+    # TODO: 更新判断方法
     def _update_state(self) -> None:
-        text = ("左相机寄了" if isinstance(self.__res_left, bool) \
-                    else "左相机正常工作") \
-               + "\t" + ("右相机寄了" if isinstance(self.__res_right, bool) \
-                             else "右相机正常工作")
+        text = ("左相机寄了" if isinstance(self.__res_left, bool) else "左相机正常工作") \
+               + "\t" + ("右相机寄了" if isinstance(self.__res_right, bool) else "右相机正常工作")
         self.set_board_text("INFO", "相机", text)
-        text = "<br \>".join(list(self.board_textBrowser.values()))  # css format to replace \n
+        text = "<br />".join(list(self.board_textBrowser.values()))  # css format to replace \n
         self.condition.setText(text)
 
     # 更新图像
@@ -511,6 +537,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
         self.loc_alarm.two_camera_merge_update(t_loc_left, t_loc_right, self.repo_left.get_rp_alarming())
         self.loc_alarm.check()
         self.loc_alarm.show()
+        # logger.debug(self.loc_alarm.get_mode())
 
     # 更新串口
     def _update_serial(self) -> None:
@@ -541,25 +568,64 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):  # 这个地方要注意
     # 更新UI
     def _update_ui(self) -> None:
         # 更新FPS
-        self.FpsStatus.setText("网络FPS：%.2f 相机FPS：%.2f" %
-                               (self._cameras['cam_left']['process'].fps, self._cameras['cam_left']['camera'].real_fps))
+        self.FpsStatus.setText("网络FPS：%.2f\t相机FPS：%.2f\t" % (self._cameras['cam_left'].process_fps(),
+                                                                 self._cameras['cam_left'].camera_fps()))
         # 更新进度条
-        if not self.is_slider_held:
-            now_time = int(self._cameras['cam_left']['camera'].get_prop('frame') * self.ori_spf) \
-                if self.__cam_left else 0
+        if not self.is_slider_held and self._record is not None:
+            # now_time = int(self._cameras['cam_left']['camera_service'].get_prop('new_data') * self.ori_spf) \
+            # if self.__cam_left else 0
+            now_time = self._record.time_pos * self._record.total_time
             self.PlayStatus.setText("%d:%02d/%d:%02d" %
                                     (now_time // 60, now_time % 60, self.total_time // 60, self.total_time % 60))
             self.TimeSlider.setValue(int(now_time / self.total_time * self.TimeSlider.maximum()))
 
+    def _net_show(self):
+        """绘制函数"""
+        if not isinstance(self.__res_left, np.ndarray):
+            return
+        from config import net1_cls, net2_cls_names
+        color = (255, 0, 255)
+        line_thickness = 3
+        # 线条和字体的thickness
+        tl = line_thickness
+        for i in self.__res_left:
+            # 连接前res为 (N,6) ，net2_output为 (N,8)，i[11]为小车类型（对应编号）
+            if not np.isnan(i[11]):
+                # 类型（car/watcher/base）、置信度、小车编号
+                label = f'{net1_cls[int(i[5])]} {i[4]:.2f}  {net2_cls_names[int(i[11])]}'
+            else:
+                label = f'{net1_cls[int(i[5])]} {i[4]:.2f} None'
+            # Plots one bounding box on image img
+            # 再输出图像上画一个框
+            if not np.isnan(i[11]):
+                c1, c2 = (int(i[6]), int(i[7])), (int(i[8]), int(i[9]))
+                cv.rectangle(self.__pic_left, c1, c2, color, thickness=tl, lineType=cv.LINE_AA)
+            c1, c2 = (int(i[0]), int(i[1])), (int(i[2]), int(i[3]))
+            cv.rectangle(self.__pic_left, c1, c2, color, thickness=tl, lineType=cv.LINE_AA)
+
+            # 在一旁添加文字说明
+            if label:
+                tf = max(tl - 1, 1)  # font thickness
+                t_size = cv.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
+                c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
+                cv.rectangle(self.__pic_left, c1, c2, color, -1, cv.LINE_AA)  # filled
+                cv.putText(self.__pic_left, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf,
+                           lineType=cv.LINE_AA)
 
     # 主函数循环
     def spin(self) -> None:
         # get images
         if self.__cam_left:
-            self.__res_left, self.__pic_left = self._cameras['cam_left']['process'].sub()
+            self.__pic_left = self._cameras['cam_left'].camera_provider(timeout=1)
+            res_left = self._cameras['cam_left'].detection_provider()
+            if isinstance(res_left, np.ndarray) and res_left.shape != 0:
+                self.__res_left = res_left
         if self.__cam_right:
-            self.__res_right, self.__pic_right = self._cameras['cam_left']['process'].sub()
+            self.__pic_left = self._cameras['cam_right'].camera_provider()
+            self.__res_left = self._cameras['cam_right'].detection_provider()
+            # self.__res_right, self.__pic_right = self._cameras['cam_left']['process'].sub()
 
+        self._net_show()
         # if in epnp_mode , just show the images
         if not self.epnp_mode:
             if self.show_pc_state:
