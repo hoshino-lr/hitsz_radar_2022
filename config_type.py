@@ -6,12 +6,17 @@ from dataclasses import dataclass
 import numpy as np
 
 
+class RdrReceive:
+    """表示从 pyrdr 接收网络数据"""
+    pass
+
+
 @dataclass
 class CameraConfig:
     """相机的通用设置"""
     enable: bool
     """是否启用"""
-    net_process: bool | str
+    net_process: bool | str | RdrReceive
     """是否启用网络处理，如果是字符串则直接回放预先推理的模型输出"""
     k_0: np.matrix
     """内参"""
@@ -49,3 +54,9 @@ class VideoConfig(CameraConfig):
     """视频假相机的设置"""
     path: str
     """视频路径"""
+
+
+@dataclass
+class RdrConfig(CameraConfig):
+    """pyrdr传入相机"""
+    endpoint: str
