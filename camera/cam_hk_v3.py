@@ -7,11 +7,10 @@ created by 李龙 2021/11
 import cv2 as cv
 import numpy as np
 from camera.MvImport.MvCameraControl_class import *
-from camera.cam import Camera
 from config_type import HikCameraDriverConfigExt
 
 
-class Camera_HK(Camera):
+class Camera_HK:
     """
     海康机器人相机类。
     通过加载 Hikrobot MVS 提供的动态库来实现，
